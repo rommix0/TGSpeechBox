@@ -495,8 +495,9 @@ settings:
         afterFlags: [nasal]
         action: scale
         fieldScales:
-          pa5: 0.70
-          pa6: 0.55
+          pa5: 0.50
+          pa6: 0.35
+          fricationAmplitude: 0.70
 
       # ── Diphthong offglide sharpening ──────────────────────────────
       # When /ɪ/ is the second element of a tied diphthong (FACE /eɪ/,
