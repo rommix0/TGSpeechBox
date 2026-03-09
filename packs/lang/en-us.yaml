@@ -485,6 +485,19 @@ settings:
           pa5: 0.50
           pa6: 0.40
 
+    # ── Post-nasal /d/ burst softening ──────────────────────────────
+    # /nd/ clusters ("calendar", "understand") sound affricated on small
+    # speakers because nasal release adds frication energy that combines
+    # with the stop burst.  Roll off upper burst components so /d/ stays
+    # clean without touching /d/ in other positions ("afraid", "day").
+      - name: post_nasal_d_soften
+        phonemes: ["d"]
+        afterFlags: [nasal]
+        action: scale
+        fieldScales:
+          pa5: 0.70
+          pa6: 0.55
+
       # ── Diphthong offglide sharpening ──────────────────────────────
       # When /ɪ/ is the second element of a tied diphthong (FACE /eɪ/,
       # PRICE /aɪ/, CHOICE /ɔɪ/), push formants toward /i/ territory
