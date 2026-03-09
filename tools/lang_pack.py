@@ -84,6 +84,22 @@ class PhonemeDef:
     end_pf1: float = float('nan')
     end_pf2: float = float('nan')
     end_pf3: float = float('nan')
+    has_fric_attack_ms: bool = False
+    fric_attack_ms: float = 3.0
+    has_fric_decay_ms: bool = False
+    fric_decay_ms: float = 4.0
+    has_burst_spectral_tilt: bool = False
+    burst_spectral_tilt: float = 0.0
+    has_burst_duration_ms: bool = False
+    burst_duration_ms: float = 5.0
+    has_burst_decay_rate: bool = False
+    burst_decay_rate: float = 0.6
+    has_voice_bar_amplitude: bool = False
+    voice_bar_amplitude: float = 0.3
+    has_voice_bar_f1: bool = False
+    voice_bar_f1: float = 150.0
+    has_release_spread_ms: bool = False
+    release_spread_ms: float = 4.0
 
     @property
     def is_vowel(self) -> bool: return bool(self.flags & PHONEME_FLAGS["_isVowel"])
