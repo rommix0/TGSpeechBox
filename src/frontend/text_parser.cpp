@@ -1413,7 +1413,33 @@ std::string prepareTextForEspeak(
     result = insertDateOrdinals(result);
   }
 
-  // 3. Year splitting ("1995" → "19 95").
+  // 3. Expand uppercase "AM" → "A. M." so eSpeak spells it as letter names
+  //    ("ay em") instead of the word "am".  Dots trigger eSpeak's abbreviation
+  //    mode.  Applies to all-caps only ("AM", not "am"/"Am").
+  //    "PM" already comes out as "P M" from eSpeak, so no fix needed there.
+  if (langTag.size() >= 2 && (langTag[0] == 'e' || langTag[0] == 'E') &&
+      (langTag[1] == 'n' || langTag[1] == 'N') &&
+      (langTag.size() == 2 || langTag[2] == '-' || langTag[2] == '_')) {
+    std::string expanded;
+    expanded.reserve(result.size() + 8);
+    for (size_t i = 0; i < result.size(); ) {
+      if (result[i] == 'A' && i + 1 < result.size() && result[i + 1] == 'M') {
+        // Check it's a whole word: not preceded/followed by a letter.
+        bool prevOk = (i == 0 || !std::isalpha(static_cast<unsigned char>(result[i - 1])));
+        bool nextOk = (i + 2 >= result.size() || !std::isalpha(static_cast<unsigned char>(result[i + 2])));
+        if (prevOk && nextOk) {
+          expanded += "A. M.";
+          i += 2;
+          continue;
+        }
+      }
+      expanded += result[i];
+      ++i;
+    }
+    result = std::move(expanded);
+  }
+
+  // 4. Year splitting ("1995" → "19 95").
   if (yearSplitting) {
     result = splitYears(result, ohDigit);
   }
