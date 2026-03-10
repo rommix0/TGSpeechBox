@@ -846,6 +846,7 @@ phonemes:
     # Burst: diffuse-rising spectrum (Blumstein & Stevens 1979).
     # Front-cavity resonance ~4000 Hz → pa4/pa5 dominant.
     # F2 locus ~1700 Hz (Delattre et al. 1955, Sussman et al. 1993).
+    # pa5/pa6 rolled off to reduce affricate quality on small speakers.
     _isLiquid: false
     _isNasal: false
     _isStop: true
@@ -1861,8 +1862,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 540
-    cf2: 1000
+    cf1: 440
+    cf2: 860
     cf3: 2300
     cf4: 3300
     cf5: 3750
@@ -1906,8 +1907,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 500
-    cf2: 1000
+    cf1: 440
+    cf2: 860
     cf3: 2300
     cf4: 3300
     cf5: 3750
@@ -4225,8 +4226,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 450
-    cf2: 870
+    cf1: 420
+    cf2: 840
     cf3: 2400
     cf4: 3300
     cf5: 3750
@@ -8119,8 +8120,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 625
-    cf2: 1060
+    cf1: 590
+    cf2: 1020
     cf3: 2380
     cf4: 3300
     cf5: 3750

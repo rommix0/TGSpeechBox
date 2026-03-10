@@ -499,6 +499,18 @@ settings:
           pa6: 0.35
           fricationAmplitude: 0.70
 
+    # ── Pre-rhotic THOUGHT vowel closing ──────────────────────────────
+    # American FORCE vowel (forty, four, more) is more closed "oh" than
+    # THOUGHT (dog, all, dialog).  Both map to ᴐ after en-us rules.
+    # Close the vowel before /ɹ/ to get the FORCE quality right.
+      - name: thought_pre_rhotic_close
+        phonemes: ["ᴐ", "ᴐː"]
+        beforePhonemes: ["ɹ"]
+        action: set
+        fieldValues:
+          cf1: 500
+          cf2: 920
+
       # ── Diphthong offglide sharpening ──────────────────────────────
       # When /ɪ/ is the second element of a tied diphthong (FACE /eɪ/,
       # PRICE /aɪ/, CHOICE /ɔɪ/), push formants toward /i/ territory
