@@ -325,32 +325,26 @@ class TgsbEngine: ObservableObject {
         guard let eng = engine else { return }
         editorLangTag = langTag
 
-        // Temporarily switch language to read its settings
-        let curLang = selectedLanguage
-        tgsb_set_language(eng, langTag, langTag)
-
-        guard let ptr = tgsb_get_pack_settings(eng) else {
-            tgsb_set_language(eng, curLang.espeakTag, curLang.tgsbTag)
-            applyStoredOverrides(curLang.tgsbTag)
-            return
-        }
-        let raw = String(cString: ptr)
+        // Query settings directly by langTag — no temp language switch needed.
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_SETTINGS, langTag, 0, 0) else { return }
+        let jsonStr = String(cString: ptr)
         tgsb_free_string(ptr)
 
         let overrides = loadOverrides(langTag)
-        if !overrides.isEmpty {
-            let yaml = overrides.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
-            _ = tgsb_apply_setting_overrides(eng, yaml)
-        }
+
+        guard let data = jsonStr.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return }
 
         var settings: [PackSetting] = []
-        for line in raw.split(separator: "\n") {
-            guard let tabIdx = line.firstIndex(of: "\t") else { continue }
-            let key = String(line[line.startIndex..<tabIdx])
+        for obj in arr {
+            guard let key = obj["key"] as? String else { continue }
             if Self.hiddenKeys.contains(key) { continue }
-            let baseValue = String(line[line.index(after: tabIdx)...])
+            let baseValue = "\(obj["value"] ?? "")"
             let effectiveValue = overrides[key] ?? baseValue
-            let type = detectType(effectiveValue)
+            let jsonType = obj["type"] as? String ?? "string"
+            let type: SettingType = jsonType == "bool" ? .bool_ :
+                                    jsonType == "float" ? .number : .text
             settings.append(PackSetting(
                 id: key, key: key,
                 displayName: camelToDisplay(key),
@@ -360,9 +354,12 @@ class TgsbEngine: ObservableObject {
         }
         editorSettings = settings
 
-        // Restore
-        tgsb_set_language(eng, curLang.espeakTag, curLang.tgsbTag)
-        applyStoredOverrides(curLang.tgsbTag)
+        // Apply overrides to the active language if it matches.
+        if !overrides.isEmpty {
+            for (k, v) in overrides {
+                tgsb_set_data(eng, TGSB_DATA_SETTINGS, langTag, k, v)
+            }
+        }
     }
 
     func setEditorOverride(langTag: String, key: String, value: String) {
@@ -410,14 +407,16 @@ class TgsbEngine: ObservableObject {
 
     private func getBaseValues(_ langTag: String) -> [String: String] {
         guard let eng = engine else { return [:] }
-        tgsb_set_language(eng, langTag, langTag)
-        guard let ptr = tgsb_get_pack_settings(eng) else { return [:] }
-        let raw = String(cString: ptr)
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_SETTINGS, langTag, 0, 0) else { return [:] }
+        let jsonStr = String(cString: ptr)
         tgsb_free_string(ptr)
+        guard let data = jsonStr.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return [:] }
         var map: [String: String] = [:]
-        for line in raw.split(separator: "\n") {
-            guard let tabIdx = line.firstIndex(of: "\t") else { continue }
-            map[String(line[line.startIndex..<tabIdx])] = String(line[line.index(after: tabIdx)...])
+        for obj in arr {
+            guard let key = obj["key"] as? String else { continue }
+            map[key] = "\(obj["value"] ?? "")"
         }
         return map
     }

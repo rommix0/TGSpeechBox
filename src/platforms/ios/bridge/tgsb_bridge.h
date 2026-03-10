@@ -105,12 +105,6 @@ char *tgsb_get_voice_profile_names(TgsbEngine *engine);
 /* --- Pack settings editor --- */
 
 /*
- * Get all effective pack settings as "key\tvalue\n" pairs.
- * Caller must free() the returned string.
- */
-char *tgsb_get_pack_settings(TgsbEngine *engine);
-
-/*
  * Apply setting overrides from a YAML snippet ("key: value\n...").
  * Returns 1 on success, 0 on failure.
  */
@@ -122,8 +116,27 @@ int tgsb_apply_setting_overrides(TgsbEngine *engine, const char *yamlSnippet);
  */
 char *tgsb_get_available_languages(TgsbEngine *engine);
 
-/* Free a string returned by tgsb_get_pack_settings or tgsb_get_available_languages. */
+/* Free a string returned by tgsb_query_data or tgsb_get_available_languages. */
 void tgsb_free_string(char *str);
+
+/* --- Generic Data Query API (ABI v5+) --- */
+
+/* Domain constants (match NVSP_DATA_* in nvspFrontend.h). */
+#define TGSB_DATA_SETTINGS   0
+#define TGSB_DATA_PHONEMES   1
+#define TGSB_DATA_DICTIONARY 2
+
+/* Count records in a domain for a language. Returns -1 on error. */
+int tgsb_get_data_count(TgsbEngine *engine, int domain, const char *langTag);
+
+/* Query a page of typed records as a JSON array string.
+   Caller must free with tgsb_free_string(). Returns NULL on error. */
+char *tgsb_query_data(TgsbEngine *engine, int domain, const char *langTag,
+                      int offset, int limit);
+
+/* Set a single value in a domain. Returns 1 on success, 0 on failure. */
+int tgsb_set_data(TgsbEngine *engine, int domain, const char *langTag,
+                  const char *key, const char *value);
 
 #ifdef __cplusplus
 }

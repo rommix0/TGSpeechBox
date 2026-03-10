@@ -968,22 +968,6 @@ Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeSetPauseMode(
 /* Pack settings editor API                                           */
 /* ------------------------------------------------------------------ */
 
-JNIEXPORT jstring JNICALL
-Java_com_tgspeechbox_tts_TgsbTtsService_nativeGetPackSettings(
-    JNIEnv *env, jobject thiz, jlong handle
-) {
-    (void)thiz;
-    TgsbEngine *engine = (TgsbEngine *)(intptr_t)handle;
-    if (!engine || !engine->frontend) return NULL;
-
-    char *settings = nvspFrontend_getPackSettings(engine->frontend);
-    if (!settings) return NULL;
-
-    jstring result = env->NewStringUTF(settings);
-    nvspFrontend_freeString(settings);
-    return result;
-}
-
 JNIEXPORT jint JNICALL
 Java_com_tgspeechbox_tts_TgsbTtsService_nativeApplySettingOverrides(
     JNIEnv *env, jobject thiz, jlong handle, jstring yamlSnippet
@@ -1018,13 +1002,6 @@ Java_com_tgspeechbox_tts_TgsbTtsService_nativeGetAvailableLanguages(
 
 /* SpeakEngine delegates */
 
-JNIEXPORT jstring JNICALL
-Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeGetPackSettings(
-    JNIEnv *env, jobject thiz, jlong handle
-) {
-    return Java_com_tgspeechbox_tts_TgsbTtsService_nativeGetPackSettings(
-        env, thiz, handle);
-}
 
 JNIEXPORT jint JNICALL
 Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeApplySettingOverrides(
@@ -1040,6 +1017,103 @@ Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeGetAvailableLanguages(
 ) {
     return Java_com_tgspeechbox_tts_TgsbTtsService_nativeGetAvailableLanguages(
         env, thiz, handle);
+}
+
+/* ------------------------------------------------------------------ */
+/* Generic Data Query API (ABI v5+)                                   */
+/* ------------------------------------------------------------------ */
+
+JNIEXPORT jint JNICALL
+Java_com_tgspeechbox_tts_TgsbTtsService_nativeGetDataCount(
+    JNIEnv *env, jobject thiz, jlong handle, jint domain, jstring langTag
+) {
+    (void)thiz;
+    TgsbEngine *engine = (TgsbEngine *)(intptr_t)handle;
+    if (!engine || !engine->frontend || !langTag) return -1;
+
+    const char *tag = env->GetStringUTFChars(langTag, NULL);
+    if (!tag) return -1;
+
+    int count = nvspFrontend_getDataCount(engine->frontend, (int)domain, tag);
+    env->ReleaseStringUTFChars(langTag, tag);
+    return (jint)count;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_tgspeechbox_tts_TgsbTtsService_nativeQueryData(
+    JNIEnv *env, jobject thiz, jlong handle,
+    jint domain, jstring langTag, jint offset, jint limit
+) {
+    (void)thiz;
+    TgsbEngine *engine = (TgsbEngine *)(intptr_t)handle;
+    if (!engine || !engine->frontend || !langTag) return NULL;
+
+    const char *tag = env->GetStringUTFChars(langTag, NULL);
+    if (!tag) return NULL;
+
+    char *json = nvspFrontend_queryData(engine->frontend, (int)domain, tag,
+                                        (int)offset, (int)limit);
+    env->ReleaseStringUTFChars(langTag, tag);
+    if (!json) return NULL;
+
+    jstring result = env->NewStringUTF(json);
+    nvspFrontend_freeString(json);
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_tgspeechbox_tts_TgsbTtsService_nativeSetData(
+    JNIEnv *env, jobject thiz, jlong handle,
+    jint domain, jstring langTag, jstring key, jstring value
+) {
+    (void)thiz;
+    TgsbEngine *engine = (TgsbEngine *)(intptr_t)handle;
+    if (!engine || !engine->frontend || !langTag || !key) return 0;
+
+    const char *tag = env->GetStringUTFChars(langTag, NULL);
+    const char *k = env->GetStringUTFChars(key, NULL);
+    const char *v = value ? env->GetStringUTFChars(value, NULL) : "";
+    if (!tag || !k) {
+        if (tag) env->ReleaseStringUTFChars(langTag, tag);
+        if (k) env->ReleaseStringUTFChars(key, k);
+        if (value && v) env->ReleaseStringUTFChars(value, v);
+        return 0;
+    }
+
+    int ok = nvspFrontend_setData(engine->frontend, (int)domain, tag, k, v);
+
+    env->ReleaseStringUTFChars(langTag, tag);
+    env->ReleaseStringUTFChars(key, k);
+    if (value && v) env->ReleaseStringUTFChars(value, v);
+    return (jint)ok;
+}
+
+/* SpeakEngine delegates for data query API */
+
+JNIEXPORT jint JNICALL
+Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeGetDataCount(
+    JNIEnv *env, jobject thiz, jlong handle, jint domain, jstring langTag
+) {
+    return Java_com_tgspeechbox_tts_TgsbTtsService_nativeGetDataCount(
+        env, thiz, handle, domain, langTag);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeQueryData(
+    JNIEnv *env, jobject thiz, jlong handle,
+    jint domain, jstring langTag, jint offset, jint limit
+) {
+    return Java_com_tgspeechbox_tts_TgsbTtsService_nativeQueryData(
+        env, thiz, handle, domain, langTag, offset, limit);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeSetData(
+    JNIEnv *env, jobject thiz, jlong handle,
+    jint domain, jstring langTag, jstring key, jstring value
+) {
+    return Java_com_tgspeechbox_tts_TgsbTtsService_nativeSetData(
+        env, thiz, handle, domain, langTag, key, value);
 }
 
 } /* extern "C" */

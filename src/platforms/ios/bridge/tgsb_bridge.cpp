@@ -621,12 +621,6 @@ void tgsb_set_sample_rate(TgsbEngine *engine, int sampleRate)
 /* Pack settings editor API                                           */
 /* ------------------------------------------------------------------ */
 
-char *tgsb_get_pack_settings(TgsbEngine *engine)
-{
-    if (!engine || !engine->frontend) return NULL;
-    return nvspFrontend_getPackSettings(engine->frontend);
-}
-
 int tgsb_apply_setting_overrides(TgsbEngine *engine, const char *yamlSnippet)
 {
     if (!engine || !engine->frontend || !yamlSnippet) return 0;
@@ -642,6 +636,30 @@ char *tgsb_get_available_languages(TgsbEngine *engine)
 void tgsb_free_string(char *str)
 {
     nvspFrontend_freeString(str);
+}
+
+/* ------------------------------------------------------------------ */
+/* Generic Data Query API (ABI v5+)                                   */
+/* ------------------------------------------------------------------ */
+
+int tgsb_get_data_count(TgsbEngine *engine, int domain, const char *langTag)
+{
+    if (!engine || !engine->frontend || !langTag) return -1;
+    return nvspFrontend_getDataCount(engine->frontend, domain, langTag);
+}
+
+char *tgsb_query_data(TgsbEngine *engine, int domain, const char *langTag,
+                      int offset, int limit)
+{
+    if (!engine || !engine->frontend || !langTag) return NULL;
+    return nvspFrontend_queryData(engine->frontend, domain, langTag, offset, limit);
+}
+
+int tgsb_set_data(TgsbEngine *engine, int domain, const char *langTag,
+                  const char *key, const char *value)
+{
+    if (!engine || !engine->frontend || !langTag || !key) return 0;
+    return nvspFrontend_setData(engine->frontend, domain, langTag, key, value);
 }
 
 } /* extern "C" */

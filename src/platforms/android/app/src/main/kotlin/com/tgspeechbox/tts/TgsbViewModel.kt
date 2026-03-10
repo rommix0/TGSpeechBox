@@ -562,32 +562,28 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadEditorSettings(langTag: String) {
         editorLangTag = langTag
-        // Temporarily set language to read its settings, then restore.
-        val curLang = languages.getOrNull(selectedLanguageIndex.value)
-        engine.setLanguage(langTag, langTag)
 
-        val raw = engine.getPackSettings() ?: ""
+        // Query settings directly by langTag — no temp language switch needed.
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_SETTINGS, langTag) ?: return
         val overrides = loadOverrides(langTag)
-
-        // Re-apply overrides so the engine reflects them.
-        if (overrides.isNotEmpty()) {
-            val yaml = overrides.entries.joinToString("\n") { "${it.key}: ${it.value}" }
-            engine.applySettingOverrides(yaml)
-        }
 
         // Settings managed by Engine Settings sliders — hide from editor.
         val hiddenKeys = setOf("legacyPitchMode", "legacyPitchInflectionScale")
 
         val settings = mutableListOf<PackSetting>()
-        for (line in raw.lines()) {
-            if (line.isBlank()) continue
-            val tab = line.indexOf('\t')
-            if (tab < 0) continue
-            val key = line.substring(0, tab)
+        val arr = org.json.JSONArray(jsonStr)
+        for (i in 0 until arr.length()) {
+            val obj = arr.getJSONObject(i)
+            val key = obj.getString("key")
             if (key in hiddenKeys) continue
-            val baseValue = line.substring(tab + 1)
+            val baseValue = obj.get("value").toString()
             val effectiveValue = overrides[key] ?: baseValue
-            val type = detectType(effectiveValue)
+            val jsonType = obj.getString("type")
+            val type = when (jsonType) {
+                "bool" -> SettingType.Bool
+                "float" -> SettingType.Number
+                else -> SettingType.Text
+            }
             settings.add(PackSetting(
                 key = key,
                 displayName = camelToDisplay(key),
@@ -598,10 +594,11 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         }
         editorSettings.value = settings
 
-        // Restore the original language.
-        if (curLang != null) {
-            engine.setLanguage(curLang.langDef.espeakLang, curLang.langDef.tgsbLang)
-            applyStoredOverrides(curLang.langDef.tgsbLang)
+        // Apply overrides to the active language if it matches.
+        if (overrides.isNotEmpty()) {
+            for ((k, v) in overrides) {
+                engine.setData(TgsbSpeakEngine.DATA_SETTINGS, langTag, k, v)
+            }
         }
     }
 
@@ -621,13 +618,12 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Read base pack values (no overrides) for comparison. */
     private fun getBaseValues(langTag: String): Map<String, String> {
-        engine.setLanguage(langTag, langTag)
-        val raw = engine.getPackSettings() ?: return emptyMap()
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_SETTINGS, langTag) ?: return emptyMap()
         val map = mutableMapOf<String, String>()
-        for (line in raw.lines()) {
-            val tab = line.indexOf('\t')
-            if (tab < 0) continue
-            map[line.substring(0, tab)] = line.substring(tab + 1)
+        val arr = org.json.JSONArray(jsonStr)
+        for (i in 0 until arr.length()) {
+            val obj = arr.getJSONObject(i)
+            map[obj.getString("key")] = obj.get("value").toString()
         }
         return map
     }

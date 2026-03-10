@@ -34,6 +34,7 @@ SPEECHPLAYER_SRCS = \
 
 # libtgsbFrontend.so sources (IPA -> Frames)
 FRONTEND_SRCS = \
+	$(FRONTENDDIR)/data_query.cpp \
 	$(FRONTENDDIR)/frame_emit.cpp \
 	$(FRONTENDDIR)/ipa_engine.cpp \
 	$(FRONTENDDIR)/nvspFrontend.cpp \
@@ -139,6 +140,9 @@ $(BUILDDIR)/speechWaveGenerator.o: $(SRCDIR)/speechWaveGenerator.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
 # Frontend sources
+$(BUILDDIR)/data_query.o: $(FRONTENDDIR)/data_query.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
+
 $(BUILDDIR)/frame_emit.o: $(FRONTENDDIR)/frame_emit.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 

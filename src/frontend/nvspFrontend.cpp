@@ -17,6 +17,7 @@ Licensed under the MIT License. See LICENSE for details.
 #include <string>
 #include <vector>
 
+#include "data_query.h"
 #include "ipa_engine.h"
 #include "pack.h"
 #include "text_parser.h"
@@ -62,6 +63,9 @@ struct Handle {
   std::string pendingPitchMode;
   double pendingInflectionScale = 0.0;
   bool hasPendingInflectionScale = false;
+
+  // Generic data query cache (ABI v5+).
+  tgsb_data::DataCache dataCache;
 };
 
 static Handle* asHandle(nvspFrontend_handle_t h) {
@@ -159,6 +163,10 @@ NVSP_FRONTEND_API int nvspFrontend_setLanguage(nvspFrontend_handle_t handle, con
   h->streamHasSpeech = false;
   h->lastEndsVowelLike = false;
   h->langTag = normalizeLangTag(lang);
+
+  // Invalidate the data query cache — new language means new settings.
+  h->dataCache.invalidate();
+
   return 1;
 }
 
@@ -987,23 +995,6 @@ NVSP_FRONTEND_API void nvspFrontend_freeString(char* str) {
   std::free(str);
 }
 
-NVSP_FRONTEND_API char* nvspFrontend_getPackSettings(nvspFrontend_handle_t handle) {
-  using namespace nvsp_frontend;
-  Handle* h = asHandle(handle);
-  if (!h) return nullptr;
-
-  std::lock_guard<std::mutex> lock(h->mu);
-  if (!h->packLoaded) return nullptr;
-
-  std::string result = getEffectiveSettings(h->packDir, h->langTag);
-  if (result.empty()) return nullptr;
-
-  char* out = static_cast<char*>(std::malloc(result.size() + 1));
-  if (!out) return nullptr;
-  std::memcpy(out, result.c_str(), result.size() + 1);
-  return out;
-}
-
 NVSP_FRONTEND_API int nvspFrontend_applySettingOverrides(
   nvspFrontend_handle_t handle,
   const char* yamlSnippetUtf8
@@ -1015,7 +1006,9 @@ NVSP_FRONTEND_API int nvspFrontend_applySettingOverrides(
   std::lock_guard<std::mutex> lock(h->mu);
   if (!h->packLoaded) return 0;
 
-  return applySettingOverrides(h->pack.lang, std::string(yamlSnippetUtf8)) ? 1 : 0;
+  bool ok = applySettingOverrides(h->pack.lang, std::string(yamlSnippetUtf8));
+  if (ok) h->dataCache.invalidate();  // Old API changed settings — stale cache.
+  return ok ? 1 : 0;
 }
 
 NVSP_FRONTEND_API char* nvspFrontend_getAvailableLanguages(nvspFrontend_handle_t handle) {
@@ -1038,6 +1031,104 @@ NVSP_FRONTEND_API char* nvspFrontend_getAvailableLanguages(nvspFrontend_handle_t
   if (!out) return nullptr;
   std::memcpy(out, result.c_str(), result.size() + 1);
   return out;
+}
+
+// ── Generic Data Query API (ABI v5+) ──────────────────────────────
+
+NVSP_FRONTEND_API int nvspFrontend_getDataCount(
+  nvspFrontend_handle_t handle,
+  int domain,
+  const char* langTagUtf8
+) {
+  using namespace nvsp_frontend;
+  Handle* h = asHandle(handle);
+  if (!h || !langTagUtf8 || !langTagUtf8[0]) return -1;
+
+  std::lock_guard<std::mutex> lock(h->mu);
+
+  if (domain == NVSP_DATA_SETTINGS) {
+    const std::string lang(langTagUtf8);
+    // Ensure cache is built for this language.
+    if (!h->dataCache.settingsValid || h->dataCache.langTag != lang) {
+      tgsb_data::buildSettingsCache(h->dataCache, h->packDir, lang);
+    }
+    return static_cast<int>(h->dataCache.settings.size());
+  }
+
+  // Unsupported domain.
+  return -1;
+}
+
+NVSP_FRONTEND_API char* nvspFrontend_queryData(
+  nvspFrontend_handle_t handle,
+  int domain,
+  const char* langTagUtf8,
+  int offset,
+  int limit
+) {
+  using namespace nvsp_frontend;
+  Handle* h = asHandle(handle);
+  if (!h || !langTagUtf8 || !langTagUtf8[0]) return nullptr;
+
+  std::lock_guard<std::mutex> lock(h->mu);
+
+  if (domain == NVSP_DATA_SETTINGS) {
+    const std::string lang(langTagUtf8);
+    // Ensure cache is built for this language.
+    if (!h->dataCache.settingsValid || h->dataCache.langTag != lang) {
+      tgsb_data::buildSettingsCache(h->dataCache, h->packDir, lang);
+    }
+
+    std::string json = tgsb_data::serializeSettingsJson(h->dataCache, offset, limit);
+    if (json.empty()) return nullptr;
+
+    char* out = static_cast<char*>(std::malloc(json.size() + 1));
+    if (!out) return nullptr;
+    std::memcpy(out, json.c_str(), json.size() + 1);
+    return out;
+  }
+
+  // Unsupported domain.
+  return nullptr;
+}
+
+NVSP_FRONTEND_API int nvspFrontend_setData(
+  nvspFrontend_handle_t handle,
+  int domain,
+  const char* langTagUtf8,
+  const char* keyUtf8,
+  const char* valueUtf8
+) {
+  using namespace nvsp_frontend;
+  Handle* h = asHandle(handle);
+  if (!h || !langTagUtf8 || !langTagUtf8[0] || !keyUtf8 || !keyUtf8[0]) return 0;
+  if (!valueUtf8) valueUtf8 = "";
+
+  std::lock_guard<std::mutex> lock(h->mu);
+
+  if (domain == NVSP_DATA_SETTINGS) {
+    const std::string lang(langTagUtf8);
+    const std::string key(keyUtf8);
+    const std::string value(valueUtf8);
+
+    // Build a YAML snippet "key: value\n" and apply via existing path.
+    // Only effective if langTag matches the currently loaded language.
+    if (h->packLoaded && h->langTag == lang) {
+      std::string snippet = key + ": " + value + "\n";
+      if (!applySettingOverrides(h->pack.lang, snippet)) {
+        setError(h, "Failed to apply setting override");
+        return 0;
+      }
+    }
+
+    // Invalidate the cache so the next queryData reads fresh base values.
+    h->dataCache.invalidate();
+
+    return 1;
+  }
+
+  // Unsupported domain.
+  return 0;
 }
 
 } // extern "C"

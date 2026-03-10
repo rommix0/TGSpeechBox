@@ -28,6 +28,9 @@ class TgsbSpeakEngine(private val context: Context) {
     companion object {
         private const val TAG = "TgsbSpeak"
         private const val DEFAULT_SAMPLE_RATE = 22050
+        const val DATA_SETTINGS = 0
+        const val DATA_PHONEMES = 1
+        const val DATA_DICTIONARY = 2
 
         init {
             System.loadLibrary("tgspeechbox_jni")
@@ -97,9 +100,11 @@ class TgsbSpeakEngine(private val context: Context) {
     private external fun nativeSetVolume(handle: Long, value: Double)
     private external fun nativeSetSampleRate(handle: Long, sampleRate: Int)
     private external fun nativeSetPauseMode(handle: Long, mode: Int)
-    private external fun nativeGetPackSettings(handle: Long): String?
     private external fun nativeApplySettingOverrides(handle: Long, yamlSnippet: String): Int
     private external fun nativeGetAvailableLanguages(handle: Long): String?
+    private external fun nativeGetDataCount(handle: Long, domain: Int, langTag: String): Int
+    private external fun nativeQueryData(handle: Long, domain: Int, langTag: String, offset: Int, limit: Int): String?
+    private external fun nativeSetData(handle: Long, domain: Int, langTag: String, key: String, value: String): Int
 
     // ── Lifecycle ────────────────────────────────────────────────────
 
@@ -270,11 +275,6 @@ class TgsbSpeakEngine(private val context: Context) {
 
     // ── Pack settings editor ────────────────────────────────────────
 
-    fun getPackSettings(): String? {
-        if (nativeHandle == 0L) return null
-        return nativeGetPackSettings(nativeHandle)
-    }
-
     fun applySettingOverrides(yamlSnippet: String): Boolean {
         if (nativeHandle == 0L) return false
         return nativeApplySettingOverrides(nativeHandle, yamlSnippet) != 0
@@ -284,6 +284,23 @@ class TgsbSpeakEngine(private val context: Context) {
         if (nativeHandle == 0L) return emptyList()
         val raw = nativeGetAvailableLanguages(nativeHandle) ?: return emptyList()
         return raw.trim().split('\n').filter { it.isNotEmpty() }
+    }
+
+    // ── Generic Data Query API (ABI v5+) ────────────────────────────
+
+    fun getDataCount(domain: Int, langTag: String): Int {
+        if (nativeHandle == 0L) return -1
+        return nativeGetDataCount(nativeHandle, domain, langTag)
+    }
+
+    fun queryData(domain: Int, langTag: String, offset: Int = 0, limit: Int = 0): String? {
+        if (nativeHandle == 0L) return null
+        return nativeQueryData(nativeHandle, domain, langTag, offset, limit)
+    }
+
+    fun setData(domain: Int, langTag: String, key: String, value: String): Boolean {
+        if (nativeHandle == 0L) return false
+        return nativeSetData(nativeHandle, domain, langTag, key, value) != 0
     }
 
     fun stop() {
@@ -364,7 +381,7 @@ class TgsbSpeakEngine(private val context: Context) {
     // ── Asset extraction (same logic as TgsbTtsService) ─────────────
 
     private fun extractAssets() {
-        val assetVersion = 6
+        val assetVersion = 8
         val marker = File(context.filesDir, ".assets_v$assetVersion")
         if (marker.exists()) return
 

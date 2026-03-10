@@ -23,7 +23,7 @@ extern "C" {
   #define NVSP_FRONTEND_API
 #endif
 
-#define NVSP_FRONTEND_ABI_VERSION 4
+#define NVSP_FRONTEND_ABI_VERSION 5
 
 typedef void* nvspFrontend_handle_t;
 
@@ -513,14 +513,6 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
 NVSP_FRONTEND_API void nvspFrontend_freeString(char* str);
 
 /*
-  Get effective scalar settings for the current language as "key\tvalue\n" lines.
-  Reads the YAML file chain and flattens nested keys with dot notation.
-  Returns NULL if no language is loaded.
-  Caller must free with nvspFrontend_freeString().
-*/
-NVSP_FRONTEND_API char* nvspFrontend_getPackSettings(nvspFrontend_handle_t handle);
-
-/*
   Apply setting overrides on top of the currently loaded language pack.
   yamlSnippetUtf8 is a mini YAML snippet containing "key: value" lines.
   Dot-notation keys (e.g. "boundarySmoothing.enabled: true") are supported.
@@ -536,6 +528,91 @@ NVSP_FRONTEND_API int nvspFrontend_applySettingOverrides(
   Returns a malloc'd "langTag\n" string. Caller must free with nvspFrontend_freeString().
 */
 NVSP_FRONTEND_API char* nvspFrontend_getAvailableLanguages(nvspFrontend_handle_t handle);
+
+/* ============================================================================
+ * Generic Data Query API (ABI v5+)
+ * ============================================================================
+ *
+ * Paginated, typed access to pack settings (and future phoneme / dictionary
+ * data) without re-reading YAML from disk on every call.
+ *
+ * Key improvement over getPackSettings: accepts a langTag parameter so
+ * callers can query any language without a disruptive setLanguage() switch.
+ */
+
+/* Data domains. New values can be added without ABI break. */
+#define NVSP_DATA_SETTINGS   0
+#define NVSP_DATA_PHONEMES   1   /* reserved for Phase 1b */
+#define NVSP_DATA_DICTIONARY 2   /* reserved for future */
+
+/*
+  Count records in a data domain for a language, without loading them.
+  Useful for scroll sizing or showing "Settings (291)" in tab headers.
+
+  Parameters:
+  - domain: NVSP_DATA_SETTINGS, NVSP_DATA_PHONEMES, or NVSP_DATA_DICTIONARY
+  - langTagUtf8: language to query (does NOT change active language)
+
+  Returns the number of records, or -1 on error.
+*/
+NVSP_FRONTEND_API int nvspFrontend_getDataCount(
+  nvspFrontend_handle_t handle,
+  int domain,
+  const char* langTagUtf8
+);
+
+/*
+  Query a page of typed records from a data domain.
+
+  Returns a malloc'd UTF-8 JSON array string. Each element is an object with
+  at least "key", "type", and "value" fields. Caller must free with
+  nvspFrontend_freeString(). Returns NULL on error.
+
+  For NVSP_DATA_SETTINGS, each object has:
+    { "key": "boundarySmoothing.enabled", "type": "bool",
+      "value": true, "group": "boundarySmoothing" }
+  Types: "float" (numeric value), "bool" (true/false), "string" (quoted).
+
+  Parameters:
+  - domain: NVSP_DATA_SETTINGS, etc.
+  - langTagUtf8: language to query (does NOT change active language)
+  - offset: 0-based record index to start from
+  - limit: max records to return (0 = all remaining from offset)
+
+  First call builds a cache; subsequent calls slice it (no disk I/O).
+  Cache is invalidated by setLanguage() or setData() for the same langTag.
+*/
+NVSP_FRONTEND_API char* nvspFrontend_queryData(
+  nvspFrontend_handle_t handle,
+  int domain,
+  const char* langTagUtf8,
+  int offset,
+  int limit
+);
+
+/*
+  Set a single value in a data domain.
+
+  If langTagUtf8 matches the currently active language, the change is applied
+  to the in-memory pack immediately (live preview). Otherwise the call
+  succeeds but the override is not applied — the caller should persist it
+  and re-apply after the next setLanguage().
+
+  Parameters:
+  - domain: NVSP_DATA_SETTINGS, etc.
+  - langTagUtf8: target language
+  - keyUtf8: record key (dot-notation setting name, phoneme IPA, etc.)
+  - valueUtf8: new value as string ("1.4", "true", "foo")
+
+  Returns 1 on success, 0 on failure (call nvspFrontend_getLastError).
+*/
+NVSP_FRONTEND_API int nvspFrontend_setData(
+  nvspFrontend_handle_t handle,
+  int domain,
+  const char* langTagUtf8,
+  const char* keyUtf8,
+  const char* valueUtf8
+);
 
 #ifdef __cplusplus
 }
