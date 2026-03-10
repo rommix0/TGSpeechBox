@@ -341,9 +341,14 @@ class TgsbEngine: ObservableObject {
         for obj in arr {
             guard let key = obj["key"] as? String else { continue }
             if Self.hiddenKeys.contains(key) { continue }
-            let baseValue = "\(obj["value"] ?? "")"
-            let effectiveValue = overrides[key] ?? baseValue
             let jsonType = obj["type"] as? String ?? "string"
+            let baseValue: String
+            if jsonType == "bool", let b = obj["value"] as? Bool {
+                baseValue = b ? "true" : "false"
+            } else {
+                baseValue = "\(obj["value"] ?? "")"
+            }
+            let effectiveValue = overrides[key] ?? baseValue
             let type: SettingType = jsonType == "bool" ? .bool_ :
                                     jsonType == "float" ? .number : .text
             let options = (obj["options"] as? [String])
@@ -419,7 +424,12 @@ class TgsbEngine: ObservableObject {
         var map: [String: String] = [:]
         for obj in arr {
             guard let key = obj["key"] as? String else { continue }
-            map[key] = "\(obj["value"] ?? "")"
+            let jsonType = obj["type"] as? String ?? "string"
+            if jsonType == "bool", let b = obj["value"] as? Bool {
+                map[key] = b ? "true" : "false"
+            } else {
+                map[key] = "\(obj["value"] ?? "")"
+            }
         }
         return map
     }

@@ -226,7 +226,10 @@ private struct SettingRowView: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(setting.displayName), \(setting.value)\(setting.isOverridden ? ", customized" : "")")
+            .accessibilityLabel({
+                let valLabel = setting.type == .bool_ ? (setting.value == "true" ? "on" : "off") : setting.value
+                return "\(setting.displayName), \(valLabel)\(setting.isOverridden ? ", customized" : "")"
+            }())
             .accessibilityAddTraits(setting.type != .bool_ && !hasOptions ? .isButton : [])
             .accessibilityHint(setting.type != .bool_ && !hasOptions ? "Double tap to edit" : "")
 
