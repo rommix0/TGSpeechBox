@@ -150,6 +150,7 @@ class LangPackSettingsMixin:
             # suppress writes during that replay window to avoid overwriting
             # edits made via Notepad or our settings panel.
             if getattr(self, "_suppressLangPackWrites", False):
+                log.debug("TGSpeechBox: _setLangPackSetting(%s, %r) — SUPPRESSED (init replay)", key, value)
                 return
 
             # Ensure our effective-value comparison reflects the current files
@@ -158,9 +159,12 @@ class LangPackSettingsMixin:
 
             packsDir = getattr(self, "_packsDir", None)
             if not packsDir:
+                log.debug("TGSpeechBox: _setLangPackSetting(%s) — no packsDir", key)
                 return
 
             langTag = self._getCurrentLangTag()
+            log.debug("TGSpeechBox: _setLangPackSetting(%s, %r) lang=%r resolved=%r tag=%r",
+                       key, value, getattr(self, "_language", "?"), getattr(self, "_resolvedLang", "?"), langTag)
 
             # Avoid churn if no effective change.
             cur = getattr(self, "_langPackSettingsCache", {}).get(key)
@@ -168,10 +172,12 @@ class LangPackSettingsMixin:
                 if isinstance(value, bool):
                     # If cur is None, the key doesn't exist in YAML yet - always write it.
                     if cur is not None and langPackYaml.parseBool(cur, default=value) == value:
+                        log.debug("TGSpeechBox: _setLangPackSetting(%s) — no change (bool cur=%r)", key, cur)
                         return
                 else:
                     # Packs store scalars as strings; normalize whitespace for comparison.
                     if cur is not None and str(cur).strip() == str(value).strip():
+                        log.debug("TGSpeechBox: _setLangPackSetting(%s) — no change (cur=%r, val=%r)", key, cur, value)
                         return
             except Exception:
                 log.debug(
