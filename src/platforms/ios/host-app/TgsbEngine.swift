@@ -307,6 +307,7 @@ class TgsbEngine: ObservableObject {
         let value: String
         let isOverridden: Bool
         let type: SettingType
+        let options: [String]?  // dropdown options for enum-like strings
     }
 
     @Published var editorLanguages: [String] = []
@@ -345,12 +346,14 @@ class TgsbEngine: ObservableObject {
             let jsonType = obj["type"] as? String ?? "string"
             let type: SettingType = jsonType == "bool" ? .bool_ :
                                     jsonType == "float" ? .number : .text
+            let options = (obj["options"] as? [String])
             settings.append(PackSetting(
                 id: key, key: key,
                 displayName: camelToDisplay(key),
                 value: effectiveValue,
                 isOverridden: overrides[key] != nil,
-                type: type))
+                type: type,
+                options: options))
         }
         editorSettings = settings
 

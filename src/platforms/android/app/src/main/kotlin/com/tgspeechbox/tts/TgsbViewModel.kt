@@ -549,7 +549,8 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         val displayName: String,
         val value: String,
         val isOverridden: Boolean,
-        val type: SettingType
+        val type: SettingType,
+        val options: List<String>? = null  // dropdown options for enum-like strings
     )
 
     val editorLanguages = MutableStateFlow<List<String>>(emptyList())
@@ -584,12 +585,17 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
                 "float" -> SettingType.Number
                 else -> SettingType.Text
             }
+            val options = if (obj.has("options")) {
+                val optArr = obj.getJSONArray("options")
+                (0 until optArr.length()).map { optArr.getString(it) }
+            } else null
             settings.add(PackSetting(
                 key = key,
                 displayName = camelToDisplay(key),
                 value = effectiveValue,
                 isOverridden = overrides.containsKey(key),
-                type = type
+                type = type,
+                options = options
             ))
         }
         editorSettings.value = settings

@@ -12,6 +12,7 @@ package com.tgspeechbox.tts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -108,6 +109,8 @@ private fun PackSettingsScreen(
     val settings by viewModel.editorSettings.collectAsState()
     var editingKey by remember { mutableStateOf<String?>(null) }
     var editingValue by remember { mutableStateOf("") }
+    var selectingKey by remember { mutableStateOf<String?>(null) }
+    var selectingOptions by remember { mutableStateOf<List<String>>(emptyList()) }
     var showResetAll by remember { mutableStateOf(false) }
 
     LaunchedEffect(langTag) {
@@ -156,8 +159,13 @@ private fun PackSettingsScreen(
                             viewModel.setEditorOverride(langTag, setting.key, newVal)
                         },
                         onEdit = {
-                            editingKey = setting.key
-                            editingValue = setting.value
+                            if (setting.options != null) {
+                                selectingKey = setting.key
+                                selectingOptions = setting.options
+                            } else {
+                                editingKey = setting.key
+                                editingValue = setting.value
+                            }
                         },
                         onReset = {
                             viewModel.removeEditorOverride(langTag, setting.key)
@@ -191,6 +199,49 @@ private fun PackSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { editingKey = null }) {
+                    Text(stringResource(R.string.cancel_button))
+                }
+            }
+        )
+    }
+
+    // Option selection dialog (for enum-like string settings)
+    if (selectingKey != null) {
+        AlertDialog(
+            onDismissRequest = { selectingKey = null },
+            title = { Text(selectingKey!!) },
+            text = {
+                Column {
+                    val current = settings.find { it.key == selectingKey }?.value
+                    for (option in selectingOptions) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = option == current,
+                                    onClick = {
+                                        viewModel.setEditorOverride(langTag, selectingKey!!, option)
+                                        selectingKey = null
+                                    },
+                                    role = androidx.compose.ui.semantics.Role.RadioButton
+                                )
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = option == current,
+                                onClick = null,
+                                modifier = Modifier.clearAndSetSemantics {}
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(option, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { selectingKey = null }) {
                     Text(stringResource(R.string.cancel_button))
                 }
             }

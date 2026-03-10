@@ -176,6 +176,8 @@ private struct SettingRowView: View {
     var onEdit: () -> Void
     var onReset: () -> Void
 
+    private var hasOptions: Bool { setting.options != nil && !setting.options!.isEmpty }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -199,21 +201,34 @@ private struct SettingRowView: View {
                     ))
                     .labelsHidden()
                 default:
-                    Text(setting.value)
-                        .foregroundColor(.secondary)
-                        .font(.body)
+                    if hasOptions {
+                        Picker(setting.displayName, selection: Binding(
+                            get: { setting.value },
+                            set: { onToggle($0) }
+                        )) {
+                            ForEach(setting.options!, id: \.self) { option in
+                                Text(option).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                    } else {
+                        Text(setting.value)
+                            .foregroundColor(.secondary)
+                            .font(.body)
+                    }
                 }
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                if setting.type != .bool_ {
+                if setting.type != .bool_ && !hasOptions {
                     onEdit()
                 }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(setting.displayName), \(setting.value)\(setting.isOverridden ? ", customized" : "")")
-            .accessibilityAddTraits(setting.type != .bool_ ? .isButton : [])
-            .accessibilityHint(setting.type != .bool_ ? "Double tap to edit" : "")
+            .accessibilityAddTraits(setting.type != .bool_ && !hasOptions ? .isButton : [])
+            .accessibilityHint(setting.type != .bool_ && !hasOptions ? "Double tap to edit" : "")
 
             if setting.isOverridden {
                 Button("Reset \(setting.displayName)") {

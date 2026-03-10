@@ -93,6 +93,23 @@ void buildSettingsCache(DataCache& cache,
   cache.settingsValid = true;
 }
 
+// ── String field options ─────────────────────────────────────────────
+
+// Returns a list of valid values for enum-like string settings, or empty.
+static std::vector<const char*> getStringOptions(const std::string& key) {
+  if (key == "stopClosureMode")
+    return {"always", "after-vowel", "vowel-and-cluster"};
+  if (key == "toneContoursMode")
+    return {"absolute", "relative"};
+  if (key == "spellingDiphthongMode")
+    return {"none", "monophthong"};
+  if (key == "prominence.longVowelMode")
+    return {"never", "always", "unstressed-only"};
+  if (key == "singleWordClauseTypeOverride")
+    return {".", ",", "?", "!"};
+  return {};
+}
+
 // ── JSON helpers ────────────────────────────────────────────────────
 
 // Escape a string for JSON output (handles quotes, backslashes, control chars).
@@ -180,6 +197,19 @@ std::string serializeSettingsJson(const DataCache& cache, int offset, int limit)
     // "group": "..."
     out += ",\"group\":";
     jsonEscapeAppend(out, rec.group);
+
+    // "options": ["a","b","c"]  (only for enum-like string fields)
+    if (rec.type == FieldType::String) {
+      auto opts = getStringOptions(rec.key);
+      if (!opts.empty()) {
+        out += ",\"options\":[";
+        for (size_t j = 0; j < opts.size(); ++j) {
+          if (j > 0) out += ',';
+          jsonEscapeAppend(out, opts[j]);
+        }
+        out += ']';
+      }
+    }
 
     out += '}';
   }
