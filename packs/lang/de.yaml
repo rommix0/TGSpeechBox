@@ -35,6 +35,7 @@ settings:
   # German glottal stop before vowel-initial words (Knacklaut)
   # This is what makes German sound "choppy" to English ears
   # Enable glottal reinforcement for vowel-initial stressed syllables
+  allophoneRulesEnabled: true
   allophoneRules:
     enabled: true
     rules:

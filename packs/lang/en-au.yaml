@@ -192,6 +192,7 @@ settings:
     enabled: false
 
   # ── Allophone rules ────────────────────────────────────────────
+  allophoneRulesEnabled: true
   allophoneRules:
     enabled: true
     rules:

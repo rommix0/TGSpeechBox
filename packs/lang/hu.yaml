@@ -258,6 +258,7 @@ settings:
   # transition pops on words like "tehát", "ahogy", "ehez".
   # The [ɦ] phoneme has _copyAdjacent: true, so it inherits surrounding
   # vowel formant colors — just like /h/ does, but with voicing maintained.
+  allophoneRulesEnabled: true
   allophoneRules:
     enabled: true
     rules:

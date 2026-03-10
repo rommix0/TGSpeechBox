@@ -55,6 +55,7 @@ settings:
     enabled: false
   lengthContrast:
     enabled: false
+  allophoneRulesEnabled: true
   allophoneRules:
     enabled: false
     glottalReinforcement:

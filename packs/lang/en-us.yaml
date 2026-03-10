@@ -251,6 +251,7 @@ settings:
     onsetSettleMs: 12
   lengthContrast:
     enabled: false
+  allophoneRulesEnabled: true
   allophoneRules:
     enabled: true
     rules:
