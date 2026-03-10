@@ -476,7 +476,7 @@ settings:
       nasalMs: 18
       liquidMs: 15
       affricateMs: 12
-      semivowelMs: 10
+      semivowelMs: 30
       tapMs: 4
       trillMs: 12
       voicedConsonantMs: 10

@@ -705,7 +705,7 @@ settings:
       nasalMs: 18           # place perception (/ɲ/ vs /n/ vs /ŋ/)
       liquidMs: 15           # /ɹ/ and /l/ need F3 transition time
       affricateMs: 12        # shorter than fricative, longer than stop
-      semivowelMs: 10        # glide needs some trajectory to register
+      semivowelMs: 30        # glide IS the trajectory — needs full sweep
       tapMs: 4               # quick by nature, don't over-protect
       trillMs: 12            # needs at least one modulation cycle
       voicedConsonantMs: 10  # catch-all for voiced C's not matched above

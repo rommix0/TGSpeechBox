@@ -274,8 +274,10 @@ bool runBoundarySmoothing(PassContext& ctx, std::vector<Token>& tokens, std::str
       // Cap fade to fraction of duration to preserve steady-state.
       // Tied offglides (tiedFrom) are part of a diphthong — use the full
       // baseline ratio so the glide transition isn't starved at high speed.
+      // Semivowels (/j/, /w/): the formant glide IS the percept — squeezing
+      // it at high rates kills identity (e.g. /uː/→/juː/ "do you" loses /j/).
       if (cur.durationMs > 0.0) {
-        const double ratio = cur.tiedFrom ? 0.75 : maxFadeRatio;
+        const double ratio = (cur.tiedFrom || tokIsSemivowel(cur)) ? 0.75 : maxFadeRatio;
         const double maxFade = cur.durationMs * ratio;
         targetFade = std::min(targetFade, maxFade);
         if (targetFade < kMinFadeMs) {
