@@ -1154,6 +1154,11 @@ double liquidDynamicsLabialGlideTransitionPct = 0.60;
   double rateCompSonorantContextBonusMs = 8.0;
   double sonorantContextAmplitudeScale = 1.15;  // 1.0 = no boost
 
+  // Pre-rhotic cluster protection: vowels before liquid + consonant
+  // ("stairs" /ɛɹz/, "pairs" /ɛɹz/) need extra time so the vowel
+  // quality establishes before the rhotic pulls formants down.
+  double rateCompPreRhoticClusterBonusMs = 10.0;
+
   // Absorbed from old reduction pass: rate-dependent schwa shortening.
   // At speeds above threshold, unstressed schwas shorten. Floor still
   // enforced — this can't create sub-threshold segments.

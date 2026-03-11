@@ -213,6 +213,63 @@ bool runRateCompensation(
     }
   }
 
+  // ── Phase 1c: Pre-rhotic cluster vowel protection ──
+  // Vowels before /ɹ/ + consonant ("stairs" /ɛɹz/, "pairs" /ɛɹz/) lose
+  // their quality because the rhotic pulls formants down before the vowel
+  // has time to establish.  Word-final /ɹ/ alone is fine ("stair", "air")
+  // because the vowel gets utterance-final lengthening.
+  if (lang.rateCompPreRhoticClusterBonusMs > 0.0) {
+    for (size_t i = 0; i < tokens.size(); ++i) {
+      Token& t = tokens[i];
+      if (isSilenceOrMissing(t) || !isVowel(t)) continue;
+
+      // Look for: vowel → liquid (rhotic) → non-silence consonant
+      bool nextIsLiquid = false;
+      bool afterLiquidIsConsonant = false;
+      size_t liquidIdx = 0;
+      for (size_t j = i + 1; j < tokens.size(); ++j) {
+        const Token& n = tokens[j];
+        if (isSyntheticGap(n) || n.silence) continue;
+        if (isLiquid(n)) {
+          nextIsLiquid = true;
+          liquidIdx = j;
+        }
+        break;
+      }
+      if (nextIsLiquid) {
+        for (size_t j = liquidIdx + 1; j < tokens.size(); ++j) {
+          const Token& n = tokens[j];
+          if (isSyntheticGap(n) || n.silence) continue;
+          if (!isVowel(n)) afterLiquidIsConsonant = true;
+          break;
+        }
+      }
+
+      if (nextIsLiquid && afterLiquidIsConsonant) {
+        // Protect the vowel.
+        double bonus = scaleFloor(
+            lang.rateCompPreRhoticClusterBonusMs,
+            lang.rateCompFloorSpeedScale, ctx.speed);
+        double boostedFloor = scaleFloor(
+            lang.rateCompVowelFloorMs, lang.rateCompFloorSpeedScale, ctx.speed)
+            + bonus;
+        if (t.durationMs < boostedFloor) {
+          t.durationMs = boostedFloor;
+        }
+        // Also protect the liquid — the /ɹ/ needs time for the F3 glide
+        // that creates the r-colored quality.  Without this, "stairs"
+        // compresses both /ɛ/ AND /ɹ/, losing the "air" percept.
+        Token& liq = tokens[liquidIdx];
+        double liqFloor = scaleFloor(
+            lang.rateCompLiquidFloorMs + bonus * 0.5,
+            lang.rateCompFloorSpeedScale, ctx.speed);
+        if (liq.durationMs < liqFloor) {
+          liq.durationMs = liqFloor;
+        }
+      }
+    }
+  }
+
   // ── Phase 2: Word-final protection ──
   for (size_t i = 0; i < tokens.size(); ++i) {
     Token& t = tokens[i];
