@@ -40,6 +40,7 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
     private var cachedEspeakLang: String = ""
     private var cachedTgsbLang: String = ""
     private var cachedSettingsVersion: Int = -1
+    private var requestCount: Int = 0
 
     // Reusable synthesis buffers to avoid per-utterance allocation
     private var pullChunk = [Int16](repeating: 0, count: 4096)
@@ -221,11 +222,25 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         let voiceName = parts.count >= 3 ? String(parts[2]) : "adam"
         let bcp47 = parts.count >= 4 ? String(parts[3]) : "en-us"
 
+        requestCount += 1
         var plainText = extractPlainText(from: speechRequest.ssmlRepresentation)
         if plainText.isEmpty {
-            // VoiceOver preview or empty request — speak a demo message
-            // so the user can hear what this voice sounds like.
-            plainText = "Hello, this is \(voiceName.capitalized)."
+            if requestCount == 1 {
+                // First request with empty text — likely a voice preview
+                // from VoiceOver Settings. Speak a demo so the user can
+                // hear the voice. Subsequent empty requests (hints, spacers)
+                // get a silent frame instead.
+                plainText = "Hello, this is \(voiceName.capitalized)."
+            } else {
+                // Empty text during normal use — provide a single silent
+                // frame so the render block can signal completion and
+                // VoiceOver proceeds to the next utterance (e.g. hint).
+                outputMutex.wait()
+                output = [0]
+                outputOffset = 0
+                outputMutex.signal()
+                return
+            }
         }
 
         // Force cross-process sync so AU extension sees host app's latest writes.
