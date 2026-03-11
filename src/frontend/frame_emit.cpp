@@ -1936,12 +1936,12 @@ void emitFramesEx(
       const double onsetDur = remainDur * 0.45;
       const double recovDur = remainDur - onsetDur;
 
-      // Amplitude dip: reduce voiceAmplitude in the notch.
-      // Gentler dip (60%) — the formant sweep now carries identity,
-      // so the amplitude doesn't need to do all the work.
+      // Amplitude dip: sharper notch (42%) so the tap is clearly audible.
+      // Research: "reduction in amplitude relative to spectral envelope"
+      // is the primary perceptual cue.  60% was too gentle (soft/Russian).
       const int vaIdx = static_cast<int>(FieldId::voiceAmplitude);
       const double origAmp = base[vaIdx];
-      const double notchAmp = origAmp * 0.60;
+      const double notchAmp = origAmp * 0.42;
 
       // Formant indices for coarticulation blending.
       const int cf1 = static_cast<int>(FieldId::cf1);
@@ -1957,13 +1957,14 @@ void emitFramesEx(
       const double microFade = std::max(0.5, 1.5 / std::max(0.5, speed));
 
       // Phase 1: onset — formants blend FROM previous vowel TOWARD tap.
-      // 70% previous + 30% tap = gentle approach, not an abrupt jump.
+      // 50/50 blend — research says tap transitions should be "abrupt but
+      // short".  Too much previous vowel (70/30) sounded soft/Russian.
       {
         double seg[kFrameFieldCount];
         std::memcpy(seg, base, sizeof(seg));
         if (trajectoryState->hasPrevBase) {
-          const double prevW = 0.70;
-          const double tapW  = 0.30;
+          const double prevW = 0.50;
+          const double tapW  = 0.50;
           seg[cf1] = trajectoryState->prevBase[cf1] * prevW + base[cf1] * tapW;
           seg[cf2] = trajectoryState->prevBase[cf2] * prevW + base[cf2] * tapW;
           seg[cf3] = trajectoryState->prevBase[cf3] * prevW + base[cf3] * tapW;
@@ -1998,9 +1999,9 @@ void emitFramesEx(
         double seg[kFrameFieldCount];
         std::memcpy(seg, base, sizeof(seg));
         if (trajectoryState->hasPrevBase) {
-          // Blend toward previous vowel (proxy for surrounding vowel space).
-          const double prevW = 0.50;
-          const double tapW  = 0.50;
+          // Blend back toward vowel space — abrupt exit from tap.
+          const double prevW = 0.65;
+          const double tapW  = 0.35;
           seg[cf1] = trajectoryState->prevBase[cf1] * prevW + base[cf1] * tapW;
           seg[cf2] = trajectoryState->prevBase[cf2] * prevW + base[cf2] * tapW;
           seg[cf3] = trajectoryState->prevBase[cf3] * prevW + base[cf3] * tapW;
