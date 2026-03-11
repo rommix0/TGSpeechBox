@@ -1276,16 +1276,17 @@ static std::string insertDateOrdinals(const std::string& text) {
       if (trailLower == "st" || trailLower == "nd" || trailLower == "rd" || trailLower == "th") continue;
     }
 
-    // Look for adjacent month (skipping whitespace tokens).
-    auto adjacentMonth = [&](int dir) -> bool {
-      for (size_t j = t + dir; j < toks.size(); j += dir) {
-        if (toks[j].isWs) continue;
-        return isEnglishMonth(toks[j].s);
-      }
-      return false;
+    // Look for adjacent month.  Only "month number" (backward) is safe.
+    // "number month" (forward) causes false positives like "column 2 March".
+    auto prevIsMonth = [&]() -> bool {
+      size_t j = t - 1;
+      if (j >= toks.size()) return false;
+      if (toks[j].isWs && j > 0) --j;
+      if (j >= toks.size() || toks[j].isWs) return false;
+      return isEnglishMonth(toks[j].s);
     };
 
-    if (adjacentMonth(+1) || adjacentMonth(-1)) {
+    if (prevIsMonth()) {
       // Insert ordinal suffix after the digits, before trailing punctuation.
       // Use the parsed int to strip leading zeros ("06" → "6th").
       const char* suf = ordinalSuffix(val);
@@ -1305,51 +1306,72 @@ static std::string insertDateOrdinals(const std::string& text) {
 
 // ── Time expansion ──
 //
-// Expand H:MM and HH:MM patterns so eSpeak reads times naturally:
-//   "6:03"  → "6 oh 3"   (single-digit minute: use "oh")
-//   "12:45" → "12 45"    (two-digit minute: just space)
-//   "5:00"  → "5 o'clock" (on the hour)
-// Only matches digit(s):digitdigit patterns.
+// Expand time patterns so eSpeak reads times naturally:
+//   "6:03"       → "6 oh 3"    (raw colon — Android/iOS/SAPI)
+//   "6 colon 03" → "6 oh 3"    (NVDA-expanded punctuation)
+//   "12:45"      → "12 45"     (two-digit minute)
+//   "5:00"       → "5 o'clock"
+// Handles both raw ":" and NVDA's "colon" expansion.
+
+static std::string expandTimeCore(const std::string& hourStr, int min,
+                                  char minTens, char minOnes,
+                                  const std::string& ohDigit) {
+  if (min == 0) return hourStr + " o'clock";
+  if (minTens == '0') {
+    std::string oh = ohDigit.empty() ? "oh" : ohDigit;
+    return hourStr + " " + oh + " " + minOnes;
+  }
+  return hourStr + " " + minTens + minOnes;
+}
 
 static std::string expandTimes(const std::string& text, const std::string& ohDigit) {
   std::string result;
   result.reserve(text.size() + 16);
   size_t i = 0;
   while (i < text.size()) {
-    // Look for digit(s) followed by : followed by exactly 2 digits.
     if (std::isdigit(static_cast<unsigned char>(text[i]))) {
       size_t numStart = i;
       while (i < text.size() && std::isdigit(static_cast<unsigned char>(text[i]))) ++i;
       size_t hourLen = i - numStart;
-      // Must be 1-2 digit hour, followed by colon, followed by exactly 2 digits.
-      if (hourLen <= 2 && i < text.size() && text[i] == ':' &&
-          i + 2 < text.size() &&
-          std::isdigit(static_cast<unsigned char>(text[i + 1])) &&
-          std::isdigit(static_cast<unsigned char>(text[i + 2])) &&
-          (i + 3 >= text.size() || !std::isdigit(static_cast<unsigned char>(text[i + 3])))) {
-        // Validate hour (0-23) and minute (0-59).
-        int hour = std::atoi(text.substr(numStart, hourLen).c_str());
-        int min  = (text[i + 1] - '0') * 10 + (text[i + 2] - '0');
-        if (hour <= 23 && min <= 59) {
-          std::string hourStr = text.substr(numStart, hourLen);
-          if (min == 0) {
-            result += hourStr + " o'clock";
-          } else if (text[i + 1] == '0') {
-            // Single-digit minute: "6:03" → "6 oh 3"
-            std::string oh = ohDigit.empty() ? "oh" : ohDigit;
-            result += hourStr + " " + oh + " " + text[i + 2];
-          } else {
-            // Two-digit minute: "12:45" → "12 45"
-            result += hourStr + " " + text[i + 1] + text[i + 2];
+
+      if (hourLen <= 2) {
+        // Try raw colon: "6:03"
+        if (i < text.size() && text[i] == ':' &&
+            i + 2 < text.size() &&
+            std::isdigit(static_cast<unsigned char>(text[i + 1])) &&
+            std::isdigit(static_cast<unsigned char>(text[i + 2])) &&
+            (i + 3 >= text.size() || !std::isdigit(static_cast<unsigned char>(text[i + 3])))) {
+          int hour = std::atoi(text.substr(numStart, hourLen).c_str());
+          int min  = (text[i + 1] - '0') * 10 + (text[i + 2] - '0');
+          if (hour <= 23 && min <= 59) {
+            std::string hourStr = text.substr(numStart, hourLen);
+            result += expandTimeCore(hourStr, min, text[i + 1], text[i + 2], ohDigit);
+            TPLOG("  timeExpand(raw): \"%s\" -> ...\n",
+                  text.substr(numStart, (i + 3) - numStart).c_str());
+            i += 3;
+            continue;
           }
-          TPLOG("  timeExpand: \"%s\" -> \"%s\"\n",
-                text.substr(numStart, (i + 3) - numStart).c_str(),
-                result.substr(result.size() - hourStr.size() - 4).c_str());
-          i += 3;  // skip past :MM
-          continue;
+        }
+
+        // Try NVDA-expanded: "6 colon 03" (space + "colon" + space + 2 digits)
+        if (i + 9 <= text.size() &&
+            text.substr(i, 7) == " colon " &&
+            std::isdigit(static_cast<unsigned char>(text[i + 7])) &&
+            std::isdigit(static_cast<unsigned char>(text[i + 8])) &&
+            (i + 9 >= text.size() || !std::isdigit(static_cast<unsigned char>(text[i + 9])))) {
+          int hour = std::atoi(text.substr(numStart, hourLen).c_str());
+          int min  = (text[i + 7] - '0') * 10 + (text[i + 8] - '0');
+          if (hour <= 23 && min <= 59) {
+            std::string hourStr = text.substr(numStart, hourLen);
+            result += expandTimeCore(hourStr, min, text[i + 7], text[i + 8], ohDigit);
+            TPLOG("  timeExpand(nvda): \"%s\" -> ...\n",
+                  text.substr(numStart, (i + 9) - numStart).c_str());
+            i += 9;
+            continue;
+          }
         }
       }
-      // Not a time — copy the digits we scanned.
+
       result += text.substr(numStart, i - numStart);
       continue;
     }
@@ -1361,21 +1383,43 @@ static std::string expandTimes(const std::string& text, const std::string& ohDig
 
 // ── Hyphenated number range expansion ──
 //
-// "2024-2025" → "2024 to 2025" so each number is a separate token
-// and year splitting can process them independently.
-// Only matches digit(s)-digit(s) patterns (not negative numbers).
+// "2024-2025"      → "2024 to 2025"  (raw hyphen — Android/iOS/SAPI)
+// "2024 dash-2025" → "2024 to 2025"  (NVDA-expanded punctuation)
+// Each number becomes a separate token so year splitting works.
 
 static std::string expandHyphenatedRanges(const std::string& text) {
   std::string result;
   result.reserve(text.size() + 16);
   for (size_t i = 0; i < text.size(); ++i) {
+    // Raw hyphen between digits: "2024-2025"
     if (text[i] == '-' && i > 0 && i + 1 < text.size() &&
         std::isdigit(static_cast<unsigned char>(text[i - 1])) &&
         std::isdigit(static_cast<unsigned char>(text[i + 1]))) {
       result += " to ";
-    } else {
-      result += text[i];
+      TPLOG("  rangeExpand(raw): hyphen at %zu\n", i);
+      continue;
     }
+    // NVDA-expanded: "2024 dash-2025" or "2024 dash 2025"
+    // Match " dash-" or " dash " after a digit, followed by a digit.
+    if (text[i] == ' ' && i > 0 &&
+        std::isdigit(static_cast<unsigned char>(text[i - 1])) &&
+        i + 5 < text.size() &&
+        text[i + 1] == 'd' && text[i + 2] == 'a' &&
+        text[i + 3] == 's' && text[i + 4] == 'h') {
+      // "dash-" or "dash "
+      size_t afterDash = i + 5;
+      if (afterDash < text.size() && (text[afterDash] == '-' || text[afterDash] == ' ')) {
+        size_t digitPos = afterDash + 1;
+        if (digitPos < text.size() &&
+            std::isdigit(static_cast<unsigned char>(text[digitPos]))) {
+          result += " to ";
+          TPLOG("  rangeExpand(nvda): dash at %zu\n", i);
+          i = digitPos - 1;  // loop will ++i to digitPos
+          continue;
+        }
+      }
+    }
+    result += text[i];
   }
   return result;
 }
@@ -1479,6 +1523,9 @@ std::string prepareTextForEspeak(
 {
   if (text.empty()) return text;
 
+  TPLOG("prepareTextForEspeak IN: \"%s\" lang=%s yearSplit=%d\n",
+        text.c_str(), langTag.c_str(), yearSplitting ? 1 : 0);
+
   std::string result = text;
 
   // 1. Compound splitting.
@@ -1534,6 +1581,7 @@ std::string prepareTextForEspeak(
     result = splitYears(result, ohDigit);
   }
 
+  TPLOG("prepareTextForEspeak OUT: \"%s\"\n", result.c_str());
   return result;
 }
 
