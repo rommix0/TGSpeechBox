@@ -1381,43 +1381,39 @@ static std::string expandTimes(const std::string& text, const std::string& ohDig
   return result;
 }
 
-// ── Hyphenated number range expansion ──
+// ── Hyphenated number separation ──
 //
-// "2024-2025"      → "2024 to 2025"  (raw hyphen — Android/iOS/SAPI)
-// "2024 dash-2025" → "2024 to 2025"  (NVDA-expanded punctuation)
-// Each number becomes a separate token so year splitting works.
+// Separate digit-hyphen-digit so year splitting can process both halves.
+// Does NOT insert a connector word — the platform's punctuation
+// announcement handles the dash/hyphen.  Avoids ambiguity in math
+// ("5-3") or scores where "to" would mislead.
+//
+// "2024-2025"      → "2024 2025"      (raw — Android/iOS/SAPI)
+// "2024 dash-2025" → "2024 dash 2025" (NVDA — just unstick the number)
 
-static std::string expandHyphenatedRanges(const std::string& text) {
+static std::string separateHyphenatedNumbers(const std::string& text) {
   std::string result;
   result.reserve(text.size() + 16);
   for (size_t i = 0; i < text.size(); ++i) {
-    // Raw hyphen between digits: "2024-2025"
+    // Raw hyphen between digits: "2024-2025" → "2024 2025"
     if (text[i] == '-' && i > 0 && i + 1 < text.size() &&
         std::isdigit(static_cast<unsigned char>(text[i - 1])) &&
         std::isdigit(static_cast<unsigned char>(text[i + 1]))) {
-      result += " to ";
-      TPLOG("  rangeExpand(raw): hyphen at %zu\n", i);
+      result += ' ';
+      TPLOG("  hyphenSep(raw): at %zu\n", i);
       continue;
     }
-    // NVDA-expanded: "2024 dash-2025" or "2024 dash 2025"
-    // Match " dash-" or " dash " after a digit, followed by a digit.
-    if (text[i] == ' ' && i > 0 &&
-        std::isdigit(static_cast<unsigned char>(text[i - 1])) &&
-        i + 5 < text.size() &&
-        text[i + 1] == 'd' && text[i + 2] == 'a' &&
-        text[i + 3] == 's' && text[i + 4] == 'h') {
-      // "dash-" or "dash "
-      size_t afterDash = i + 5;
-      if (afterDash < text.size() && (text[afterDash] == '-' || text[afterDash] == ' ')) {
-        size_t digitPos = afterDash + 1;
-        if (digitPos < text.size() &&
-            std::isdigit(static_cast<unsigned char>(text[digitPos]))) {
-          result += " to ";
-          TPLOG("  rangeExpand(nvda): dash at %zu\n", i);
-          i = digitPos - 1;  // loop will ++i to digitPos
-          continue;
-        }
-      }
+    // NVDA-expanded: "dash-2025" — unstick the digit from "dash-"
+    // so "2024 dash-2025" → "2024 dash 2025" and year splitting
+    // can process "2025" as a standalone token.
+    if (text[i] == '-' && i >= 4 &&
+        text[i - 4] == 'd' && text[i - 3] == 'a' &&
+        text[i - 2] == 's' && text[i - 1] == 'h' &&
+        i + 1 < text.size() &&
+        std::isdigit(static_cast<unsigned char>(text[i + 1]))) {
+      result += ' ';
+      TPLOG("  hyphenSep(nvda): at %zu\n", i);
+      continue;
     }
     result += text[i];
   }
@@ -1573,13 +1569,10 @@ std::string prepareTextForEspeak(
     result = expandTimes(result, ohDigit);
   }
 
-  // 5. Hyphenated number ranges ("2024-2025" → "2024 to 2025").
-  // English only — "to" is language-specific.
-  if (langTag.size() >= 2 && (langTag[0] == 'e' || langTag[0] == 'E') &&
-      (langTag[1] == 'n' || langTag[1] == 'N') &&
-      (langTag.size() == 2 || langTag[2] == '-' || langTag[2] == '_')) {
-    result = expandHyphenatedRanges(result);
-  }
+  // 5. Separate hyphenated numbers so year splitting can process both.
+  // No connector word inserted — platform handles dash announcement.
+  // Safe for all languages (no English-specific text injected).
+  result = separateHyphenatedNumbers(result);
 
   // 6. Year splitting ("1995" → "19 95").
   if (yearSplitting) {
