@@ -1536,6 +1536,22 @@ static bool parseToTokens(const PackSet& pack, const std::u32string& text, std::
       }
     }
 
+    // Word-boundary gap after affricates: when a word-final affricate
+    // is followed by a word-initial consonant (that isn't a stop/affricate
+    // — those already get preStopGap), insert a micro-silence so the
+    // affricate's frication doesn't collide with the next consonant's
+    // noise onset (e.g. "image for": postalveolar /dʒ/ → labiodental /f/).
+    if (t.wordStart && !tokenIsVowel(t) && !t.silence &&
+        !tokenIsStop(t) && !tokenIsAfricate(t) &&
+        haveLast() && tokenIsAfricate(outTokens[lastIndex])) {
+      Token gap;
+      gap.silence = true;
+      gap.preStopGap = true;
+      gap.clusterGap = true;
+      gap.wordStart = true;
+      outTokens.push_back(gap);
+    }
+
     // Append the real phoneme.
     outTokens.push_back(t);
     const int curIndex = static_cast<int>(outTokens.size()) - 1;
