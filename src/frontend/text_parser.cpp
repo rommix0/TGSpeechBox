@@ -1574,7 +1574,12 @@ std::string prepareTextForEspeak(
   }
 
   // 5. Hyphenated number ranges ("2024-2025" → "2024 to 2025").
-  result = expandHyphenatedRanges(result);
+  // English only — "to" is language-specific.
+  if (langTag.size() >= 2 && (langTag[0] == 'e' || langTag[0] == 'E') &&
+      (langTag[1] == 'n' || langTag[1] == 'N') &&
+      (langTag.size() == 2 || langTag[2] == '-' || langTag[2] == '_')) {
+    result = expandHyphenatedRanges(result);
+  }
 
   // 6. Year splitting ("1995" → "19 95").
   if (yearSplitting) {
