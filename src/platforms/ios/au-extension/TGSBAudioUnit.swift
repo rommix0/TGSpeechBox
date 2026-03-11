@@ -216,22 +216,17 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
     public override func synthesizeSpeechRequest(
         _ speechRequest: AVSpeechSynthesisProviderRequest
     ) {
-        let plainText = extractPlainText(from: speechRequest.ssmlRepresentation)
-        guard !plainText.isEmpty else {
-            // Empty text — provide a single silent frame so the render
-            // block can signal offlineUnitRenderAction_Complete and
-            // VoiceOver proceeds to the next utterance (e.g. hint).
-            outputMutex.wait()
-            output = [0]
-            outputOffset = 0
-            outputMutex.signal()
-            return
-        }
-
         // Extract voice name and language from identifier
         let parts = speechRequest.voice.identifier.split(separator: ".")
         let voiceName = parts.count >= 3 ? String(parts[2]) : "adam"
         let bcp47 = parts.count >= 4 ? String(parts[3]) : "en-us"
+
+        var plainText = extractPlainText(from: speechRequest.ssmlRepresentation)
+        if plainText.isEmpty {
+            // VoiceOver preview or empty request — speak a demo message
+            // so the user can hear what this voice sounds like.
+            plainText = "Hello, this is \(voiceName.capitalized)."
+        }
 
         // Force cross-process sync so AU extension sees host app's latest writes.
         // Without this, VoiceOver restart can leave the extension with stale/empty
