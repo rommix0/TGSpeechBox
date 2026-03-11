@@ -60,6 +60,7 @@ BOOL APIENTRY DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID /*lpReserved*/
         g_dll_handle = hInstance;
         DisableThreadLibraryCalls(hInstance);
 
+
         try {
             g_cls_obj_factory.register_class<TGSpeech::sapi::IEnumSpObjectTokensImpl>();
             g_cls_obj_factory.register_class<TGSpeech::sapi::ISpTTSEngineImpl>();

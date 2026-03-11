@@ -72,7 +72,7 @@ inline void TruncateIfTooLarge(const std::wstring& path)
 
     // Truncate.
     FILE* f = nullptr;
-    if (_wfopen_s(&f, path.c_str(), L"w, ccs=UTF-8") == 0 && f) {
+    if (_wfopen_s(&f, path.c_str(), L"w") == 0 && f) {
         fclose(f);
     }
 }
@@ -87,7 +87,7 @@ inline void Log(const char* fmt, ...)
     FILE* f = nullptr;
     const std::wstring path = GetLogPath();
     TruncateIfTooLarge(path);
-    if (_wfopen_s(&f, path.c_str(), L"a+, ccs=UTF-8") != 0 || !f) {
+    if (_wfopen_s(&f, path.c_str(), L"a") != 0 || !f) {
         return;
     }
 
@@ -124,7 +124,7 @@ inline void ClearLog()
 
     FILE* f = nullptr;
     const std::wstring path = GetLogPath();
-    if (_wfopen_s(&f, path.c_str(), L"w, ccs=UTF-8") == 0 && f) {
+    if (_wfopen_s(&f, path.c_str(), L"w") == 0 && f) {
         std::fclose(f);
     }
 #endif

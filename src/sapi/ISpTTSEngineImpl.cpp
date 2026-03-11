@@ -50,6 +50,11 @@ bool write_bytes(ISpTTSEngineSite* site, const BYTE* data, ULONG bytes, ULONGLON
             DEBUG_LOG("TGSpeechSapi: Write failed HRESULT=0x%08X", hr);
             return false;
         }
+        if (written == 0) {
+            // Win7 SAPI returns 0 when the audio buffer is full.
+            // Return true (not fatal) — caller should Sleep + check abort + retry.
+            return true;
+        }
         if (written > remaining) {
             DEBUG_LOG("TGSpeechSapi: Write overrun (written=%lu, remaining=%lu)", written, remaining);
             return false;
@@ -485,6 +490,12 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
                 }
 
                 // Drain queued audio for this clause.
+                // Pending chunk state for Win7 flow control: if Write returns
+                // 0 bytes (buffer full), we sleep and retry the SAME chunk
+                // rather than synthesizing more.  Abort is checked each loop.
+                const BYTE* pendingData = nullptr;
+                ULONG pendingBytes = 0;
+
                 for (;;) {
                     actions = pOutputSite->GetActions();
                     if (actions & SPVES_ABORT) {
@@ -499,6 +510,24 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
                         break;
                     }
 
+                    // If we have a pending chunk from a previous Write(0), retry it.
+                    if (pendingData && pendingBytes > 0) {
+                        ULONGLONG before = ctx.bytes_written;
+                        if (!write_bytes(pOutputSite, pendingData, pendingBytes, ctx.bytes_written)) {
+                            ctx.aborted = true;
+                            break;
+                        }
+                        if (ctx.bytes_written == before) {
+                            // Still zero progress — sleep and retry.
+                            Sleep(5);
+                            continue;
+                        }
+                        // Chunk written successfully.
+                        pendingData = nullptr;
+                        pendingBytes = 0;
+                        continue;
+                    }
+
                     const int got = rt_->synthesize(static_cast<int>(sampleBuf.size()), sampleBuf.data());
                     if (got <= 0) {
                         break;
@@ -507,9 +536,17 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
                     const ULONG bytes = static_cast<ULONG>(got * sizeof(tgsb::sample_t));
                     const BYTE* data = reinterpret_cast<const BYTE*>(sampleBuf.data());
 
+                    ULONGLONG before = ctx.bytes_written;
                     if (!write_bytes(pOutputSite, data, bytes, ctx.bytes_written)) {
                         ctx.aborted = true;
                         break;
+                    }
+                    if (ctx.bytes_written == before) {
+                        // Write accepted 0 bytes (Win7 buffer full).
+                        // Stash the chunk and retry after checking abort.
+                        pendingData = data;
+                        pendingBytes = bytes;
+                        Sleep(5);
                     }
                 }
             }
