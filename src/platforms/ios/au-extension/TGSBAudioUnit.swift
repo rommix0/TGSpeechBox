@@ -53,7 +53,7 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
     private static let languageMap: [(bcp47: String, espeak: String, tgsb: String)] = [
         ("en-US", "en-us", "en-us"),
         ("en-GB", "en-gb", "en-gb"),
-        ("en-CA", "en-us", "en-us"),
+        ("en-CA", "en-us", "en-ca"),
         ("en-AU", "en",    "en-au"),
         ("fr-FR", "fr",    "fr"),
         ("fr-CA", "fr",    "fr"),

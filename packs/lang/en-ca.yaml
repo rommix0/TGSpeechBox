@@ -1,8 +1,8 @@
 # English (Canada) (en-ca)
 #
-# Note: This file exists because en.yaml is treated as UK baseline
-# in NVSP. Canada is rhotic and much closer to US-style rhotic
-# defaults, so we apply the same overrides as en-us.
+# eSpeak voice: en-us (American IPA base).  All platforms map en-ca
+# to eSpeak en-us so we get American-style taps, LOT, GOAT, etc.
+# This pack then layers Canadian-specific adjustments on top.
 
 settings:
   # Canada is largely closer to US timing than the UK baseline in en.yaml.
@@ -24,24 +24,7 @@ normalization:
     - from: "sˌɑft"
       to:   "sˌɔft"
 
-    # Don't add a GOAT offglide for the standalone letter "O" or the word "no".
-    # In en-ca, eSpeak outputs these with əʊ, which can sound like "noww" once
-    # we later normalize GOAT and apply a glide.
-    - from: "nˈəʊ"
-      to:   "nˈo"
-    - from: "nˈə͡ʊ"
-      to:   "nˈo"
-    - from: "ˈəʊ"
-      to:   "ˈo"
-    - from: "ˈə͡ʊ"
-      to:   "ˈo"
-
   classes:
-    # eSpeak en-ca uses UK-ish LOT (ɒ) in many words (desktop/top/not/hot/dog...).
-    # For a more North American feel, map LOT -> ɑ only when followed by a stop.
-    # This avoids changing cases like "sorry" (ɒ before ɹ) and "office" (ɒ before f).
-    CA_LOT_STOP_FOLLOW: ["p", "t", "k", "ɡ", "b", "d"]
-
     # Vowels (including schwa/r-colored and extra internal keys used by English packs).
     # Helps us detect spelled-out acronym sequences like "NVDA" where "A" follows a vowel.
     VOWELS: ["a", "e", "i", "o", "u", "ɐ", "ə", "ɜ", "ɝ", "ɑ", "ɒ", "ɔ", "ɛ", "æ", "ʊ", "ɪ", "ᵾ", "ᵿ", "ᴏ", "ᴐ", "ᴒ", "ã", "ẽ", "ĩ", "õ", "ũ", "ᴜ"]
@@ -69,49 +52,7 @@ normalization:
     - from: "e͡ɪ"
       to:   "e͡j"
 
-    # eSpeak en-ca uses GOAT as əʊ. Normalize to oʊ so our US/CA GOAT tuning applies.
-    - from: "əʊ"
-      to:   "oʊ"
-    - from: "ə͡ʊ"
-      to:   "o͡ʊ"
-
-    # Treat GOAT (oʊ) as vowel+glide so it doesn't split into two vowel beats
-    # (e.g. "colon" sounding like "coh-oh-len").
-    # But in words like "okay" (əʊkˈeɪ), converting oʊ -> ow makes the /w/ too audible.
-    # Collapse the common unstressed-prefix pattern first.
-    - from: "oʊkˈ"
-      to:   "okˈ"
-    - from: "oʊbˈ"
-      to:   "obˈ"
-    - from: "oʊdˈ"
-      to:   "odˈ"
-    - from: "oʊfˈ"
-      to:   "ofˈ"
-    - from: "oʊpˈ"
-      to:   "opˈ"
-    - from: "oʊtˈ"
-      to:   "otˈ"
-    - from: "oʊsˈ"
-      to:   "osˈ"
-    - from: "oʊmˈ"
-      to:   "omˈ"
-    - from: "oʊnˈ"
-      to:   "onˈ"
-    - from: "oʊlˈ"
-      to:   "olˈ"
-
-    # Use a *soft* /w/ offglide. The plain "w" phoneme is a bit too strong here
-    # ("O" and "no" can sound like "oww").
-    - from: "oʊ"
-      to:   "oᵂ"
-    - from: "o͡ʊ"
-      to:   "oᵂ"
-
-    # eSpeak en-ca uses LOT as ɒ; map to an open back vowel in stop environments.
-    - from: "ɒ"
-      to:   "ɑ"
-      when:
-        beforeClass: CA_LOT_STOP_FOLLOW
+    # GOAT (oʊ): diphthong collapse pass handles tying, same as en-us.
 
     # US/CA GOAT (oʊ) can sound oddly "midwestern" if the /o/ start is too back.
     # Use a slightly more fronted internal variant.
@@ -134,9 +75,6 @@ normalization:
     - from: "ɔ"
       to: "ᴐ"
 
-    # Undo the UK THOUGHT tweak from en.yaml (en.yaml maps ɔː -> ᴏː).
-    - from: "ᴏ"
-      to: "ɔ"
     # NOTE:
     # We intentionally *do not* undo the base English fronting of long /uː/.
     # It helps avoid the "roo" quality in words like "rules".

@@ -464,6 +464,9 @@ HRESULT runtime::set_language(const std::wstring& lang_tag)
     if (_wcsicmp(espeak_tag.c_str(), L"default") == 0) {
         espeak_tag = L"en-us";
     }
+    if (_wcsicmp(espeak_tag.c_str(), L"en-ca") == 0) {
+        espeak_tag = L"en-us";
+    }
     const std::string espeak_tag_utf8 = utils::wstring_to_string(espeak_tag);
 
     // Frontend language.

@@ -20,6 +20,7 @@ from .text_utils import splitByScript
 # (e.g. "es-mx" inside the es-419 voice) are invisible.
 # Map our pack tags to eSpeak's canonical primary tags here.
 _ESPEAK_PRIMARY_TAG = {
+    "en-ca": "en-us",
     "es-mx": "es-419",
 }
 

@@ -71,7 +71,7 @@ class TgsbTtsService : TextToSpeechService() {
             LangDef("eng", "USA", "en-us", "en-us", Locale("en", "US")),
             LangDef("eng", "GBR", "en-gb", "en-gb", Locale("en", "GB")),
             LangDef("eng", "AUS", "en",    "en-au", Locale("en", "AU")),
-            LangDef("eng", "CAN", "en",    "en-ca", Locale("en", "CA")),
+            LangDef("eng", "CAN", "en-us", "en-ca", Locale("en", "CA")),
             LangDef("eng", "",    "en-us", "en-us", Locale("en", "US")), // fallback
 
             // Romance

@@ -26,6 +26,7 @@ languages = OrderedDict([
     ("en-us", VoiceInfo("en-us", "English (US)")),
     ("en-gb", VoiceInfo("en-gb", "English (UK)")),
     ("en-au", VoiceInfo("en-au", "English (Australia)")),
+    ("en-ca", VoiceInfo("en-ca", "English (Canada)")),
     ("zh", VoiceInfo("zh", "Chinese")),
     ("pt", VoiceInfo("pt", "Portuguese")),
     ("hu", VoiceInfo("hu", "Hungarian")),
