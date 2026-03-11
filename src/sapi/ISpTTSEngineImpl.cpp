@@ -199,6 +199,10 @@ void add_bookmark_event(ISpTTSEngineSite* site, ULONGLONG audio_offset_bytes, co
     ev.elParamType = SPET_LPARAM_IS_STRING;
     ev.ullAudioStreamOffset = audio_offset_bytes;
     ev.lParam = reinterpret_cast<LPARAM>(pMem);
+    ev.wParam = static_cast<WPARAM>(_wtol(pMem));  // Numeric bookmark ID for NVDA
+
+    DEBUG_LOG("TGSpeechSapi: bookmark id=%ld str='%ls' at byte %llu",
+              static_cast<long>(ev.wParam), pMem, audio_offset_bytes);
 
     site->AddEvents(&ev, 1);
 }
@@ -221,13 +225,46 @@ void add_sentence_boundary_event(ISpTTSEngineSite* site, ULONGLONG audio_offset_
 
 } // namespace
 
+// ── Process-global runtime cache ──
+// SAPI creates/destroys a COM instance per registered voice during
+// enumeration.  Each runtime does a full eSpeak + pack init (~1 sec).
+// With 26 voices that's 26 seconds of startup lag.
+// Fix: when a COM instance is destroyed, cache its runtime instead of
+// tearing it down.  The next COM instance grabs it — zero init, just
+// a language switch.
+static std::unique_ptr<tgsb::runtime> g_cached_runtime;
+static std::mutex g_cache_mutex;
+
 ISpTTSEngineImpl::ISpTTSEngineImpl()
-    : rt_(std::make_unique<tgsb::runtime>())
-    , sample_buf_(2048)
+    : sample_buf_(2048)
 {
+    // Try to reuse a cached runtime from a previous COM instance.
+    std::lock_guard<std::mutex> lock(g_cache_mutex);
+    if (g_cached_runtime) {
+        rt_ = std::move(g_cached_runtime);
+        // Fully drain any stale DSP state so the synthesizer is empty.
+        // purge() queues a silence frame; drain it so it doesn't fill
+        // the Win7 audio buffer and cause Write(0) on the next Speak().
+        rt_->purge();
+        tgsb::sample_t drain[512];
+        while (rt_->synthesize(512, drain) > 0) {}
+    } else {
+        rt_ = std::make_unique<tgsb::runtime>();
+    }
 }
 
-ISpTTSEngineImpl::~ISpTTSEngineImpl() = default;
+ISpTTSEngineImpl::~ISpTTSEngineImpl()
+{
+    // Return the runtime to the cache instead of destroying it.
+    // If there's already a cached runtime, let ours be destroyed normally.
+    std::lock_guard<std::mutex> lock(g_cache_mutex);
+    if (!g_cached_runtime && rt_) {
+        rt_->purge();
+        tgsb::sample_t drain[512];
+        while (rt_->synthesize(512, drain) > 0) {}
+        g_cached_runtime = std::move(rt_);
+    }
+}
 
 STDMETHODIMP ISpTTSEngineImpl::SetObjectToken(ISpObjectToken* pToken)
 {
@@ -399,6 +436,7 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
         sampleBuf.resize(2048);
     }
 
+
     const SPVTEXTFRAG* frag = pTextFragList;
     while (frag) {
         // Handle SAPI actions.
@@ -549,6 +587,7 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
                         Sleep(5);
                     }
                 }
+
             }
         }
 
