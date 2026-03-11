@@ -8,6 +8,7 @@ vowelcharts/
 *.pyo
 build/
 build-x64/
+build-x64-nvda/
 build-x86/
 .claude/
 briefing.md

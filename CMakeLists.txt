@@ -15,11 +15,6 @@ if(MSVC)
   # Make the compiler treat source files as UTF-8 (important for IPA symbols).
   add_compile_options(/utf-8)
 
-  # Static MSVC runtime (/MT).  Required for Windows 7 compatibility:
-  # with /MD, ucrtbase.dll's own import of CreateFile2/CopyFile2 crashes
-  # on Win7.  /MT embeds the CRT so YY-Thunks can intercept those calls.
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
   # Release optimizations and dead code stripping.
   add_compile_options("$<$<CONFIG:Release>:/O2>" "$<$<CONFIG:Release>:/DNDEBUG>")
   add_compile_options("$<$<CONFIG:Release>:/Gy>" "$<$<CONFIG:Release>:/Gw>")
@@ -30,23 +25,40 @@ if(MSVC)
 endif()
 
 # -------------------------------------------------
-# Windows 7 compatibility (YY-Thunks)
+# Windows 7 compatibility (YY-Thunks + static CRT)
 # -------------------------------------------------
 # VS2022's UCRT internally calls Win8+ APIs (CreateFile2, CopyFile2, etc.)
 # which crash on Windows 7.  YY-Thunks provides fallback implementations
 # that redirect to Win7-compatible equivalents at runtime.
 # See: https://github.com/Chuyu-Team/YY-Thunks  (MIT license)
+#
+# Pass -DTGSB_WIN7_COMPAT=OFF to disable for targets that don't need it
+# (e.g. NVDA addon DLLs — NVDA 2024.1+ requires Windows 10).
+option(TGSB_WIN7_COMPAT "Enable Windows 7 compatibility (YY-Thunks + static CRT)" ON)
+
 if(WIN32 AND MSVC)
-  add_compile_definitions(WINVER=0x0601 _WIN32_WINNT=0x0601)
+  if(TGSB_WIN7_COMPAT)
+    # Static CRT required for Win7: with /MD, ucrtbase.dll imports
+    # CreateFile2/CopyFile2 which don't exist on Win7.  /MT embeds
+    # the CRT so YY-Thunks can intercept those calls.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(YY_THUNKS_OBJ "${CMAKE_CURRENT_SOURCE_DIR}/deps/YY-Thunks/objs/x64/YY_Thunks_for_Win7.obj")
+    add_compile_definitions(WINVER=0x0601 _WIN32_WINNT=0x0601)
+
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+      set(YY_THUNKS_OBJ "${CMAKE_CURRENT_SOURCE_DIR}/deps/YY-Thunks/objs/x64/YY_Thunks_for_Win7.obj")
+    else()
+      set(YY_THUNKS_OBJ "${CMAKE_CURRENT_SOURCE_DIR}/deps/YY-Thunks/objs/x86/YY_Thunks_for_Win7.obj")
+    endif()
+
+    if(NOT EXISTS "${YY_THUNKS_OBJ}")
+      message(WARNING "YY-Thunks obj not found at ${YY_THUNKS_OBJ} — Win7 compat disabled")
+      set(YY_THUNKS_OBJ "")
+    endif()
   else()
-    set(YY_THUNKS_OBJ "${CMAKE_CURRENT_SOURCE_DIR}/deps/YY-Thunks/objs/x86/YY_Thunks_for_Win7.obj")
-  endif()
-
-  if(NOT EXISTS "${YY_THUNKS_OBJ}")
-    message(WARNING "YY-Thunks obj not found at ${YY_THUNKS_OBJ} — Win7 compat disabled")
+    # No Win7 compat: use dynamic CRT for smaller DLLs, target Win10+.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    add_compile_definitions(WINVER=0x0A00 _WIN32_WINNT=0x0A00)
     set(YY_THUNKS_OBJ "")
   endif()
 endif()
