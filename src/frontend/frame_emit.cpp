@@ -1910,32 +1910,43 @@ void emitFramesEx(
     }
 
     // ============================================
-    // TAP MICRO-EVENT EMISSION (amplitude notch)
-    // ============================================
-    // Research shows the primary perceptual cue for taps is a brief amplitude
-    // dip, not formant identity.  At high speech rates, smooth crossfade
-    // completely smears the dip.  Emit 3 micro-frames: onset, notch, recovery.
+    // TAP MICRO-EVENT EMISSION (coarticulated amplitude notch)
+    // =========================================================
+    // A tap is almost entirely coarticulation — the tongue tip briefly flicks
+    // the alveolar ridge without the jaw closing.  The primary cue is a brief
+    // amplitude dip, but formants must also sweep smoothly from the preceding
+    // vowel through the alveolar target and back, never dwelling at the tap's
+    // static formant values.  Using static tap formants for all 3 phases
+    // created an abrupt formant jump that sounded velar/clenched.
+    //
+    // New approach: onset starts at 70% previous vowel + 30% tap formants,
+    // notch reaches 100% tap target (brief), recovery blends back out.
+    // The DSP crossfade to the following token handles the exit naturally.
     const bool isTap = t.def && ((t.def->flags & kIsTap) != 0);
     // See non-Ex path comment: skip micro-event notch for very short taps.
     if (isTap && t.durationMs >= 8.0) {
       const double totalDur = t.durationMs;
 
-      // Phase proportions: onset 25%, notch 50%, recovery 25%.
-      // Notch gets a duration floor so the dip survives extreme speeds.
+      // Phase proportions: onset 30%, notch 40%, recovery 30%.
+      // More onset/recovery time than before for smoother coarticulation.
       const double notchFloorMs = 1.5;
-      double notchDur = std::max(totalDur * 0.50, notchFloorMs);
-      if (notchDur > totalDur * 0.80) notchDur = totalDur * 0.80;
+      double notchDur = std::max(totalDur * 0.40, notchFloorMs);
+      if (notchDur > totalDur * 0.70) notchDur = totalDur * 0.70;
       const double remainDur = totalDur - notchDur;
-      // Asymmetric split: short onset, longer recovery.  The tap should
-      // interrupt the vowel stream sharply; the recovery bridges back to the
-      // following vowel and benefits from more time.
-      const double onsetDur = remainDur * 0.35;
+      const double onsetDur = remainDur * 0.45;
       const double recovDur = remainDur - onsetDur;
 
-      // Amplitude dip: reduce voiceAmplitude by 50% in the notch.
+      // Amplitude dip: reduce voiceAmplitude in the notch.
+      // Gentler dip (60%) — the formant sweep now carries identity,
+      // so the amplitude doesn't need to do all the work.
       const int vaIdx = static_cast<int>(FieldId::voiceAmplitude);
       const double origAmp = base[vaIdx];
-      const double notchAmp = origAmp * 0.50;
+      const double notchAmp = origAmp * 0.60;
+
+      // Formant indices for coarticulation blending.
+      const int cf1 = static_cast<int>(FieldId::cf1);
+      const int cf2 = static_cast<int>(FieldId::cf2);
+      const int cf3 = static_cast<int>(FieldId::cf3);
 
       // Pitch interpolation
       const double startPitch = base[vp];
@@ -1943,15 +1954,20 @@ void emitFramesEx(
       const double onsetFrac = (totalDur > 0.0) ? (onsetDur / totalDur) : 0.0;
       const double notchEndFrac = (totalDur > 0.0) ? ((onsetDur + notchDur) / totalDur) : 0.0;
 
-      // Short micro-fade for ALL phases — the tap is a micro-event, not a
-      // normal segment.  Using t.fadeMs (10 ms) on the onset consumed the
-      // entire onset in crossfade, creating an audible gap before the notch.
       const double microFade = std::max(0.5, 1.5 / std::max(0.5, speed));
 
-      // Phase 1: onset — full amplitude, tap formants, sharp entry.
+      // Phase 1: onset — formants blend FROM previous vowel TOWARD tap.
+      // 70% previous + 30% tap = gentle approach, not an abrupt jump.
       {
         double seg[kFrameFieldCount];
         std::memcpy(seg, base, sizeof(seg));
+        if (trajectoryState->hasPrevBase) {
+          const double prevW = 0.70;
+          const double tapW  = 0.30;
+          seg[cf1] = trajectoryState->prevBase[cf1] * prevW + base[cf1] * tapW;
+          seg[cf2] = trajectoryState->prevBase[cf2] * prevW + base[cf2] * tapW;
+          seg[cf3] = trajectoryState->prevBase[cf3] * prevW + base[cf3] * tapW;
+        }
         seg[vp] = startPitch;
         seg[evp] = startPitch + pitchDelta * onsetFrac;
 
@@ -1961,7 +1977,8 @@ void emitFramesEx(
         hadPrevFrame = true;
       }
 
-      // Phase 2: notch — amplitude dipped, tap formants hold.
+      // Phase 2: notch — amplitude dipped, tap formants at full target.
+      // This is the brief moment of alveolar contact.
       {
         double seg[kFrameFieldCount];
         std::memcpy(seg, base, sizeof(seg));
@@ -1974,10 +1991,20 @@ void emitFramesEx(
         cb(userData, &f, &frameEx, notchDur, microFade, userIndexBase);
       }
 
-      // Phase 3: recovery — amplitude back to full, fade out short.
+      // Phase 3: recovery — formants blend AWAY from tap back toward
+      // neutral.  Uses 50/50 blend; the DSP crossfade to the next token
+      // completes the trajectory to the following vowel.
       {
         double seg[kFrameFieldCount];
         std::memcpy(seg, base, sizeof(seg));
+        if (trajectoryState->hasPrevBase) {
+          // Blend toward previous vowel (proxy for surrounding vowel space).
+          const double prevW = 0.50;
+          const double tapW  = 0.50;
+          seg[cf1] = trajectoryState->prevBase[cf1] * prevW + base[cf1] * tapW;
+          seg[cf2] = trajectoryState->prevBase[cf2] * prevW + base[cf2] * tapW;
+          seg[cf3] = trajectoryState->prevBase[cf3] * prevW + base[cf3] * tapW;
+        }
         seg[vp] = startPitch + pitchDelta * notchEndFrac;
         seg[evp] = startPitch + pitchDelta;
 

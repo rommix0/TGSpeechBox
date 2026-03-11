@@ -1132,7 +1132,7 @@ double liquidDynamicsLabialGlideTransitionPct = 0.60;
   double rateCompLiquidFloorMs = 15.0;
   double rateCompAffricateFloorMs = 12.0;
   double rateCompSemivowelFloorMs = 30.0;
-  double rateCompTapFloorMs = 15.0;
+  double rateCompTapFloorMs = 10.0;
   double rateCompTrillFloorMs = 12.0;
   double rateCompVoicedConsonantFloorMs = 10.0;
 

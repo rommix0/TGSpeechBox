@@ -24,6 +24,7 @@ static inline bool tokIsSemivowel(const Token& t) {
   return t.def && ((t.def->flags & kIsSemivowel) != 0);
 }
 
+
 static inline bool tokIsVowelLike(const Token& t) {
   return tokIsVowel(t) || tokIsSemivowel(t);
 }
