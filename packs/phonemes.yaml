@@ -6976,6 +6976,12 @@ phonemes:
     pf6: 4900
     voiceAmplitude: 0.9
   "ɾ":
+    # Voiced alveolar tap.  Brief tongue-tip flick at alveolar ridge,
+    # jaw stays open.  NOT a full stop closure — F1 stays high (~400 Hz)
+    # to avoid sounding velar/clenched.  Minimal frication; the tap is
+    # almost entirely voiced with a quick amplitude dip.
+    # F2 ~1600 Hz (alveolar locus, slightly lower than /d/ to reflect
+    # the more relaxed articulation).
     _isLiquid: false
     _isNasal: false
     _isSemivowel: false
@@ -6985,15 +6991,15 @@ phonemes:
     _isVowel: false
     aspirationAmplitude: 0
     caNP: 0
-    cb1: 60
-    cb2: 80
-    cb3: 130
+    cb1: 80
+    cb2: 100
+    cb3: 150
     cb4: 320
     cb5: 400
     cb6: 1400
     cbN0: 100
     cbNP: 100
-    cf1: 220
+    cf1: 280
     cf2: 1650
     cf3: 2600
     cf4: 3300
@@ -7001,17 +7007,18 @@ phonemes:
     cf6: 4900
     cfN0: 250
     cfNP: 200
-    fricationAmplitude: 0.40
-    pa1: 0.10
-    pa2: 0.22
-    pa3: 0.32
-    pa4: 0.20
-    pa5: 0.12
-    pa6: 0.10
+    voiceAmplitude: 0.90
+    fricationAmplitude: 0.18
+    pa1: 0.20
+    pa2: 0.40
+    pa3: 0.45
+    pa4: 0.50
+    pa5: 0.28
+    pa6: 0.14
     parallelBypass: 0
-    pb1: 55
-    pb2: 100
-    pb3: 160
+    pb1: 70
+    pb2: 110
+    pb3: 170
     pb4: 320
     pb5: 400
     pb6: 1400
