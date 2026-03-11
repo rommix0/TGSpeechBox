@@ -279,6 +279,9 @@ static void splitMixedTokens(std::vector<std::string>& words) {
       if (std::isdigit(prev) && isExpandedSymbol(static_cast<char>(cur))) split = true;
       // expanded symbol → alpha/digit: "%EXP", "%100"
       if (isExpandedSymbol(static_cast<char>(prev)) && (std::isalpha(cur) || std::isdigit(cur))) split = true;
+      // comma between alpha and digit: "neelix,2649" → "neelix" + "2649"
+      if (prev == ',' && std::isdigit(cur)) split = true;
+      if (std::isalpha(prev) && cur == ',') split = true;
 
       if (split) {
         result.push_back(w.substr(start, i - start));
@@ -1300,6 +1303,83 @@ static std::string insertDateOrdinals(const std::string& text) {
   return result;
 }
 
+// ── Time expansion ──
+//
+// Expand H:MM and HH:MM patterns so eSpeak reads times naturally:
+//   "6:03"  → "6 oh 3"   (single-digit minute: use "oh")
+//   "12:45" → "12 45"    (two-digit minute: just space)
+//   "5:00"  → "5 o'clock" (on the hour)
+// Only matches digit(s):digitdigit patterns.
+
+static std::string expandTimes(const std::string& text, const std::string& ohDigit) {
+  std::string result;
+  result.reserve(text.size() + 16);
+  size_t i = 0;
+  while (i < text.size()) {
+    // Look for digit(s) followed by : followed by exactly 2 digits.
+    if (std::isdigit(static_cast<unsigned char>(text[i]))) {
+      size_t numStart = i;
+      while (i < text.size() && std::isdigit(static_cast<unsigned char>(text[i]))) ++i;
+      size_t hourLen = i - numStart;
+      // Must be 1-2 digit hour, followed by colon, followed by exactly 2 digits.
+      if (hourLen <= 2 && i < text.size() && text[i] == ':' &&
+          i + 2 < text.size() &&
+          std::isdigit(static_cast<unsigned char>(text[i + 1])) &&
+          std::isdigit(static_cast<unsigned char>(text[i + 2])) &&
+          (i + 3 >= text.size() || !std::isdigit(static_cast<unsigned char>(text[i + 3])))) {
+        // Validate hour (0-23) and minute (0-59).
+        int hour = std::atoi(text.substr(numStart, hourLen).c_str());
+        int min  = (text[i + 1] - '0') * 10 + (text[i + 2] - '0');
+        if (hour <= 23 && min <= 59) {
+          std::string hourStr = text.substr(numStart, hourLen);
+          if (min == 0) {
+            result += hourStr + " o'clock";
+          } else if (text[i + 1] == '0') {
+            // Single-digit minute: "6:03" → "6 oh 3"
+            std::string oh = ohDigit.empty() ? "oh" : ohDigit;
+            result += hourStr + " " + oh + " " + text[i + 2];
+          } else {
+            // Two-digit minute: "12:45" → "12 45"
+            result += hourStr + " " + text[i + 1] + text[i + 2];
+          }
+          TPLOG("  timeExpand: \"%s\" -> \"%s\"\n",
+                text.substr(numStart, (i + 3) - numStart).c_str(),
+                result.substr(result.size() - hourStr.size() - 4).c_str());
+          i += 3;  // skip past :MM
+          continue;
+        }
+      }
+      // Not a time — copy the digits we scanned.
+      result += text.substr(numStart, i - numStart);
+      continue;
+    }
+    result += text[i];
+    ++i;
+  }
+  return result;
+}
+
+// ── Hyphenated number range expansion ──
+//
+// "2024-2025" → "2024 to 2025" so each number is a separate token
+// and year splitting can process them independently.
+// Only matches digit(s)-digit(s) patterns (not negative numbers).
+
+static std::string expandHyphenatedRanges(const std::string& text) {
+  std::string result;
+  result.reserve(text.size() + 16);
+  for (size_t i = 0; i < text.size(); ++i) {
+    if (text[i] == '-' && i > 0 && i + 1 < text.size() &&
+        std::isdigit(static_cast<unsigned char>(text[i - 1])) &&
+        std::isdigit(static_cast<unsigned char>(text[i + 1]))) {
+      result += " to ";
+    } else {
+      result += text[i];
+    }
+  }
+  return result;
+}
+
 // ── Year splitting ──
 //
 // Split 4-digit numbers into two 2-digit pairs so eSpeak reads them
@@ -1439,7 +1519,17 @@ std::string prepareTextForEspeak(
     result = std::move(expanded);
   }
 
-  // 4. Year splitting ("1995" → "19 95").
+  // 4. Time expansion ("6:03" → "6 oh 3", "12:45" → "12 45").
+  if (langTag.size() >= 2 && (langTag[0] == 'e' || langTag[0] == 'E') &&
+      (langTag[1] == 'n' || langTag[1] == 'N') &&
+      (langTag.size() == 2 || langTag[2] == '-' || langTag[2] == '_')) {
+    result = expandTimes(result, ohDigit);
+  }
+
+  // 5. Hyphenated number ranges ("2024-2025" → "2024 to 2025").
+  result = expandHyphenatedRanges(result);
+
+  // 6. Year splitting ("1995" → "19 95").
   if (yearSplitting) {
     result = splitYears(result, ohDigit);
   }
