@@ -105,8 +105,9 @@ char *tgsb_get_voice_profile_names(TgsbEngine *engine);
 /* --- Pack settings editor --- */
 
 /*
- * Apply setting overrides from a YAML snippet ("key: value\n...").
- * Returns 1 on success, 0 on failure.
+ * DEPRECATED: Use tgsb_set_data(engine, TGSB_DATA_SETTINGS, langTag, key, value)
+ * for per-key overrides instead. This YAML batch path is retained for
+ * backwards compatibility but all callers have been migrated.
  */
 int tgsb_apply_setting_overrides(TgsbEngine *engine, const char *yamlSnippet);
 

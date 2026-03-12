@@ -647,7 +647,11 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetAllEditorOverrides(langTag: String) {
-        prefs.edit().remove("pack_overrides_$langTag").apply()
+        val ver = prefs.getInt("pack_overrides_version", 0) + 1
+        prefs.edit()
+            .remove("pack_overrides_$langTag")
+            .putInt("pack_overrides_version", ver)
+            .apply()
         reloadCurrentLanguage()
         loadEditorSettings(langTag)
     }
@@ -659,12 +663,13 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         applyStoredOverrides(curLang.langDef.tgsbLang)
     }
 
-    /** Apply stored overrides after setLanguage (call from speak path too). */
+    /** Apply stored overrides after setLanguage via per-key setData. */
     fun applyStoredOverrides(tgsbLang: String) {
         val overrides = loadOverrides(tgsbLang)
         if (overrides.isEmpty()) return
-        val yaml = overrides.entries.joinToString("\n") { "${it.key}: ${it.value}" }
-        engine.applySettingOverrides(yaml)
+        for ((k, v) in overrides) {
+            engine.setData(TgsbSpeakEngine.DATA_SETTINGS, tgsbLang, k, v)
+        }
     }
 
     private fun loadOverrides(langTag: String): Map<String, String> {
@@ -676,13 +681,18 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun saveOverrides(langTag: String, overrides: Map<String, String>) {
+        val e = prefs.edit()
         if (overrides.isEmpty()) {
-            prefs.edit().remove("pack_overrides_$langTag").apply()
-            return
+            e.remove("pack_overrides_$langTag")
+        } else {
+            val obj = org.json.JSONObject()
+            for ((k, v) in overrides) obj.put(k, v)
+            e.putString("pack_overrides_$langTag", obj.toString())
         }
-        val obj = org.json.JSONObject()
-        for ((k, v) in overrides) obj.put(k, v)
-        prefs.edit().putString("pack_overrides_$langTag", obj.toString()).apply()
+        // Bump version so the TTS Service knows to reload the pack.
+        val ver = prefs.getInt("pack_overrides_version", 0) + 1
+        e.putInt("pack_overrides_version", ver)
+        e.apply()
     }
 
     private fun detectType(value: String): SettingType = when {

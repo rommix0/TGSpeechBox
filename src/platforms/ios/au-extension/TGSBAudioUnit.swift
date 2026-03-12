@@ -313,7 +313,14 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         // Re-apply engine settings after voice/language identity is set.
         // Language change reloads the pack which resets pitch mode, so
         // settings must also be re-applied after a language change.
-        if curVersion != cachedSettingsVersion || voiceChanged || languageChanged {
+        // Settings version bump also forces a language reload to clear
+        // stale pack overrides from the in-memory pack.
+        let settingsChanged = curVersion != cachedSettingsVersion
+        if settingsChanged && !languageChanged {
+            // Force pack reload to wipe stale in-memory overrides.
+            tgsb_set_language(eng, espeakLang, tgsbLang)
+        }
+        if settingsChanged || voiceChanged || languageChanged {
             let newRate = Self.loadDspRate()
             if newRate != dspRate {
                 tgsb_set_sample_rate(eng, Int32(newRate))
@@ -507,8 +514,9 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String],
               !obj.isEmpty
         else { return }
-        let yaml = obj.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
-        _ = tgsb_apply_setting_overrides(eng, yaml)
+        for (k, v) in obj {
+            tgsb_set_data(eng, TGSB_DATA_SETTINGS, tgsbLang, k, v)
+        }
     }
 
     // MARK: - Resampling

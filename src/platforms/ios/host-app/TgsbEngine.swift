@@ -394,6 +394,9 @@ class TgsbEngine: ObservableObject {
     func resetAllEditorOverrides(langTag: String) {
         let d = UserDefaults(suiteName: kAppGroupId)
         d?.removeObject(forKey: "pack_overrides_\(langTag)")
+        // Bump version so AU extension reloads pack.
+        let ver = (d?.integer(forKey: "adv_settingsVersion") ?? 0) + 1
+        d?.set(ver, forKey: "adv_settingsVersion")
         d?.synchronize()
         reloadCurrentLanguage()
         loadEditorSettings(langTag: langTag)
@@ -482,8 +485,9 @@ class TgsbEngine: ObservableObject {
         guard let eng = engine else { return }
         let overrides = loadOverrides(tgsbLang)
         if overrides.isEmpty { return }
-        let yaml = overrides.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
-        tgsb_apply_setting_overrides(eng, yaml)
+        for (k, v) in overrides {
+            tgsb_set_data(eng, TGSB_DATA_SETTINGS, tgsbLang, k, v)
+        }
     }
 
     private func reloadCurrentLanguage() {
@@ -530,6 +534,9 @@ class TgsbEngine: ObservableObject {
                   let json = String(data: data, encoding: .utf8) {
             d?.set(json, forKey: "pack_overrides_\(langTag)")
         }
+        // Bump version so AU extension reloads pack with new overrides.
+        let ver = (d?.integer(forKey: "adv_settingsVersion") ?? 0) + 1
+        d?.set(ver, forKey: "adv_settingsVersion")
         d?.synchronize()
     }
 

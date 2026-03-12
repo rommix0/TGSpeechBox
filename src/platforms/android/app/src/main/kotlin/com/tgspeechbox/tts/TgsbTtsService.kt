@@ -170,6 +170,7 @@ class TgsbTtsService : TextToSpeechService() {
     /** Tracks what the native side actually has loaded.
      *  null = unknown/failed — forces re-try on next synthesis. */
     private var confirmedNativeLang: LangDef? = null
+    private var cachedOverridesVersion: Int = -1
     private lateinit var prefs: SharedPreferences
 
     // JNI declarations
@@ -219,6 +220,7 @@ class TgsbTtsService : TextToSpeechService() {
     private external fun nativeSetSampleRate(handle: Long, sampleRate: Int)
     private external fun nativeSetPauseMode(handle: Long, mode: Int)
     private external fun nativeApplySettingOverrides(handle: Long, yamlSnippet: String): Int
+    private external fun nativeSetData(handle: Long, domain: Int, langTag: String, key: String, value: String): Int
 
     override fun onCreate() {
         super.onCreate()
@@ -273,16 +275,18 @@ class TgsbTtsService : TextToSpeechService() {
         }
     }
 
-    /** Apply pack setting overrides saved by the editor. */
+    /** Apply pack setting overrides saved by the editor via per-key setData. */
     private fun applyStoredOverrides(tgsbLang: String) {
         if (nativeHandle == 0L) return
         val json = prefs.getString("pack_overrides_$tgsbLang", null) ?: return
         val overrides = try {
             val obj = org.json.JSONObject(json)
-            obj.keys().asSequence().map { "${it}: ${obj.getString(it)}" }.joinToString("\n")
+            obj.keys().asSequence().associateWith { obj.getString(it) }
         } catch (e: Exception) { return }
         if (overrides.isEmpty()) return
-        nativeApplySettingOverrides(nativeHandle, overrides)
+        for ((k, v) in overrides) {
+            nativeSetData(nativeHandle, TgsbSpeakEngine.DATA_SETTINGS, tgsbLang, k, v)
+        }
     }
 
     /**
@@ -577,7 +581,13 @@ class TgsbTtsService : TextToSpeechService() {
         // Ensure the native side has the right language loaded BEFORE
         // applying advanced settings — setPitchMode writes to h->pack
         // which requires a loaded language pack.
-        if (confirmedNativeLang != currentLang) {
+        // Check overrides version: if the editor changed overrides, force
+        // a full pack reload so cleared/changed overrides take effect.
+        val overridesVer = prefs.getInt("pack_overrides_version", 0)
+        val overridesChanged = overridesVer != cachedOverridesVersion
+        cachedOverridesVersion = overridesVer
+
+        if (confirmedNativeLang != currentLang || overridesChanged) {
             setNativeLanguage(currentLang)
         } else {
             applyStoredOverrides(currentLang.tgsbLang)

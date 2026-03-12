@@ -966,6 +966,8 @@ Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeSetPauseMode(
 
 /* ------------------------------------------------------------------ */
 /* Pack settings editor API                                           */
+/* DEPRECATED: Use nativeSetData(DATA_SETTINGS, ...) per-key instead. */
+/* Retained for backwards compatibility — all callers have migrated.  */
 /* ------------------------------------------------------------------ */
 
 JNIEXPORT jint JNICALL
