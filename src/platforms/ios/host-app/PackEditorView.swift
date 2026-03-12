@@ -89,6 +89,7 @@ private struct PackSettingsListView: View {
     @State private var showResetAll = false
     @State private var showImportPicker = false
     @State private var showExportPicker = false
+    @State private var exportFileURL: URL?
     @State private var showImportConfirm = false
     @State private var pendingImportURL: URL?
     @State private var statusMessage: String?
@@ -104,6 +105,7 @@ private struct PackSettingsListView: View {
                         Text("Back")
                     }
                 }
+                .accessibilityLabel("Back to language list")
                 .accessibilityFocused($headerFocused)
                 Spacer()
                 Text(langTag)
@@ -116,10 +118,14 @@ private struct PackSettingsListView: View {
 
             // Import / Export actions
             HStack(spacing: 12) {
-                Button("Import Pack") { showImportPicker = true }
+                Button("Import") { showImportPicker = true }
                     .buttonStyle(.bordered)
-                Button("Export Pack") { showExportPicker = true }
+                Button("Export") { showExportPicker = true }
                     .buttonStyle(.bordered)
+                if let url = exportFileURL {
+                    ShareLink("Share", item: url)
+                        .buttonStyle(.bordered)
+                }
             }
             .padding(.horizontal)
             .padding(.bottom, 8)
@@ -153,9 +159,8 @@ private struct PackSettingsListView: View {
         }
         .onAppear {
             engine.loadEditorSettings(langTag: langTag)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                headerFocused = true
-            }
+            exportFileURL = engine.exportPackToTempFile(langTag: langTag)
+            headerFocused = true
         }
         .alert("Edit Value", isPresented: Binding(
             get: { editingKey != nil },
@@ -308,7 +313,7 @@ struct PackYamlDocument: FileDocument {
 
     let content: String
 
-    init(engine: TgsbEngine, langTag: String) {
+    @MainActor init(engine: TgsbEngine, langTag: String) {
         content = engine.packYamlContent(langTag: langTag) ?? ""
     }
 
