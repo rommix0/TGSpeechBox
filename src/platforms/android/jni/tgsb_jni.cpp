@@ -858,6 +858,48 @@ Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeQueueText(
          ctx.frameCount, sp, bp);
 }
 
+/*
+ * nativeQueueIpa — Queue raw IPA for synthesis, skipping eSpeak.
+ * Used for phoneme preview: play a single phoneme in isolation.
+ * Uses nvspFrontend_previewPhoneme to bypass the full pipeline
+ * (no allophone rules, no pitch contour — just raw DSP frame).
+ */
+JNIEXPORT void JNICALL
+Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeQueueIpa(
+    JNIEnv *env, jobject thiz,
+    jlong handle, jstring ipa, jdouble speed, jdouble pitchHz
+) {
+    TgsbEngine *engine = (TgsbEngine *)(intptr_t)handle;
+    if (!engine || !engine->player || !engine->frontend) return;
+
+    engine->stopRequested = 0;
+
+    speechPlayer_queueFrame(engine->player, NULL, 0, 0, -1, true);
+
+    const char *ipaChars = env->GetStringUTFChars(ipa, NULL);
+    if (!ipaChars || !*ipaChars) {
+        if (ipaChars) env->ReleaseStringUTFChars(ipa, ipaChars);
+        return;
+    }
+
+    double bp = pitchHz;
+    if (bp < 40.0) bp = 40.0;
+    if (bp > 500.0) bp = 500.0;
+
+    FrameCtx ctx;
+    ctx.engine = engine;
+    ctx.frameCount = 0;
+
+    int ok = nvspFrontend_previewPhoneme(
+        engine->frontend, ipaChars,
+        bp, 300.0,
+        onFrame, &ctx
+    );
+
+    LOGI("SpeakEngine: previewPhoneme ok=%d frames=%d", ok, ctx.frameCount);
+    env->ReleaseStringUTFChars(ipa, ipaChars);
+}
+
 JNIEXPORT jint JNICALL
 Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativePullAudio(
     JNIEnv *env, jobject thiz,

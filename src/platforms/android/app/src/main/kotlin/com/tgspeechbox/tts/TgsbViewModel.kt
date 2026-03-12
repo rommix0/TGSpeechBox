@@ -712,6 +712,238 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         }.toString().replaceFirstChar { it.uppercase() }
     }
 
+    // ── Phoneme editor ────────────────────────────────────────────────
+
+    data class PhonemeEntry(
+        val key: String,         // IPA key e.g. "ɪ"
+        val phonemeClass: String, // "vowel", "stop", etc.
+        val mappingFrom: String   // non-empty in lang-filtered view
+    )
+
+    data class PhonemeField(
+        val key: String,          // full dot key e.g. "ɪ.cf2"
+        val fieldName: String,    // just the field part e.g. "cf2"
+        val displayName: String,  // human-readable e.g. "F2 Frequency"
+        val value: String,
+        val isOverridden: Boolean,
+        val type: SettingType
+    )
+
+    /** Human-readable names and sort order for phoneme fields. */
+    private val phonemeFieldInfo = linkedMapOf(
+        // ── Voicing ──
+        "voicePitch" to "Voice Pitch (Hz)",
+        "endVoicePitch" to "End Voice Pitch (Hz)",
+        "voiceAmplitude" to "Voice Amplitude",
+        "aspirationAmplitude" to "Aspiration Amplitude",
+        "glottalOpenQuotient" to "Glottal Open Quotient",
+        "voiceTurbulenceAmplitude" to "Voice Turbulence",
+        "vibratoPitchOffset" to "Vibrato Pitch Offset",
+        "vibratoSpeed" to "Vibrato Speed (Hz)",
+        // ── Cascade formants ──
+        "cf1" to "F1 Frequency (Hz)",
+        "cf2" to "F2 Frequency (Hz)",
+        "cf3" to "F3 Frequency (Hz)",
+        "cf4" to "F4 Frequency (Hz)",
+        "cf5" to "F5 Frequency (Hz)",
+        "cf6" to "F6 Frequency (Hz)",
+        "cb1" to "F1 Bandwidth (Hz)",
+        "cb2" to "F2 Bandwidth (Hz)",
+        "cb3" to "F3 Bandwidth (Hz)",
+        "cb4" to "F4 Bandwidth (Hz)",
+        "cb5" to "F5 Bandwidth (Hz)",
+        "cb6" to "F6 Bandwidth (Hz)",
+        // ── Nasal formants ──
+        "cfN0" to "Nasal Zero Frequency",
+        "cfNP" to "Nasal Pole Frequency",
+        "cbN0" to "Nasal Zero Bandwidth",
+        "cbNP" to "Nasal Pole Bandwidth",
+        "caNP" to "Nasal Pole Amplitude",
+        // ── Frication ──
+        "fricationAmplitude" to "Frication Amplitude",
+        "preFormantGain" to "Pre-Formant Gain",
+        // ── Parallel formants ──
+        "pf1" to "Parallel F1 Frequency",
+        "pf2" to "Parallel F2 Frequency",
+        "pf3" to "Parallel F3 Frequency",
+        "pf4" to "Parallel F4 Frequency",
+        "pf5" to "Parallel F5 Frequency",
+        "pf6" to "Parallel F6 Frequency",
+        "pb1" to "Parallel F1 Bandwidth",
+        "pb2" to "Parallel F2 Bandwidth",
+        "pb3" to "Parallel F3 Bandwidth",
+        "pb4" to "Parallel F4 Bandwidth",
+        "pb5" to "Parallel F5 Bandwidth",
+        "pb6" to "Parallel F6 Bandwidth",
+        "pa1" to "Parallel F1 Amplitude",
+        "pa2" to "Parallel F2 Amplitude",
+        "pa3" to "Parallel F3 Amplitude",
+        "pa4" to "Parallel F4 Amplitude",
+        "pa5" to "Parallel F5 Amplitude",
+        "pa6" to "Parallel F6 Amplitude",
+        "parallelBypass" to "Parallel Bypass",
+        "outputGain" to "Output Gain",
+        // ── Flags ──
+        "_isVowel" to "Is Vowel",
+        "_isVoiced" to "Is Voiced",
+        "_isStop" to "Is Stop",
+        "_isNasal" to "Is Nasal",
+        "_isLiquid" to "Is Liquid",
+        "_isSemivowel" to "Is Semivowel",
+        "_isAffricate" to "Is Affricate",
+        "_isTap" to "Is Tap",
+        "_isTrill" to "Is Trill",
+        "_copyAdjacent" to "Copy Adjacent",
+        // ── FrameEx ──
+        "frameEx.creakiness" to "Creakiness",
+        "frameEx.breathiness" to "Breathiness",
+        "frameEx.jitter" to "Jitter",
+        "frameEx.shimmer" to "Shimmer",
+        "frameEx.sharpness" to "Glottal Sharpness",
+        "frameEx.endCf1" to "Diphthong End F1",
+        "frameEx.endCf2" to "Diphthong End F2",
+        "frameEx.endCf3" to "Diphthong End F3",
+        "frameEx.endPf1" to "Diphthong End Parallel F1",
+        "frameEx.endPf2" to "Diphthong End Parallel F2",
+        "frameEx.endPf3" to "Diphthong End Parallel F3",
+        // ── Micro-events ──
+        "burstDurationMs" to "Burst Duration (ms)",
+        "burstDecayRate" to "Burst Decay Rate",
+        "burstSpectralTilt" to "Burst Spectral Tilt",
+        "voiceBarAmplitude" to "Voice Bar Amplitude",
+        "voiceBarF1" to "Voice Bar F1 (Hz)",
+        "releaseSpreadMs" to "Release Spread (ms)",
+        "fricAttackMs" to "Frication Attack (ms)",
+        "fricDecayMs" to "Frication Decay (ms)",
+        "durationScale" to "Duration Scale",
+    )
+
+    /** Sort order: fields in phonemeFieldInfo map order, unknowns at end. */
+    private val phonemeFieldOrder: Map<String, Int> by lazy {
+        phonemeFieldInfo.keys.withIndex().associate { (i, k) -> k to i }
+    }
+
+    private fun phonemeDisplayName(fieldName: String): String =
+        phonemeFieldInfo[fieldName] ?: camelToDisplay(fieldName)
+
+    val phonemeList = MutableStateFlow<List<PhonemeEntry>>(emptyList())
+    val phonemeFields = MutableStateFlow<List<PhonemeField>>(emptyList())
+    private var phonemeLangFilter: String = ""
+
+    fun loadPhonemeList(langTag: String = "") {
+        phonemeLangFilter = langTag
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_PHONEMES, langTag)
+            ?: return
+        val arr = org.json.JSONArray(jsonStr)
+        val seen = mutableMapOf<String, PhonemeEntry>()
+        for (i in 0 until arr.length()) {
+            val obj = arr.getJSONObject(i)
+            val group = obj.getString("group")
+            if (group !in seen) {
+                seen[group] = PhonemeEntry(
+                    key = group,
+                    phonemeClass = obj.optString("class", "other"),
+                    mappingFrom = obj.optString("mappingFrom", "")
+                )
+            }
+        }
+        phonemeList.value = seen.values.toList()
+    }
+
+    fun loadPhonemeFields(phonemeKey: String) {
+        // Query all phonemes (always from base) and filter to this phoneme.
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_PHONEMES, "")
+            ?: return
+        val overrides = loadPhonemeOverrides()
+        val arr = org.json.JSONArray(jsonStr)
+        val fields = mutableListOf<PhonemeField>()
+        for (i in 0 until arr.length()) {
+            val obj = arr.getJSONObject(i)
+            if (obj.getString("group") != phonemeKey) continue
+            val fullKey = obj.getString("key")
+            val fieldName = fullKey.removePrefix("$phonemeKey.")
+            val baseValue = obj.get("value").toString()
+            val effectiveValue = overrides[fullKey] ?: baseValue
+            val jsonType = obj.getString("type")
+            val type = when (jsonType) {
+                "bool" -> SettingType.Bool
+                "float" -> SettingType.Number
+                else -> SettingType.Text
+            }
+            fields.add(PhonemeField(
+                key = fullKey,
+                fieldName = fieldName,
+                displayName = phonemeDisplayName(fieldName),
+                value = effectiveValue,
+                isOverridden = overrides.containsKey(fullKey),
+                type = type
+            ))
+        }
+        val maxOrder = phonemeFieldOrder.size
+        phonemeFields.value = fields.sortedBy { phonemeFieldOrder[it.fieldName] ?: maxOrder }
+    }
+
+    fun setPhonemeOverride(fullKey: String, value: String) {
+        // Apply in-memory immediately for live preview.
+        engine.setData(TgsbSpeakEngine.DATA_PHONEMES, "", fullKey, value)
+
+        // Persist to SharedPreferences.
+        val overrides = loadPhonemeOverrides().toMutableMap()
+        overrides[fullKey] = value
+        savePhonemeOverrides(overrides)
+    }
+
+    fun removePhonemeOverride(fullKey: String) {
+        val overrides = loadPhonemeOverrides().toMutableMap()
+        overrides.remove(fullKey)
+        savePhonemeOverrides(overrides)
+        // Reload language to get base value back.
+        reloadCurrentLanguage()
+        reapplyAllPhonemeOverrides()
+    }
+
+    /** Remove all overrides for a single phoneme (keys starting with "phonemeKey."). */
+    fun resetPhonemeOverrides(phonemeKey: String) {
+        val prefix = "$phonemeKey."
+        val overrides = loadPhonemeOverrides().toMutableMap()
+        overrides.keys.removeAll { it.startsWith(prefix) }
+        savePhonemeOverrides(overrides)
+        reloadCurrentLanguage()
+        reapplyAllPhonemeOverrides()
+    }
+
+    fun previewPhoneme(ipa: String) {
+        engine.previewPhoneme(ipa)
+    }
+
+    private fun loadPhonemeOverrides(): Map<String, String> {
+        val json = prefs.getString("phoneme_overrides", null) ?: return emptyMap()
+        return try {
+            val obj = org.json.JSONObject(json)
+            obj.keys().asSequence().associateWith { obj.getString(it) }
+        } catch (e: Exception) { emptyMap() }
+    }
+
+    private fun savePhonemeOverrides(overrides: Map<String, String>) {
+        val e = prefs.edit()
+        if (overrides.isEmpty()) {
+            e.remove("phoneme_overrides")
+        } else {
+            val obj = org.json.JSONObject()
+            for ((k, v) in overrides) obj.put(k, v)
+            e.putString("phoneme_overrides", obj.toString())
+        }
+        e.apply()
+    }
+
+    /** Re-apply all phoneme overrides after a language reload. */
+    fun reapplyAllPhonemeOverrides() {
+        val overrides = loadPhonemeOverrides()
+        for ((k, v) in overrides) {
+            engine.setData(TgsbSpeakEngine.DATA_PHONEMES, "", k, v)
+        }
+    }
+
     // ── Pack import / export ───────────────────────────────────────────
 
     private val _importExportStatus = MutableStateFlow<String?>(null)

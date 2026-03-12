@@ -1,7 +1,8 @@
 /*
- * EditorScreen — Pack settings editor tab.
+ * EditorScreen — Pack settings and phoneme editor.
  *
- * Lets users view and override language pack settings.
+ * Tabbed interface: Packs (language pack settings) and Phonemes
+ * (acoustic parameters with live preview).
  * Changes are stored in SharedPreferences and re-applied after setLanguage.
  *
  * License: GPL-3.0
@@ -13,12 +14,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +37,29 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun EditorScreen(viewModel: TgsbViewModel) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabTitles = listOf("Packs", "Phonemes")
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TabRow(selectedTabIndex = selectedTab) {
+            tabTitles.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = { Text(title) }
+                )
+            }
+        }
+
+        when (selectedTab) {
+            0 -> PacksTab(viewModel)
+            1 -> PhonemesTab(viewModel)
+        }
+    }
+}
+
+@Composable
+private fun PacksTab(viewModel: TgsbViewModel) {
     var selectedLang by remember { mutableStateOf<String?>(null) }
 
     if (selectedLang != null) {
@@ -50,6 +77,435 @@ fun EditorScreen(viewModel: TgsbViewModel) {
 }
 
 @Composable
+private fun PhonemesTab(viewModel: TgsbViewModel) {
+    var selectedPhoneme by remember { mutableStateOf<String?>(null) }
+    var langFilter by remember { mutableStateOf("") }
+
+    if (selectedPhoneme != null) {
+        PhonemeDetailScreen(
+            viewModel = viewModel,
+            phonemeKey = selectedPhoneme!!,
+            onBack = { selectedPhoneme = null }
+        )
+    } else {
+        PhonemeListScreen(
+            viewModel = viewModel,
+            langFilter = langFilter,
+            onLangFilterChanged = { langFilter = it },
+            onPhonemeSelected = { selectedPhoneme = it }
+        )
+    }
+}
+
+@Composable
+private fun PhonemeListScreen(
+    viewModel: TgsbViewModel,
+    langFilter: String,
+    onLangFilterChanged: (String) -> Unit,
+    onPhonemeSelected: (String) -> Unit
+) {
+    val phonemes by viewModel.phonemeList.collectAsState()
+    val langs by viewModel.editorLanguages.collectAsState()
+
+    LaunchedEffect(langFilter) {
+        viewModel.loadEditorLanguages()
+        viewModel.loadPhonemeList(langFilter)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Language filter dropdown
+        var expanded by remember { mutableStateOf(false) }
+        val filterLabel = if (langFilter.isEmpty()) "All phonemes" else langFilter
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier.semantics {
+                    contentDescription = "$filterLabel, dropdown menu"
+                }
+            ) {
+                Text(filterLabel, modifier = Modifier.clearAndSetSemantics {})
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("All phonemes") },
+                    onClick = {
+                        onLangFilterChanged("")
+                        expanded = false
+                    }
+                )
+                for (lang in langs) {
+                    DropdownMenuItem(
+                        text = { Text(lang) },
+                        onClick = {
+                            onLangFilterChanged(lang)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "${phonemes.size} phonemes",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyColumn {
+            items(phonemes, key = { it.key }) { entry ->
+                val desc = buildString {
+                    append(entry.key)
+                    append(", ")
+                    append(entry.phonemeClass)
+                    if (entry.mappingFrom.isNotEmpty()) {
+                        append(", mapped from ")
+                        append(entry.mappingFrom)
+                    }
+                }
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPhonemeSelected(entry.key) }
+                        .semantics { contentDescription = desc },
+                    tonalElevation = 1.dp,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = entry.key,
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.clearAndSetSemantics {}
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier
+                            .weight(1f)
+                            .clearAndSetSemantics {}
+                        ) {
+                            Text(
+                                text = entry.phonemeClass,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (entry.mappingFrom.isNotEmpty()) {
+                                Text(
+                                    text = "from: ${entry.mappingFrom}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+    }
+}
+
+/** Slider range for a phoneme field based on its name and current value. */
+private fun phonemeFieldRange(fieldName: String, value: Float): ClosedFloatingPointRange<Float> {
+    return when {
+        // Formant frequencies (cf1-6, pf1-6)
+        fieldName.matches(Regex("^[cp]f[1-6]$")) -> 0f..8000f
+        fieldName in listOf("cfNP", "cfN", "cfTP") -> 0f..5000f
+        // End-of-diphthong formant frequencies
+        fieldName.matches(Regex("^end[CP]f[1-6]$")) -> 0f..8000f
+        // Bandwidths (cb1-6, pb1-6)
+        fieldName.matches(Regex("^[cp]b[1-6]$")) -> 0f..1000f
+        fieldName.matches(Regex("^end[CP]b[1-6]$")) -> 0f..1000f
+        // Parallel amplitudes (pa1-6)
+        fieldName.matches(Regex("^pa[1-6]$")) -> 0f..1.5f
+        // Named amplitudes
+        fieldName.contains("Amplitude") || fieldName.contains("amplitude") -> 0f..1.5f
+        // Pitch
+        fieldName.contains("Pitch") || fieldName.contains("pitch") -> 40f..500f
+        // Gains and ratios (0-1 range)
+        fieldName in listOf("preFormantGain", "parallelBypass",
+            "glottalOpenQuotient", "breathiness", "creakiness",
+            "jitter", "shimmer", "sharpness") -> 0f..1f
+        // Fallback: relative range around current value
+        value in 0f..1f -> 0f..1.5f
+        value > 1f -> 0f..maxOf(value * 2.5f, 100f)
+        else -> 0f..maxOf(value * 2.5f, 100f)
+    }
+}
+
+/** Format a slider value for display — drop trailing zeros. */
+private fun fmtVal(v: Float): String {
+    return if (v == v.toLong().toFloat()) v.toLong().toString()
+    else "%.2f".format(v).trimEnd('0').trimEnd('.')
+}
+
+@Composable
+private fun PhonemeDetailScreen(
+    viewModel: TgsbViewModel,
+    phonemeKey: String,
+    onBack: () -> Unit
+) {
+    val fields by viewModel.phonemeFields.collectAsState()
+    var editingKey by remember { mutableStateOf<String?>(null) }
+    var editingValue by remember { mutableStateOf("") }
+
+    LaunchedEffect(phonemeKey) {
+        viewModel.loadPhonemeFields(phonemeKey)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Top bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+            Text(
+                text = phonemeKey,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f)
+            )
+            // Preview button
+            IconButton(
+                onClick = { viewModel.previewPhoneme(phonemeKey) },
+                modifier = Modifier.semantics {
+                    contentDescription = "Preview $phonemeKey"
+                }
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+            }
+            // Reset all overrides for this phoneme
+            TextButton(onClick = {
+                viewModel.resetPhonemeOverrides(phonemeKey)
+                viewModel.loadPhonemeFields(phonemeKey)
+            }) {
+                Text("Reset all")
+            }
+        }
+
+        if (fields.isEmpty()) {
+            Text(
+                text = "No fields",
+                modifier = Modifier.padding(16.dp)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                items(fields, key = { it.key }) { field ->
+                    PhonemeFieldRow(
+                        field = field,
+                        onValueChanged = { newVal ->
+                            viewModel.setPhonemeOverride(field.key, newVal)
+                        },
+                        onEdit = {
+                            editingKey = field.key
+                            editingValue = field.value
+                        },
+                        onToggle = { newVal ->
+                            viewModel.setPhonemeOverride(field.key, newVal)
+                            viewModel.loadPhonemeFields(phonemeKey)
+                        },
+                        onReset = {
+                            viewModel.removePhonemeOverride(field.key)
+                            viewModel.loadPhonemeFields(phonemeKey)
+                        },
+                        onPreview = { viewModel.previewPhoneme(phonemeKey) }
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+
+    // Edit value dialog (tap field name for precise input)
+    if (editingKey != null) {
+        AlertDialog(
+            onDismissRequest = { editingKey = null },
+            title = { Text(editingKey!!.substringAfter(".")) },
+            text = {
+                OutlinedTextField(
+                    value = editingValue,
+                    onValueChange = { editingValue = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.setPhonemeOverride(editingKey!!, editingValue)
+                    viewModel.previewPhoneme(phonemeKey)
+                    viewModel.loadPhonemeFields(phonemeKey)
+                    editingKey = null
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingKey = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun PhonemeFieldRow(
+    field: TgsbViewModel.PhonemeField,
+    onValueChanged: (String) -> Unit,
+    onEdit: () -> Unit,
+    onToggle: (String) -> Unit,
+    onReset: () -> Unit,
+    onPreview: () -> Unit
+) {
+    val isBool = field.type == TgsbViewModel.SettingType.Bool
+    val isNumber = field.type == TgsbViewModel.SettingType.Number
+
+    if (isBool) {
+        // Boolean toggle row
+        val checked = field.value == "true"
+        val overriddenSuffix = if (field.isOverridden) ", overridden" else ""
+        val rowDesc = "${field.displayName}, ${if (checked) "on" else "off"}$overriddenSuffix"
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = checked,
+                    onValueChange = { onToggle(if (it) "true" else "false") },
+                    role = androidx.compose.ui.semantics.Role.Switch
+                )
+                .semantics { contentDescription = rowDesc }
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = field.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f).clearAndSetSemantics {}
+            )
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                modifier = Modifier.clearAndSetSemantics {}
+            )
+        }
+        if (field.isOverridden) {
+            TextButton(onClick = onReset) {
+                Text("Reset", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    } else if (isNumber) {
+        // Numeric slider row with live preview on release
+        val baseValue = field.value.toFloatOrNull() ?: 0f
+        var sliderValue by remember(field.key, field.value) {
+            mutableStateOf(baseValue)
+        }
+        val range = phonemeFieldRange(field.fieldName, baseValue)
+        val overriddenSuffix = if (field.isOverridden) ", overridden" else ""
+
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            // Label row — tap to open text input for precise values
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onEdit)
+                    .semantics {
+                        contentDescription =
+                            "${field.displayName}, ${fmtVal(sliderValue)}$overriddenSuffix, double tap for exact input"
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = field.displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f).clearAndSetSemantics {}
+                )
+                Text(
+                    text = fmtVal(sliderValue),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (field.isOverridden)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clearAndSetSemantics {}
+                )
+            }
+            // Slider — drag to adjust, preview plays on release
+            Slider(
+                value = sliderValue.coerceIn(range),
+                onValueChange = { newVal ->
+                    sliderValue = newVal
+                    onValueChanged(fmtVal(newVal))
+                },
+                onValueChangeFinished = {
+                    onPreview()
+                },
+                valueRange = range,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription =
+                            "${field.displayName} slider, ${fmtVal(sliderValue)}"
+                    }
+            )
+            if (field.isOverridden) {
+                TextButton(onClick = onReset) {
+                    Text("Reset", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    } else {
+        // Text field row (non-numeric, non-bool)
+        val overriddenSuffix = if (field.isOverridden) ", overridden" else ""
+        val rowDesc = "${field.displayName}, ${field.value}$overriddenSuffix"
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onEdit)
+                .semantics { contentDescription = rowDesc }
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = field.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f).clearAndSetSemantics {}
+            )
+            Text(
+                text = field.value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clearAndSetSemantics {}
+            )
+        }
+        if (field.isOverridden) {
+            TextButton(onClick = onReset) {
+                Text("Reset", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
 private fun LanguageListScreen(
     viewModel: TgsbViewModel,
     onLanguageSelected: (String) -> Unit
@@ -63,6 +519,7 @@ private fun LanguageListScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
         Text(
@@ -80,25 +537,21 @@ private fun LanguageListScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        Column(
-            modifier = Modifier.verticalScroll(rememberScrollState())
-        ) {
-            for (lang in langs) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onLanguageSelected(lang) },
-                    tonalElevation = 1.dp,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = lang,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+        for (lang in langs) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onLanguageSelected(lang) },
+                tonalElevation = 1.dp,
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = lang,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(16.dp)
+                )
             }
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }

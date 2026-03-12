@@ -68,6 +68,9 @@ class TgsbSpeakEngine(private val context: Context) {
     private external fun nativeQueueText(
         handle: Long, text: String, speed: Double, pitchHz: Double
     )
+    private external fun nativeQueueIpa(
+        handle: Long, ipa: String, speed: Double, pitchHz: Double
+    )
     private external fun nativePullAudio(
         handle: Long, outBuffer: ShortArray, maxSamples: Int
     ): Int
@@ -271,6 +274,46 @@ class TgsbSpeakEngine(private val context: Context) {
                 setSpeaking(false)
             }
         }, "TgsbSynth").also { it.start() }
+    }
+
+    // ── Phoneme preview ────────────────────────────────────────────
+
+    /**
+     * Preview a phoneme in isolation by synthesizing raw IPA.
+     * Used by the phoneme editor — plays the sound immediately.
+     */
+    fun previewPhoneme(ipa: String, speed: Double = 1.0, pitchHz: Double = 120.0) {
+        if (nativeHandle == 0L) return
+        stop()
+
+        stopRequested = false
+        setSpeaking(true)
+
+        synthThread = Thread({
+            try {
+                nativeQueueIpa(nativeHandle, ipa, speed, pitchHz)
+
+                val chunk = ShortArray(4096)
+                val allSamples = mutableListOf<Short>()
+
+                while (!stopRequested) {
+                    val n = nativePullAudio(nativeHandle, chunk, chunk.size)
+                    if (n <= 0) break
+                    for (i in 0 until n) allSamples.add(chunk[i])
+                }
+
+                if (stopRequested || allSamples.isEmpty()) {
+                    setSpeaking(false)
+                    return@Thread
+                }
+
+                val pcmArray = ShortArray(allSamples.size) { allSamples[it] }
+                playPcm(pcmArray)
+            } catch (e: Exception) {
+                Log.e(TAG, "Phoneme preview error: ${e.message}", e)
+                setSpeaking(false)
+            }
+        }, "TgsbPhonemePreview").also { it.start() }
     }
 
     // ── Pack settings editor ────────────────────────────────────────
