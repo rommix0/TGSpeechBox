@@ -175,7 +175,8 @@ settings:
     enabled: true
     durationScale: 1.0
     pairScales:
-      "a j": 1.20         # PRICE — wide (offglide is semivowel in RP)
+      "a j": 1.20         # PRICE — wide (fallback if replacement doesn't fire)
+      "a_gb j": 1.20     # PRICE — RP retracted onset via a_gb
       "å w": 1.30          # MOUTH — wide (å = RP open back onset)
       "ɔ j": 1.05          # CHOICE — slightly tightened from 1.15
       "e j": 0.95          # FACE — narrow
@@ -810,10 +811,11 @@ normalization:
     - from: "ɝ"
       to: "ɜ"
 
-    # RP PRICE: compound with [ʌ]-like onset (F1=610, more closed than
-    # GenAm [ɑ] F1=660).  Bjelakovic 2016: RP onset is retracted/centralized.
+    # RP PRICE onset: a_gb (F2=1350, retracted from GenAm 1430).
+    # Keeps pair structure so collapse handles onset hold + micro-frames.
+    # Compound approach (ɑj_gb) had rushed/forced glide at low rates.
     - from: "a͡ɪ"
-      to:   "ɑj_gb"
+      to:   "a_gb͡ɪ"
 
     # RP GOAT: compound with [ʊ] offset target (F2=1000), not [w] (F2=610).
     # Fixes "oww" quality reported by Alex Chapman and Dane Stange.
