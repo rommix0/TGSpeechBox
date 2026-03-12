@@ -120,6 +120,16 @@ char *tgsb_get_available_languages(TgsbEngine *engine);
 /* Free a string returned by tgsb_query_data or tgsb_get_available_languages. */
 void tgsb_free_string(char *str);
 
+/* --- Phoneme preview --- */
+
+/*
+ * Preview a single phoneme in isolation (bypasses eSpeak + pipeline).
+ * Queues DSP frames directly — call tgsb_pull_audio() afterwards.
+ * Returns 1 on success, 0 if phoneme not found.
+ */
+int tgsb_preview_phoneme(TgsbEngine *engine, const char *phonemeKey,
+                         double pitchHz, double durationMs);
+
 /* --- Generic Data Query API (ABI v5+) --- */
 
 /* Domain constants (match NVSP_DATA_* in nvspFrontend.h). */

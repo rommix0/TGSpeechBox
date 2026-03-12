@@ -639,6 +639,36 @@ void tgsb_free_string(char *str)
 }
 
 /* ------------------------------------------------------------------ */
+/* Phoneme preview                                                     */
+/* ------------------------------------------------------------------ */
+
+int tgsb_preview_phoneme(TgsbEngine *engine, const char *phonemeKey,
+                         double pitchHz, double durationMs)
+{
+    if (!engine || !engine->player || !engine->frontend) return 0;
+    if (!phonemeKey || !*phonemeKey) return 0;
+
+    engine->stopRequested = 0;
+
+    /* Purge stale frames */
+    speechPlayer_queueFrame(engine->player, NULL, 0, 0, -1, true);
+
+    if (pitchHz < 40.0) pitchHz = 40.0;
+    if (pitchHz > 500.0) pitchHz = 500.0;
+
+    FrameCtx ctx;
+    ctx.engine = engine;
+    ctx.frameCount = 0;
+
+    int ok = nvspFrontend_previewPhoneme(
+        engine->frontend, phonemeKey,
+        pitchHz, durationMs,
+        onFrame, &ctx
+    );
+    return ok;
+}
+
+/* ------------------------------------------------------------------ */
 /* Generic Data Query API (ABI v5+)                                   */
 /* ------------------------------------------------------------------ */
 

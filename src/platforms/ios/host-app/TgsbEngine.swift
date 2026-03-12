@@ -558,6 +558,261 @@ class TgsbEngine: ObservableObject {
         return result.prefix(1).uppercased() + result.dropFirst()
     }
 
+    // MARK: - Phoneme editor
+
+    struct PhonemeEntry: Identifiable {
+        let id: String  // IPA key
+        let key: String
+        let phonemeClass: String // "vowel", "stop", etc.
+        let mappingFrom: String  // non-empty in lang-filtered view
+    }
+
+    struct PhonemeField: Identifiable {
+        let id: String       // full dot key e.g. "ɪ.cf2"
+        let key: String
+        let fieldName: String    // just the field part e.g. "cf2"
+        let displayName: String
+        let value: String
+        let isOverridden: Bool
+        let type: SettingType
+    }
+
+    /// Human-readable names and sort order for phoneme fields.
+    private static let phonemeFieldInfo: [(String, String)] = [
+        // Voicing
+        ("voicePitch", "Voice Pitch (Hz)"),
+        ("endVoicePitch", "End Voice Pitch (Hz)"),
+        ("voiceAmplitude", "Voice Amplitude"),
+        ("aspirationAmplitude", "Aspiration Amplitude"),
+        ("glottalOpenQuotient", "Glottal Open Quotient"),
+        ("voiceTurbulenceAmplitude", "Voice Turbulence"),
+        ("vibratoPitchOffset", "Vibrato Pitch Offset"),
+        ("vibratoSpeed", "Vibrato Speed (Hz)"),
+        // Cascade formants
+        ("cf1", "F1 Frequency (Hz)"), ("cf2", "F2 Frequency (Hz)"),
+        ("cf3", "F3 Frequency (Hz)"), ("cf4", "F4 Frequency (Hz)"),
+        ("cf5", "F5 Frequency (Hz)"), ("cf6", "F6 Frequency (Hz)"),
+        ("cb1", "F1 Bandwidth (Hz)"), ("cb2", "F2 Bandwidth (Hz)"),
+        ("cb3", "F3 Bandwidth (Hz)"), ("cb4", "F4 Bandwidth (Hz)"),
+        ("cb5", "F5 Bandwidth (Hz)"), ("cb6", "F6 Bandwidth (Hz)"),
+        // Nasal
+        ("cfN0", "Nasal Zero Frequency"), ("cfNP", "Nasal Pole Frequency"),
+        ("cbN0", "Nasal Zero Bandwidth"), ("cbNP", "Nasal Pole Bandwidth"),
+        ("caNP", "Nasal Pole Amplitude"),
+        // Frication
+        ("fricationAmplitude", "Frication Amplitude"),
+        ("preFormantGain", "Pre-Formant Gain"),
+        // Parallel formants
+        ("pf1", "Parallel F1 Frequency"), ("pf2", "Parallel F2 Frequency"),
+        ("pf3", "Parallel F3 Frequency"), ("pf4", "Parallel F4 Frequency"),
+        ("pf5", "Parallel F5 Frequency"), ("pf6", "Parallel F6 Frequency"),
+        ("pb1", "Parallel F1 Bandwidth"), ("pb2", "Parallel F2 Bandwidth"),
+        ("pb3", "Parallel F3 Bandwidth"), ("pb4", "Parallel F4 Bandwidth"),
+        ("pb5", "Parallel F5 Bandwidth"), ("pb6", "Parallel F6 Bandwidth"),
+        ("pa1", "Parallel F1 Amplitude"), ("pa2", "Parallel F2 Amplitude"),
+        ("pa3", "Parallel F3 Amplitude"), ("pa4", "Parallel F4 Amplitude"),
+        ("pa5", "Parallel F5 Amplitude"), ("pa6", "Parallel F6 Amplitude"),
+        ("parallelBypass", "Parallel Bypass"),
+        ("outputGain", "Output Gain"),
+        // Flags
+        ("_isVowel", "Is Vowel"), ("_isVoiced", "Is Voiced"),
+        ("_isStop", "Is Stop"), ("_isNasal", "Is Nasal"),
+        ("_isLiquid", "Is Liquid"), ("_isSemivowel", "Is Semivowel"),
+        ("_isAffricate", "Is Affricate"), ("_isTap", "Is Tap"),
+        ("_isTrill", "Is Trill"), ("_copyAdjacent", "Copy Adjacent"),
+        // FrameEx
+        ("frameEx.creakiness", "Creakiness"), ("frameEx.breathiness", "Breathiness"),
+        ("frameEx.jitter", "Jitter"), ("frameEx.shimmer", "Shimmer"),
+        ("frameEx.sharpness", "Glottal Sharpness"),
+        ("frameEx.endCf1", "Diphthong End F1"), ("frameEx.endCf2", "Diphthong End F2"),
+        ("frameEx.endCf3", "Diphthong End F3"),
+        ("frameEx.endPf1", "Diphthong End Parallel F1"),
+        ("frameEx.endPf2", "Diphthong End Parallel F2"),
+        ("frameEx.endPf3", "Diphthong End Parallel F3"),
+        // Micro-events
+        ("burstDurationMs", "Burst Duration (ms)"), ("burstDecayRate", "Burst Decay Rate"),
+        ("burstSpectralTilt", "Burst Spectral Tilt"),
+        ("voiceBarAmplitude", "Voice Bar Amplitude"), ("voiceBarF1", "Voice Bar F1 (Hz)"),
+        ("releaseSpreadMs", "Release Spread (ms)"),
+        ("fricAttackMs", "Frication Attack (ms)"), ("fricDecayMs", "Frication Decay (ms)"),
+        ("durationScale", "Duration Scale"),
+    ]
+
+    private static let phonemeFieldOrder: [String: Int] = {
+        var map: [String: Int] = [:]
+        for (i, pair) in phonemeFieldInfo.enumerated() {
+            map[pair.0] = i
+        }
+        return map
+    }()
+
+    private func phonemeDisplayName(_ fieldName: String) -> String {
+        for (k, v) in Self.phonemeFieldInfo {
+            if k == fieldName { return v }
+        }
+        return camelToDisplay(fieldName)
+    }
+
+    @Published var phonemeList: [PhonemeEntry] = []
+    @Published var phonemeFields: [PhonemeField] = []
+
+    func loadPhonemeList(langTag: String = "") {
+        guard let eng = engine else { return }
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_PHONEMES, langTag, 0, 0) else { return }
+        let jsonStr = String(cString: ptr)
+        tgsb_free_string(ptr)
+
+        guard let data = jsonStr.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return }
+
+        var seen: [String: PhonemeEntry] = [:]
+        var order: [String] = []
+        for obj in arr {
+            guard let group = obj["group"] as? String else { continue }
+            if seen[group] == nil {
+                order.append(group)
+                seen[group] = PhonemeEntry(
+                    id: group, key: group,
+                    phonemeClass: obj["class"] as? String ?? "other",
+                    mappingFrom: obj["mappingFrom"] as? String ?? "")
+            }
+        }
+        phonemeList = order.compactMap { seen[$0] }
+    }
+
+    func loadPhonemeFields(phonemeKey: String) {
+        guard let eng = engine else { return }
+        // Always query all phonemes (base) then filter.
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_PHONEMES, "", 0, 0) else { return }
+        let jsonStr = String(cString: ptr)
+        tgsb_free_string(ptr)
+
+        let overrides = loadPhonemeOverrides()
+
+        guard let data = jsonStr.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return }
+
+        var fields: [PhonemeField] = []
+        for obj in arr {
+            guard let group = obj["group"] as? String, group == phonemeKey,
+                  let fullKey = obj["key"] as? String else { continue }
+            let fieldName = String(fullKey.dropFirst(phonemeKey.count + 1)) // remove "key."
+            let jsonType = obj["type"] as? String ?? "string"
+            let baseValue: String
+            if jsonType == "bool", let b = obj["value"] as? Bool {
+                baseValue = b ? "true" : "false"
+            } else {
+                baseValue = "\(obj["value"] ?? "")"
+            }
+            let effectiveValue = overrides[fullKey] ?? baseValue
+            let type: SettingType = jsonType == "bool" ? .bool_ :
+                                    jsonType == "float" ? .number : .text
+            fields.append(PhonemeField(
+                id: fullKey, key: fullKey,
+                fieldName: fieldName,
+                displayName: phonemeDisplayName(fieldName),
+                value: effectiveValue,
+                isOverridden: overrides[fullKey] != nil,
+                type: type))
+        }
+
+        let maxOrder = Self.phonemeFieldOrder.count
+        phonemeFields = fields.sorted { a, b in
+            let oa = Self.phonemeFieldOrder[a.fieldName] ?? maxOrder
+            let ob = Self.phonemeFieldOrder[b.fieldName] ?? maxOrder
+            return oa < ob
+        }
+    }
+
+    func setPhonemeOverride(fullKey: String, value: String) {
+        guard let eng = engine else { return }
+        // Apply in-memory immediately for live preview.
+        tgsb_set_data(eng, TGSB_DATA_PHONEMES, "", fullKey, value)
+        // Persist.
+        var overrides = loadPhonemeOverrides()
+        overrides[fullKey] = value
+        savePhonemeOverrides(overrides)
+    }
+
+    func removePhonemeOverride(fullKey: String) {
+        var overrides = loadPhonemeOverrides()
+        overrides.removeValue(forKey: fullKey)
+        savePhonemeOverrides(overrides)
+        reloadCurrentLanguage()
+        reapplyAllPhonemeOverrides()
+    }
+
+    func resetPhonemeOverrides(phonemeKey: String) {
+        let prefix = "\(phonemeKey)."
+        var overrides = loadPhonemeOverrides()
+        overrides = overrides.filter { !$0.key.hasPrefix(prefix) }
+        savePhonemeOverrides(overrides)
+        reloadCurrentLanguage()
+        reapplyAllPhonemeOverrides()
+    }
+
+    func previewPhoneme(_ phonemeKey: String) {
+        guard let eng = engine else { return }
+        stopSpeaking()
+
+        isSpeaking = true
+        let sr = self.sampleRate
+
+        synthQueue.async { [weak self] in
+            tgsb_preview_phoneme(eng, phonemeKey, 120.0, 300.0)
+
+            let chunkSize = 4096
+            var chunk = [Int16](repeating: 0, count: chunkSize)
+            var allSamples = [Int16]()
+
+            while true {
+                let n = tgsb_pull_audio(eng, &chunk, Int32(chunkSize))
+                if n <= 0 { break }
+                allSamples.append(contentsOf: chunk.prefix(Int(n)))
+            }
+
+            guard !allSamples.isEmpty else {
+                DispatchQueue.main.async { self?.isSpeaking = false }
+                return
+            }
+
+            let wavData = Self.makeWAV(samples: allSamples, sampleRate: sr)
+            DispatchQueue.main.async {
+                self?.playWAV(wavData)
+            }
+        }
+    }
+
+    func reapplyAllPhonemeOverrides() {
+        guard let eng = engine else { return }
+        let overrides = loadPhonemeOverrides()
+        for (k, v) in overrides {
+            tgsb_set_data(eng, TGSB_DATA_PHONEMES, "", k, v)
+        }
+    }
+
+    private func loadPhonemeOverrides() -> [String: String] {
+        let d = UserDefaults(suiteName: kAppGroupId)
+        guard let json = d?.string(forKey: "phoneme_overrides"),
+              let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        else { return [:] }
+        return obj
+    }
+
+    private func savePhonemeOverrides(_ overrides: [String: String]) {
+        let d = UserDefaults(suiteName: kAppGroupId)
+        if overrides.isEmpty {
+            d?.removeObject(forKey: "phoneme_overrides")
+        } else if let data = try? JSONSerialization.data(withJSONObject: overrides),
+                  let json = String(data: data, encoding: .utf8) {
+            d?.set(json, forKey: "phoneme_overrides")
+        }
+        d?.synchronize()
+    }
+
     func speak(_ text: String) {
         guard let eng = engine else { return }
         stopSpeaking()
