@@ -176,7 +176,7 @@ settings:
     durationScale: 1.0
     pairScales:
       "a j": 1.20         # PRICE — wide (fallback if replacement doesn't fire)
-      "a_gb j": 1.20     # PRICE — RP retracted onset via a_gb
+      "a_gb ɪ_gb": 1.15   # PRICE — RP: vowel offglide, not semivowel
       "å w": 1.30          # MOUTH — wide (å = RP open back onset)
       "ɔ j": 1.05          # CHOICE — slightly tightened from 1.15
       "e j": 0.95          # FACE — narrow
@@ -811,11 +811,12 @@ normalization:
     - from: "ɝ"
       to: "ɜ"
 
-    # RP PRICE onset: a_gb (F2=1350, retracted from GenAm 1430).
-    # Keeps pair structure so collapse handles onset hold + micro-frames.
-    # Compound approach (ɑj_gb) had rushed/forced glide at low rates.
+    # RP PRICE: retracted onset (a_gb) + vowel offglide (ɪ_gb).
+    # ɪ_gb avoids semivowel conversion (ɪ→j) — keeps natural vowel
+    # quality instead of compressed consonant-like [j] offglide.
+    # Collapse handles onset hold + micro-frames for "ah-i-ve" timing.
     - from: "a͡ɪ"
-      to:   "a_gb͡ɪ"
+      to:   "a_gb͡ɪ_gb"
 
     # RP GOAT: compound with [ʊ] offset target (F2=1000), not [w] (F2=610).
     # Fixes "oww" quality reported by Alex Chapman and Dane Stange.
