@@ -463,7 +463,23 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
         cur.has_state = false;
 
         const SPVTEXTFRAG* f = pTextFragList;
+        int frag_idx = 0;
         while (f) {
+            // Log every fragment JAWS sends us.
+            if (f->pTextStart && f->ulTextLen > 0) {
+                std::string narrow(f->ulTextLen + 1, '\0');
+                WideCharToMultiByte(CP_UTF8, 0, f->pTextStart, (int)f->ulTextLen,
+                                    &narrow[0], (int)narrow.size(), nullptr, nullptr);
+                DEBUG_LOG("FRAG[%d] action=%d len=%lu srcOff=%lu text='%s'",
+                          frag_idx, (int)f->State.eAction, f->ulTextLen,
+                          f->ulTextSrcOffset, narrow.c_str());
+            } else {
+                DEBUG_LOG("FRAG[%d] action=%d len=%lu srcOff=%lu text=(null)",
+                          frag_idx, (int)f->State.eAction, f->ulTextLen,
+                          f->ulTextSrcOffset);
+            }
+            ++frag_idx;
+
             switch (f->State.eAction) {
             case SPVA_Bookmark: {
                 pending_bookmark bm{};
@@ -488,9 +504,15 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
                     if (!cur.text.empty()) {
                         wchar_t last = cur.text.back();
                         wchar_t first = f->pTextStart[0];
+                        bool added_space = false;
                         if (last != L' ' && last != L'\t' && last != L'\n' &&
-                            first != L' ' && first != L'\t' && first != L'\n')
+                            first != L' ' && first != L'\t' && first != L'\n') {
                             cur.text += L' ';
+                            added_space = true;
+                        }
+                        DEBUG_LOG("  SPEAK: last=0x%04X first=0x%04X space=%s",
+                                  (unsigned)last, (unsigned)first,
+                                  added_space ? "YES" : "NO");
                     }
                     cur.text.append(f->pTextStart, f->ulTextLen);
                 }
@@ -525,6 +547,17 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
         }
         if (!cur.text.empty() || !cur.bookmarks.empty())
             batches.push_back(std::move(cur));
+    }
+
+    // Log final batched text for each batch.
+    for (size_t bi = 0; bi < batches.size(); ++bi) {
+        auto& b = batches[bi];
+        std::string narrow(b.text.size() * 3 + 1, '\0');
+        int n = WideCharToMultiByte(CP_UTF8, 0, b.text.c_str(), (int)b.text.size(),
+                                    &narrow[0], (int)narrow.size(), nullptr, nullptr);
+        if (n > 0) narrow.resize(n);
+        DEBUG_LOG("BATCH[%zu] chars=%zu bookmarks=%zu text='%s'",
+                  bi, b.text.size(), b.bookmarks.size(), narrow.c_str());
     }
 
     // ── Phase 2: Synthesize and play each batch ──
