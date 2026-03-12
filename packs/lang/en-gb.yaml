@@ -177,7 +177,7 @@ settings:
     pairScales:
       "a j": 1.20         # PRICE — wide (offglide is semivowel in RP)
       "å w": 1.30          # MOUTH — wide (å = RP open back onset)
-      "ɔ j": 1.15          # CHOICE — wide
+      "ɔ j": 1.05          # CHOICE — slightly tightened from 1.15
       "e j": 0.95          # FACE — narrow
       "ə w": 0.75          # GOAT — minimal glide; unstressed RP GOAT is near-monophthong
     durationFloorMs: 60
@@ -807,11 +807,17 @@ normalization:
     - from: "ɝ"
       to: "ɜ"
 
-    # GOAT (əʊ): keep as diphthong.  The onset hold exponent (1.7) already
-    # compresses the offglide to prevent a drawn-out "ow" sweep.
-    # Monophthongizing to əː merged GOAT with NURSE (ɜː) because our ə
-    # and ɜ share identical F1/F2.  RP GOAT needs the falling F2 offglide
-    # toward [ʊ] to stay distinct.
+    # RP PRICE: compound with [ʌ]-like onset (F1=610, more closed than
+    # GenAm [ɑ] F1=660).  Bjelakovic 2016: RP onset is retracted/centralized.
+    - from: "a͡ɪ"
+      to:   "ɑj_gb"
+
+    # RP GOAT: compound with [ʊ] offset target (F2=1000), not [w] (F2=610).
+    # Fixes "oww" quality reported by Alex Chapman and Dane Stange.
+    # Lindsey 2019: RP GOAT onset is unrounded central [ə], offglide is
+    # mild lip rounding to [ʊ], nearly monophthongal in connected speech.
+    - from: "ə͡ʊ"
+      to:   "əw_gb"
 
     # NEAR vowel: collapse word-final iə to short schwa tail.
     - from: "iə"
