@@ -437,165 +437,226 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
     }
 
 
-    const SPVTEXTFRAG* frag = pTextFragList;
-    while (frag) {
-        // Handle SAPI actions.
-        switch (frag->State.eAction) {
-        case SPVA_Bookmark:
-            if (frag->pTextStart) {
-                add_bookmark_event(pOutputSite, ctx.bytes_written, frag->pTextStart);
-            }
-            frag = frag->pNext;
-            continue;
-        case SPVA_Speak:
-        case SPVA_SpellOut:
-            break;
-        default:
-            frag = frag->pNext;
-            continue;
-        }
+    // ── Phase 1: Collect fragments into batches ──
+    // JAWS inserts a bookmark between every word, creating separate SPVA_Speak
+    // fragments.  Synthesizing each word independently loses cross-word
+    // coarticulation and inserts audible gaps.  Fix: batch consecutive Speak
+    // fragments, synthesize once, fire bookmarks at proportional byte offsets.
 
-        // Check abort/skip.
+    struct pending_bookmark {
+        std::wstring mark;
+        size_t char_offset;
+        ULONGLONG byte_threshold;
+    };
+
+    struct speak_batch {
+        std::wstring text;
+        std::vector<pending_bookmark> bookmarks;
+        SPVSTATE first_state;
+        ULONG first_text_src_offset;
+        bool has_state;
+    };
+
+    std::vector<speak_batch> batches;
+    {
+        speak_batch cur{};
+        cur.has_state = false;
+
+        const SPVTEXTFRAG* f = pTextFragList;
+        while (f) {
+            switch (f->State.eAction) {
+            case SPVA_Bookmark: {
+                pending_bookmark bm{};
+                if (f->pTextStart && f->ulTextLen > 0)
+                    bm.mark.assign(f->pTextStart, f->ulTextLen);
+                else if (f->pTextStart)
+                    bm.mark = f->pTextStart;
+                bm.char_offset = cur.text.size();
+                bm.byte_threshold = 0;
+                cur.bookmarks.push_back(std::move(bm));
+                break;
+            }
+            case SPVA_Speak: {
+                if (!cur.has_state) {
+                    cur.first_state = f->State;
+                    cur.first_text_src_offset = f->ulTextSrcOffset;
+                    cur.has_state = true;
+                }
+                if (f->pTextStart && f->ulTextLen > 0) {
+                    // JAWS sends each word as a separate fragment without
+                    // whitespace.  Ensure words don't run together.
+                    if (!cur.text.empty()) {
+                        wchar_t last = cur.text.back();
+                        wchar_t first = f->pTextStart[0];
+                        if (last != L' ' && last != L'\t' && last != L'\n' &&
+                            first != L' ' && first != L'\t' && first != L'\n')
+                            cur.text += L' ';
+                    }
+                    cur.text.append(f->pTextStart, f->ulTextLen);
+                }
+                break;
+            }
+            case SPVA_SpellOut: {
+                // SpellOut must not merge with Speak — flush accumulated text.
+                if (!cur.text.empty() || !cur.bookmarks.empty()) {
+                    batches.push_back(std::move(cur));
+                    cur = {};
+                    cur.has_state = false;
+                }
+                // Each SpellOut letter is its own batch.
+                speak_batch sb{};
+                sb.first_state = f->State;
+                sb.first_text_src_offset = f->ulTextSrcOffset;
+                sb.has_state = true;
+                if (f->pTextStart && f->ulTextLen > 0)
+                    sb.text.assign(f->pTextStart, f->ulTextLen);
+                batches.push_back(std::move(sb));
+                break;
+            }
+            default:
+                if (!cur.text.empty() || !cur.bookmarks.empty()) {
+                    batches.push_back(std::move(cur));
+                    cur = {};
+                    cur.has_state = false;
+                }
+                break;
+            }
+            f = f->pNext;
+        }
+        if (!cur.text.empty() || !cur.bookmarks.empty())
+            batches.push_back(std::move(cur));
+    }
+
+    // ── Phase 2: Synthesize and play each batch ──
+    for (auto& batch : batches) {
+        if (ctx.aborted) break;
+
         DWORD actions = pOutputSite->GetActions();
         if (actions & SPVES_ABORT) {
             rt_->purge();
+            ctx.aborted = true;
             break;
         }
         if (actions & SPVES_SKIP) {
             pOutputSite->CompleteSkip(0);
             rt_->purge();
+            ctx.aborted = true;
             break;
         }
 
-        // Extract fragment text.
-        // SAPI *usually* provides pTextStart for SPVA_Speak/SPVA_SpellOut, but
-        // be defensive: a null pointer here will AV and take down the host
-        // process (NVDA, SpeechUX, etc.).
-        std::wstring text;
-        if (frag->pTextStart && frag->ulTextLen > 0) {
-            text.assign(frag->pTextStart, frag->ulTextLen);
-        }
-        if (!text.empty()) {
-            // Emit a sentence boundary at the start of this fragment.
-            add_sentence_boundary_event(pOutputSite, ctx.bytes_written, frag->ulTextSrcOffset);
-
-            tgsb::speak_params params;
-            params.preset_name = preset_name.empty() ? L"Adam" : preset_name;
-            // Volume:
-            // - Prefer global volume from the engine site (matches how many SAPI
-            //   hosts communicate volume).
-            // - Allow per-fragment overrides to take precedence when present.
-            params.volume = std::clamp(static_cast<double>(siteVolume) / 100.0, 0.0, 1.0);
-            if (frag->State.Volume != 100) {
-                params.volume = std::clamp(static_cast<double>(frag->State.Volume) / 100.0, 0.0, 1.0);
-            }
-            params.user_index_base = static_cast<int>(frag->ulTextSrcOffset);
-
-            // RateAdj in SAPI is typically -10..10.
-            // Some hosts provide the "global" rate via ISpTTSEngineSite::GetRate,
-            // leaving per-fragment RateAdj at 0. Treat RateAdj as an override and
-            // fall back to the site value when needed.
-            long rateAdj = frag->State.RateAdj;
-            if (rateAdj == 0) {
-                rateAdj = siteRateAdj;
-            }
-            rateAdj = std::clamp(rateAdj, -10L, 10L);
-            params.speed = std::pow(2.0, static_cast<double>(rateAdj) / 5.0);
-            params.speed = std::clamp(params.speed, 0.25, 4.0);
-
-            // Map pitch: SAPI MiddleAdj (-10..10) -> NVDA pitch slider (0..100, default 50).
-            const double pitch_slider = std::clamp(50.0 + 5.0 * static_cast<double>(frag->State.PitchAdj.MiddleAdj), 0.0, 100.0);
-            params.base_pitch = 25.0 + 21.25 * (pitch_slider / 12.5);
-
-            // Map inflection: keep NVDA-like default, adjust by RangeAdj.
-            params.inflection = k_default_inflection * std::pow(2.0, static_cast<double>(frag->State.PitchAdj.RangeAdj) / 10.0);
-            params.inflection = std::clamp(params.inflection, 0.0, 1.0);
-
-            // Split text at clause boundaries so each clause gets its
-            // own clauseType for correct intonation contours.
-            auto clauses = split_clauses(text);
-
-            for (const auto& clause : clauses) {
-                if (ctx.aborted) break;
-
-                std::wstring clauseText = text.substr(clause.start, clause.len);
-                params.clause_type = clause.clause_type;
-
-                hr = rt_->queue_text(clauseText, params);
-                if (FAILED(hr)) {
-                    DEBUG_LOG("TGSpeechSapi: queue_text failed 0x%08X", hr);
-                    continue;
-                }
-
-                // Drain queued audio for this clause.
-                // Pending chunk state for Win7 flow control: if Write returns
-                // 0 bytes (buffer full), we sleep and retry the SAME chunk
-                // rather than synthesizing more.  Abort is checked each loop.
-                const BYTE* pendingData = nullptr;
-                ULONG pendingBytes = 0;
-
-                for (;;) {
-                    actions = pOutputSite->GetActions();
-                    if (actions & SPVES_ABORT) {
-                        rt_->purge();
-                        ctx.aborted = true;
-                        break;
-                    }
-                    if (actions & SPVES_SKIP) {
-                        pOutputSite->CompleteSkip(0);
-                        rt_->purge();
-                        ctx.aborted = true;
-                        break;
-                    }
-
-                    // If we have a pending chunk from a previous Write(0), retry it.
-                    if (pendingData && pendingBytes > 0) {
-                        ULONGLONG before = ctx.bytes_written;
-                        if (!write_bytes(pOutputSite, pendingData, pendingBytes, ctx.bytes_written)) {
-                            ctx.aborted = true;
-                            break;
-                        }
-                        if (ctx.bytes_written == before) {
-                            // Still zero progress — sleep and retry.
-                            Sleep(5);
-                            continue;
-                        }
-                        // Chunk written successfully.
-                        pendingData = nullptr;
-                        pendingBytes = 0;
-                        continue;
-                    }
-
-                    const int got = rt_->synthesize(static_cast<int>(sampleBuf.size()), sampleBuf.data());
-                    if (got <= 0) {
-                        break;
-                    }
-
-                    const ULONG bytes = static_cast<ULONG>(got * sizeof(tgsb::sample_t));
-                    const BYTE* data = reinterpret_cast<const BYTE*>(sampleBuf.data());
-
-                    ULONGLONG before = ctx.bytes_written;
-                    if (!write_bytes(pOutputSite, data, bytes, ctx.bytes_written)) {
-                        ctx.aborted = true;
-                        break;
-                    }
-                    if (ctx.bytes_written == before) {
-                        // Write accepted 0 bytes (Win7 buffer full).
-                        // Stash the chunk and retry after checking abort.
-                        pendingData = data;
-                        pendingBytes = bytes;
-                        Sleep(5);
-                    }
-                }
-
-            }
+        // Bookmarks-only batch — fire at current audio position.
+        if (batch.text.empty()) {
+            for (auto& bm : batch.bookmarks)
+                add_bookmark_event(pOutputSite, ctx.bytes_written, bm.mark.c_str());
+            continue;
         }
 
-        if (ctx.aborted) {
-            break;
+        // Build speak params from first fragment's state.
+        tgsb::speak_params params;
+        params.preset_name = preset_name.empty() ? L"Adam" : preset_name;
+        params.volume = std::clamp(static_cast<double>(siteVolume) / 100.0, 0.0, 1.0);
+        if (batch.has_state && batch.first_state.Volume != 100)
+            params.volume = std::clamp(static_cast<double>(batch.first_state.Volume) / 100.0, 0.0, 1.0);
+        params.user_index_base = static_cast<int>(batch.first_text_src_offset);
+
+        long rateAdj = batch.has_state ? batch.first_state.RateAdj : 0;
+        if (rateAdj == 0) rateAdj = siteRateAdj;
+        rateAdj = std::clamp(rateAdj, -10L, 10L);
+        params.speed = std::clamp(std::pow(2.0, static_cast<double>(rateAdj) / 5.0), 0.25, 4.0);
+
+        const double pitch_slider = std::clamp(
+            50.0 + 5.0 * static_cast<double>(batch.has_state ? batch.first_state.PitchAdj.MiddleAdj : 0),
+            0.0, 100.0);
+        params.base_pitch = 25.0 + 21.25 * (pitch_slider / 12.5);
+        params.inflection = std::clamp(
+            k_default_inflection * std::pow(2.0,
+                static_cast<double>(batch.has_state ? batch.first_state.PitchAdj.RangeAdj : 0) / 10.0),
+            0.0, 1.0);
+
+        add_sentence_boundary_event(pOutputSite, ctx.bytes_written, batch.first_text_src_offset);
+
+        // Split concatenated text into clauses for intonation.
+        auto clauses = split_clauses(batch.text);
+
+        // Synthesize all clauses into an audio buffer.
+        std::vector<tgsb::sample_t> audio_buf;
+        for (const auto& clause : clauses) {
+            if (ctx.aborted) break;
+            std::wstring clauseText = batch.text.substr(clause.start, clause.len);
+            params.clause_type = clause.clause_type;
+            hr = rt_->queue_text(clauseText, params);
+            if (FAILED(hr)) {
+                DEBUG_LOG("TGSpeechSapi: queue_text failed 0x%08X", hr);
+                continue;
+            }
+            int got;
+            while ((got = rt_->synthesize(static_cast<int>(sampleBuf.size()), sampleBuf.data())) > 0)
+                audio_buf.insert(audio_buf.end(), sampleBuf.data(), sampleBuf.data() + got);
         }
 
-        frag = frag->pNext;
+        if (audio_buf.empty()) continue;
+
+        // Calculate byte thresholds for bookmarks (proportional to char position).
+        const ULONGLONG total_bytes = static_cast<ULONGLONG>(audio_buf.size()) * sizeof(tgsb::sample_t);
+        const size_t total_chars = batch.text.size();
+        for (auto& bm : batch.bookmarks) {
+            if (total_chars > 0 && bm.char_offset <= total_chars)
+                bm.byte_threshold = (static_cast<ULONGLONG>(bm.char_offset) * total_bytes) / total_chars;
+            else
+                bm.byte_threshold = total_bytes;
+        }
+
+        // Play back, firing bookmark events at proportional positions.
+        size_t bm_idx = 0;
+        size_t audio_pos = 0;
+        const ULONGLONG batch_start = ctx.bytes_written;
+
+        while (audio_pos < audio_buf.size() && !ctx.aborted) {
+            actions = pOutputSite->GetActions();
+            if (actions & SPVES_ABORT) {
+                rt_->purge();
+                ctx.aborted = true;
+                break;
+            }
+            if (actions & SPVES_SKIP) {
+                pOutputSite->CompleteSkip(0);
+                rt_->purge();
+                ctx.aborted = true;
+                break;
+            }
+
+            // Fire bookmarks whose threshold we've passed.
+            const ULONGLONG batch_progress = ctx.bytes_written - batch_start;
+            while (bm_idx < batch.bookmarks.size() &&
+                   batch_progress >= batch.bookmarks[bm_idx].byte_threshold) {
+                add_bookmark_event(pOutputSite, ctx.bytes_written,
+                                   batch.bookmarks[bm_idx].mark.c_str());
+                ++bm_idx;
+            }
+
+            const size_t remaining = audio_buf.size() - audio_pos;
+            const size_t chunk = std::min(remaining, sampleBuf.size());
+            const ULONG bytes = static_cast<ULONG>(chunk * sizeof(tgsb::sample_t));
+            const BYTE* data = reinterpret_cast<const BYTE*>(audio_buf.data() + audio_pos);
+
+            const ULONGLONG before = ctx.bytes_written;
+            if (!write_bytes(pOutputSite, data, bytes, ctx.bytes_written)) {
+                ctx.aborted = true;
+                break;
+            }
+            if (ctx.bytes_written == before) {
+                Sleep(5);
+                continue;
+            }
+            audio_pos += chunk;
+        }
+
+        // Fire any remaining bookmarks (end-of-batch).
+        while (bm_idx < batch.bookmarks.size()) {
+            add_bookmark_event(pOutputSite, ctx.bytes_written,
+                               batch.bookmarks[bm_idx].mark.c_str());
+            ++bm_idx;
+        }
     }
 
     // Pad trailing silence so SAPI hosts that cut playback on Speak()
