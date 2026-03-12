@@ -407,6 +407,17 @@ class TgsbEngine: ObservableObject {
         return try? String(contentsOfFile: path, encoding: .utf8)
     }
 
+    /// Write pack YAML to a temp file for sharing via share sheet.
+    func exportPackToTempFile(langTag: String) -> URL? {
+        guard let content = packYamlContent(langTag: langTag) else { return nil }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(langTag).yaml")
+        guard let _ = try? content.write(to: url, atomically: true, encoding: .utf8) else {
+            return nil
+        }
+        return url
+    }
+
     /// Import a YAML file as the language pack for `langTag`.
     /// Returns a status message string.
     ///

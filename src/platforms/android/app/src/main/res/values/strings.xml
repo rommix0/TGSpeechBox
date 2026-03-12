@@ -18,6 +18,7 @@
     <string name="editor_overridden">Customized</string>
     <string name="editor_import_pack">Import Pack</string>
     <string name="editor_export_pack">Export Pack</string>
+    <string name="editor_share_pack">Share Pack</string>
     <string name="editor_import_confirm">Replace the %1$s language pack with the selected file? Any existing overrides will be cleared.</string>
     <string name="editor_import_not_lang_pack">This looks like a phonemes file, not a language pack.</string>
 

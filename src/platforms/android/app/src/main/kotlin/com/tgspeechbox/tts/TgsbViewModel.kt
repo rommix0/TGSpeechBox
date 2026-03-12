@@ -12,6 +12,7 @@ package com.tgspeechbox.tts
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
@@ -725,6 +726,24 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             _importExportStatus.value = "Export failed: ${e.message}"
         }
+    }
+
+    fun sharePackYaml(context: Context, langTag: String) {
+        val packFile = packFileForLang(context, langTag)
+        if (!packFile.exists()) {
+            _importExportStatus.value = "Pack file not found for $langTag"
+            return
+        }
+        val content = try { packFile.readText() } catch (e: Exception) {
+            _importExportStatus.value = "Could not read pack: ${e.message}"
+            return
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "$langTag.yaml")
+            putExtra(Intent.EXTRA_TEXT, content)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share $langTag pack"))
     }
 
     fun importPackYaml(context: Context, langTag: String, sourceUri: Uri): Boolean {

@@ -176,6 +176,9 @@ private fun PackSettingsScreen(
             OutlinedButton(onClick = { exportLauncher.launch("$langTag.yaml") }) {
                 Text(stringResource(R.string.editor_export_pack))
             }
+            OutlinedButton(onClick = { viewModel.sharePackYaml(context, langTag) }) {
+                Text(stringResource(R.string.editor_share_pack))
+            }
         }
 
         if (settings.isEmpty()) {
