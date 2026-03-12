@@ -1042,17 +1042,25 @@ NVSP_FRONTEND_API int nvspFrontend_getDataCount(
 ) {
   using namespace nvsp_frontend;
   Handle* h = asHandle(handle);
-  if (!h || !langTagUtf8 || !langTagUtf8[0]) return -1;
+  if (!h || !langTagUtf8) return -1;
 
   std::lock_guard<std::mutex> lock(h->mu);
 
   if (domain == NVSP_DATA_SETTINGS) {
+    if (!langTagUtf8[0]) return -1;  // settings requires a lang tag
     const std::string lang(langTagUtf8);
-    // Ensure cache is built for this language.
     if (!h->dataCache.settingsValid || h->dataCache.langTag != lang) {
       tgsb_data::buildSettingsCache(h->dataCache, h->packDir, lang);
     }
     return static_cast<int>(h->dataCache.settings.size());
+  }
+
+  if (domain == NVSP_DATA_PHONEMES) {
+    const std::string lang(langTagUtf8);  // "" = all phonemes
+    if (!h->dataCache.phonemesValid || h->dataCache.phonemesLangTag != lang) {
+      tgsb_data::buildPhonemesCache(h->dataCache, h->packDir, lang);
+    }
+    return static_cast<int>(h->dataCache.phonemes.size());
   }
 
   // Unsupported domain.
@@ -1068,18 +1076,33 @@ NVSP_FRONTEND_API char* nvspFrontend_queryData(
 ) {
   using namespace nvsp_frontend;
   Handle* h = asHandle(handle);
-  if (!h || !langTagUtf8 || !langTagUtf8[0]) return nullptr;
+  if (!h || !langTagUtf8) return nullptr;
 
   std::lock_guard<std::mutex> lock(h->mu);
 
   if (domain == NVSP_DATA_SETTINGS) {
+    if (!langTagUtf8[0]) return nullptr;  // settings requires a lang tag
     const std::string lang(langTagUtf8);
-    // Ensure cache is built for this language.
     if (!h->dataCache.settingsValid || h->dataCache.langTag != lang) {
       tgsb_data::buildSettingsCache(h->dataCache, h->packDir, lang);
     }
 
     std::string json = tgsb_data::serializeSettingsJson(h->dataCache, offset, limit);
+    if (json.empty()) return nullptr;
+
+    char* out = static_cast<char*>(std::malloc(json.size() + 1));
+    if (!out) return nullptr;
+    std::memcpy(out, json.c_str(), json.size() + 1);
+    return out;
+  }
+
+  if (domain == NVSP_DATA_PHONEMES) {
+    const std::string lang(langTagUtf8);  // "" = all phonemes
+    if (!h->dataCache.phonemesValid || h->dataCache.phonemesLangTag != lang) {
+      tgsb_data::buildPhonemesCache(h->dataCache, h->packDir, lang);
+    }
+
+    std::string json = tgsb_data::serializePhonemesJson(h->dataCache, offset, limit);
     if (json.empty()) return nullptr;
 
     char* out = static_cast<char*>(std::malloc(json.size() + 1));
@@ -1101,12 +1124,13 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
 ) {
   using namespace nvsp_frontend;
   Handle* h = asHandle(handle);
-  if (!h || !langTagUtf8 || !langTagUtf8[0] || !keyUtf8 || !keyUtf8[0]) return 0;
+  if (!h || !langTagUtf8 || !keyUtf8 || !keyUtf8[0]) return 0;
   if (!valueUtf8) valueUtf8 = "";
 
   std::lock_guard<std::mutex> lock(h->mu);
 
   if (domain == NVSP_DATA_SETTINGS) {
+    if (!langTagUtf8[0]) return 0;  // settings requires a lang tag
     const std::string lang(langTagUtf8);
     const std::string key(keyUtf8);
     const std::string value(valueUtf8);
@@ -1121,9 +1145,100 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
       }
     }
 
-    // Invalidate the cache so the next queryData reads fresh base values.
     h->dataCache.invalidate();
+    return 1;
+  }
 
+  if (domain == NVSP_DATA_PHONEMES) {
+    const std::string dotKey(keyUtf8);   // e.g. "ɪ.cf2"
+    const std::string value(valueUtf8);
+
+    // Parse "phonemeKey.fieldName" (first dot splits phoneme from field).
+    // Handle frameEx: "ɪ.frameEx.breathiness" → phoneme="ɪ", field path.
+    auto firstDot = dotKey.find('.');
+    if (firstDot == std::string::npos) return 0;
+
+    std::string phonemeKeyUtf8 = dotKey.substr(0, firstDot);
+    std::string fieldPath = dotKey.substr(firstDot + 1);  // "cf2" or "frameEx.breathiness"
+    if (phonemeKeyUtf8.empty() || fieldPath.empty()) return 0;
+
+    // Apply in-memory override to the loaded pack if applicable.
+    if (h->packLoaded) {
+      std::u32string phonU32 = utf8ToU32(phonemeKeyUtf8);
+      auto it = h->pack.phonemes.find(phonU32);
+      if (it != h->pack.phonemes.end()) {
+        PhonemeDef& def = it->second;
+
+        // Check if it's a frameEx sub-field.
+        if (fieldPath.substr(0, 8) == "frameEx.") {
+          std::string fxField = fieldPath.substr(8);
+          double num = std::strtod(value.c_str(), nullptr);
+          if (fxField == "creakiness")  { def.hasCreakiness = true; def.creakiness = num; }
+          else if (fxField == "breathiness") { def.hasBreathiness = true; def.breathiness = num; }
+          else if (fxField == "jitter")      { def.hasJitter = true; def.jitter = num; }
+          else if (fxField == "shimmer")     { def.hasShimmer = true; def.shimmer = num; }
+          else if (fxField == "sharpness")   { def.hasSharpness = true; def.sharpness = num; }
+          else if (fxField == "endCf1")      { def.hasEndCf1 = true; def.endCf1 = num; }
+          else if (fxField == "endCf2")      { def.hasEndCf2 = true; def.endCf2 = num; }
+          else if (fxField == "endCf3")      { def.hasEndCf3 = true; def.endCf3 = num; }
+          else if (fxField == "endPf1")      { def.hasEndPf1 = true; def.endPf1 = num; }
+          else if (fxField == "endPf2")      { def.hasEndPf2 = true; def.endPf2 = num; }
+          else if (fxField == "endPf3")      { def.hasEndPf3 = true; def.endPf3 = num; }
+        }
+        // Check flag fields.
+        else if (!fieldPath.empty() && fieldPath[0] == '_') {
+          bool b = (value == "true" || value == "1");
+          uint32_t bit = 0;
+          if (fieldPath == "_isAffricate")  bit = kIsAfricate;
+          else if (fieldPath == "_isLiquid")     bit = kIsLiquid;
+          else if (fieldPath == "_isNasal")      bit = kIsNasal;
+          else if (fieldPath == "_isSemivowel")  bit = kIsSemivowel;
+          else if (fieldPath == "_isStop")       bit = kIsStop;
+          else if (fieldPath == "_isTap")        bit = kIsTap;
+          else if (fieldPath == "_isTrill")      bit = kIsTrill;
+          else if (fieldPath == "_isVoiced")     bit = kIsVoiced;
+          else if (fieldPath == "_isVowel")      bit = kIsVowel;
+          else if (fieldPath == "_copyAdjacent") bit = kCopyAdjacent;
+          if (bit) {
+            if (b) def.flags |= bit;
+            else   def.flags &= ~bit;
+          }
+        }
+        // Check micro-event fields.
+        else if (fieldPath == "burstDurationMs") {
+          def.hasBurstDurationMs = true; def.burstDurationMs = std::strtod(value.c_str(), nullptr);
+        } else if (fieldPath == "burstDecayRate") {
+          def.hasBurstDecayRate = true; def.burstDecayRate = std::strtod(value.c_str(), nullptr);
+        } else if (fieldPath == "burstSpectralTilt") {
+          def.hasBurstSpectralTilt = true; def.burstSpectralTilt = std::strtod(value.c_str(), nullptr);
+        } else if (fieldPath == "voiceBarAmplitude") {
+          def.hasVoiceBarAmplitude = true; def.voiceBarAmplitude = std::strtod(value.c_str(), nullptr);
+        } else if (fieldPath == "voiceBarF1") {
+          def.hasVoiceBarF1 = true; def.voiceBarF1 = std::strtod(value.c_str(), nullptr);
+        } else if (fieldPath == "releaseSpreadMs") {
+          def.hasReleaseSpreadMs = true; def.releaseSpreadMs = std::strtod(value.c_str(), nullptr);
+        } else if (fieldPath == "fricAttackMs") {
+          def.hasFricAttackMs = true; def.fricAttackMs = std::strtod(value.c_str(), nullptr);
+        } else if (fieldPath == "fricDecayMs") {
+          def.hasFricDecayMs = true; def.fricDecayMs = std::strtod(value.c_str(), nullptr);
+        } else if (fieldPath == "durationScale") {
+          def.hasDurationScale = true; def.durationScale = std::strtod(value.c_str(), nullptr);
+        }
+        // Frame fields (FieldId-based).
+        else {
+          FieldId fid;
+          if (parseFieldId(fieldPath, fid)) {
+            int idx = static_cast<int>(fid);
+            if (idx >= 0 && idx < kFrameFieldCount) {
+              def.field[idx] = std::strtod(value.c_str(), nullptr);
+              def.setMask |= (1ull << idx);
+            }
+          }
+        }
+      }
+    }
+
+    h->dataCache.invalidate();
     return 1;
   }
 

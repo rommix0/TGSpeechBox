@@ -542,16 +542,19 @@ NVSP_FRONTEND_API char* nvspFrontend_getAvailableLanguages(nvspFrontend_handle_t
 
 /* Data domains. New values can be added without ABI break. */
 #define NVSP_DATA_SETTINGS   0
-#define NVSP_DATA_PHONEMES   1   /* reserved for Phase 1b */
+#define NVSP_DATA_PHONEMES   1
 #define NVSP_DATA_DICTIONARY 2   /* reserved for future */
 
 /*
   Count records in a data domain for a language, without loading them.
-  Useful for scroll sizing or showing "Settings (291)" in tab headers.
+  Useful for scroll sizing or showing "Settings (291)" or "Phonemes (195)"
+  in tab headers.
 
   Parameters:
   - domain: NVSP_DATA_SETTINGS, NVSP_DATA_PHONEMES, or NVSP_DATA_DICTIONARY
-  - langTagUtf8: language to query (does NOT change active language)
+  - langTagUtf8: For SETTINGS: language to query (required, non-empty).
+                 For PHONEMES: "" = all base phonemes, "en-gb" = only phonemes
+                 referenced as replacement targets in that language.
 
   Returns the number of records, or -1 on error.
 */
@@ -573,9 +576,16 @@ NVSP_FRONTEND_API int nvspFrontend_getDataCount(
       "value": true, "group": "boundarySmoothing" }
   Types: "float" (numeric value), "bool" (true/false), "string" (quoted).
 
+  For NVSP_DATA_PHONEMES, each object has:
+    { "key": "ɪ.cf2", "type": "float", "value": 1750,
+      "group": "ɪ", "class": "vowel" }
+  In the lang-filtered view, objects also include:
+    "mappingFrom": "ɜː"   (the IPA that maps to this phoneme)
+
   Parameters:
-  - domain: NVSP_DATA_SETTINGS, etc.
-  - langTagUtf8: language to query (does NOT change active language)
+  - domain: NVSP_DATA_SETTINGS, NVSP_DATA_PHONEMES, etc.
+  - langTagUtf8: For SETTINGS: language (required).
+                 For PHONEMES: "" = all, "en-gb" = lang-filtered.
   - offset: 0-based record index to start from
   - limit: max records to return (0 = all remaining from offset)
 
