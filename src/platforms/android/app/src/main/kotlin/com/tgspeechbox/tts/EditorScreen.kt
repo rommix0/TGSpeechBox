@@ -22,6 +22,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -214,6 +215,34 @@ private fun PhonemeListScreen(
             }
         }
     }
+}
+
+/** Number of discrete slider steps for a phoneme field (controls accessibility increment). */
+private fun phonemeFieldSteps(fieldName: String, range: ClosedFloatingPointRange<Float>): Int {
+    val step = when {
+        // Formant frequencies: 100 Hz steps
+        fieldName.matches(Regex("^[cp]f[1-6]$")) -> 100f
+        fieldName in listOf("cfNP", "cfN", "cfTP") -> 100f
+        fieldName.matches(Regex("^end[CP]f[1-6]$")) -> 100f
+        // Bandwidths: 25 Hz steps
+        fieldName.matches(Regex("^[cp]b[1-6]$")) -> 25f
+        fieldName.matches(Regex("^end[CP]b[1-6]$")) -> 25f
+        // Pitch: 1 Hz steps
+        fieldName.contains("Pitch") || fieldName.contains("pitch") -> 1f
+        // Amplitudes, gains, ratios: 0.01 steps
+        fieldName.matches(Regex("^pa[1-6]$")) -> 0.01f
+        fieldName.contains("Amplitude") || fieldName.contains("amplitude") -> 0.01f
+        fieldName in listOf("preFormantGain", "parallelBypass", "glottalOpenQuotient",
+            "breathiness", "creakiness", "jitter", "shimmer", "sharpness",
+            "outputGain", "burstDecayRate", "burstSpectralTilt",
+            "durationScale") -> 0.01f
+        fieldName == "caNP" -> 0.01f
+        // Duration in ms: 1 ms steps
+        fieldName.contains("Ms") -> 1f
+        else -> 1f
+    }
+    val span = range.endInclusive - range.start
+    return maxOf(1, (span / step).toInt() - 1)
 }
 
 /** Slider range for a phoneme field based on its name and current value. */
@@ -438,24 +467,19 @@ private fun PhonemeFieldRow(
             mutableStateOf(baseValue)
         }
         val range = phonemeFieldRange(field.fieldName, baseValue)
+        val steps = phonemeFieldSteps(field.fieldName, range)
         val overriddenSuffix = if (field.isOverridden) ", overridden" else ""
 
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            // Label row — tap to open text input for precise values
+            // Label with current value (visual only, hidden from TalkBack)
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onEdit)
-                    .semantics {
-                        contentDescription =
-                            "${field.displayName}, ${fmtVal(sliderValue)}$overriddenSuffix, double tap for exact input"
-                    },
+                modifier = Modifier.fillMaxWidth().clearAndSetSemantics {},
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = field.displayName,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f).clearAndSetSemantics {}
+                    modifier = Modifier.weight(1f)
                 )
                 Text(
                     text = fmtVal(sliderValue),
@@ -463,28 +487,46 @@ private fun PhonemeFieldRow(
                     color = if (field.isOverridden)
                         MaterialTheme.colorScheme.primary
                     else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clearAndSetSemantics {}
+                        MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // Slider — drag to adjust, preview plays on release
-            Slider(
-                value = sliderValue.coerceIn(range),
-                onValueChange = { newVal ->
-                    sliderValue = newVal
-                    onValueChanged(fmtVal(newVal))
-                },
-                onValueChangeFinished = {
-                    onPreview()
-                },
-                valueRange = range,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics {
+            // Edit icon + slider on one line
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier.semantics {
                         contentDescription =
-                            "${field.displayName} slider, ${fmtVal(sliderValue)}"
+                            "Enter exact value for ${field.displayName}"
                     }
-            )
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp).clearAndSetSemantics {}
+                    )
+                }
+                Slider(
+                    value = sliderValue.coerceIn(range),
+                    onValueChange = { newVal ->
+                        sliderValue = newVal
+                        onValueChanged(fmtVal(newVal))
+                    },
+                    onValueChangeFinished = {
+                        onPreview()
+                    },
+                    valueRange = range,
+                    steps = steps,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics {
+                            contentDescription =
+                                "${field.displayName}$overriddenSuffix, ${fmtVal(sliderValue)}"
+                        }
+                )
+            }
             if (field.isOverridden) {
                 TextButton(onClick = onReset) {
                     Text("Reset", style = MaterialTheme.typography.labelSmall)
