@@ -259,6 +259,7 @@ private fun PhonemeDetailScreen(
     val fields by viewModel.phonemeFields.collectAsState()
     var editingKey by remember { mutableStateOf<String?>(null) }
     var editingValue by remember { mutableStateOf("") }
+    var showResetAll by remember { mutableStateOf(false) }
 
     LaunchedEffect(phonemeKey) {
         viewModel.loadPhonemeFields(phonemeKey)
@@ -293,10 +294,7 @@ private fun PhonemeDetailScreen(
                 Icon(Icons.Default.PlayArrow, contentDescription = null)
             }
             // Reset all overrides for this phoneme
-            TextButton(onClick = {
-                viewModel.resetPhonemeOverrides(phonemeKey)
-                viewModel.loadPhonemeFields(phonemeKey)
-            }) {
+            TextButton(onClick = { showResetAll = true }) {
                 Text("Reset all")
             }
         }
@@ -359,6 +357,27 @@ private fun PhonemeDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { editingKey = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Reset all confirmation
+    if (showResetAll) {
+        AlertDialog(
+            onDismissRequest = { showResetAll = false },
+            title = { Text("Reset $phonemeKey") },
+            text = { Text("Reset all overrides on this phoneme back to the original values?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetPhonemeOverrides(phonemeKey)
+                    viewModel.loadPhonemeFields(phonemeKey)
+                    showResetAll = false
+                }) { Text("Reset") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetAll = false }) {
                     Text("Cancel")
                 }
             }
