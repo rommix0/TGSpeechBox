@@ -381,7 +381,7 @@ private struct PhonemeListView: View {
                     Text(langFilter.isEmpty ? "All phonemes" : langFilter)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color(.systemGray5))
+                        .background(Color.secondary.opacity(0.15))
                         .cornerRadius(8)
                 }
                 .accessibilityLabel("Filter by language, \(langFilter.isEmpty ? "all phonemes" : langFilter)")
