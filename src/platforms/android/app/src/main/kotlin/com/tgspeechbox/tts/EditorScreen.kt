@@ -229,14 +229,14 @@ private fun phonemeFieldSteps(fieldName: String, range: ClosedFloatingPointRange
         fieldName.matches(Regex("^end[CP]b[1-6]$")) -> 25f
         // Pitch: 1 Hz steps
         fieldName.contains("Pitch") || fieldName.contains("pitch") -> 1f
-        // Amplitudes, gains, ratios: 0.01 steps
-        fieldName.matches(Regex("^pa[1-6]$")) -> 0.01f
-        fieldName.contains("Amplitude") || fieldName.contains("amplitude") -> 0.01f
+        // Amplitudes, gains, ratios: 0.1 steps
+        fieldName.matches(Regex("^pa[1-6]$")) -> 0.1f
+        fieldName.contains("Amplitude") || fieldName.contains("amplitude") -> 0.1f
         fieldName in listOf("preFormantGain", "parallelBypass", "glottalOpenQuotient",
             "breathiness", "creakiness", "jitter", "shimmer", "sharpness",
             "outputGain", "burstDecayRate", "burstSpectralTilt",
-            "durationScale") -> 0.01f
-        fieldName == "caNP" -> 0.01f
+            "durationScale") -> 0.1f
+        fieldName == "caNP" -> 0.1f
         // Duration in ms: 1 ms steps
         fieldName.contains("Ms") -> 1f
         else -> 1f

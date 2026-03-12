@@ -596,20 +596,20 @@ private func phonemeFieldStep(_ fieldName: String) -> Float {
     // Pitch: 1 Hz steps
     case fieldName.contains("Pitch") || fieldName.contains("pitch"):
         return 1
-    // Amplitudes, gains, ratios: 0.01 steps
+    // Amplitudes, gains, ratios: 0.1 steps
     case fieldName.range(of: #"^pa[1-6]$"#, options: .regularExpression) != nil,
          fieldName.contains("Amplitude") || fieldName.contains("amplitude"),
          ["preFormantGain", "parallelBypass", "glottalOpenQuotient",
           "breathiness", "creakiness", "jitter", "shimmer", "sharpness",
           "outputGain", "burstDecayRate", "burstSpectralTilt",
           "durationScale"].contains(fieldName):
-        return 0.01
+        return 0.1
     // Duration in ms: 1 ms steps
     case fieldName.contains("Ms"):
         return 1
     // Nasal pole amplitude
     case fieldName == "caNP":
-        return 0.01
+        return 0.1
     default:
         return 1
     }
