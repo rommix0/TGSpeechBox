@@ -883,6 +883,7 @@ getNum("liquidDynamicsLabialGlideTransitionPct", lp.liquidDynamicsLabialGlideTra
     getBoolFrom(*rc, "enabled", lp.rateCompEnabled);
     if (const yaml_min::Node* md = rc->get("minimumDurations"); md && md->isMap()) {
       getNumFrom(*md, "vowelMs", lp.rateCompVowelFloorMs);
+      getNumFrom(*md, "diphthongMs", lp.rateCompDiphthongFloorMs);
       getNumFrom(*md, "fricativeMs", lp.rateCompFricativeFloorMs);
       getNumFrom(*md, "stopMs", lp.rateCompStopFloorMs);
       getNumFrom(*md, "nasalMs", lp.rateCompNasalFloorMs);
@@ -909,6 +910,7 @@ getNum("liquidDynamicsLabialGlideTransitionPct", lp.liquidDynamicsLabialGlideTra
   // ── Rate compensation (flat-key fallbacks) ──
   getBool("rateCompEnabled", lp.rateCompEnabled);
   getNum("rateCompVowelFloorMs", lp.rateCompVowelFloorMs);
+  getNum("rateCompDiphthongFloorMs", lp.rateCompDiphthongFloorMs);
   getNum("rateCompFricativeFloorMs", lp.rateCompFricativeFloorMs);
   getNum("rateCompStopFloorMs", lp.rateCompStopFloorMs);
   getNum("rateCompNasalFloorMs", lp.rateCompNasalFloorMs);

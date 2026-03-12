@@ -104,7 +104,8 @@ bool runProsody(PassContext& ctx, std::vector<Token>& tokens, std::string& outEr
   if (lang.phraseFinalLengtheningNucleusOnlyMode) {
     const int lastNucleus = findLastVowel(tokens, lastSyllStart, static_cast<int>(tokens.size()));
     if (lastNucleus >= 0) {
-      const bool isDiph = tokens[static_cast<size_t>(lastNucleus)].tiedTo;
+      const auto& nuc = tokens[static_cast<size_t>(lastNucleus)];
+      const bool isDiph = nuc.tiedTo || (nuc.def && nuc.def->hasEndCf1);
       const double nucScaleOnly = isDiph
           ? ((lang.phraseFinalLengtheningNucleusDiphthongScale > 0.0)
               ? lang.phraseFinalLengtheningNucleusDiphthongScale * clauseScale
@@ -134,9 +135,11 @@ bool runProsody(PassContext& ctx, std::vector<Token>& tokens, std::string& outEr
     const double nucScaleDiph = (lang.phraseFinalLengtheningNucleusDiphthongScale > 0.0)
         ? lang.phraseFinalLengtheningNucleusDiphthongScale * clauseScale : nucScaleMono;
 
-    // Detect diphthong: check if the nucleus vowel ties to an offglide.
+    // Detect diphthong: tied pair OR compound phoneme with endCf sweep.
     const bool isDiphthongNucleus = (lastNucleus >= 0)
-        && tokens[static_cast<size_t>(lastNucleus)].tiedTo;
+        && (tokens[static_cast<size_t>(lastNucleus)].tiedTo
+            || (tokens[static_cast<size_t>(lastNucleus)].def
+                && tokens[static_cast<size_t>(lastNucleus)].def->hasEndCf1));
     const double nucScale = isDiphthongNucleus ? nucScaleDiph : nucScaleMono;
     const double codScaleGeneric = (lang.phraseFinalLengtheningCodaScale > 0.0)
         ? lang.phraseFinalLengtheningCodaScale * clauseScale : lastScale;

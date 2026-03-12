@@ -1126,6 +1126,7 @@ double liquidDynamicsLabialGlideTransitionPct = 0.60;
   // Per-class minimum durations (ms). Absolute floors regardless of speed.
   // Set to 0.0 to disable floor for that class.
   double rateCompVowelFloorMs = 25.0;
+  double rateCompDiphthongFloorMs = 0.0;  // compound diphthongs (endCf); 0 = use vowelMs
   double rateCompFricativeFloorMs = 18.0;
   double rateCompStopFloorMs = 4.0;
   double rateCompNasalFloorMs = 18.0;

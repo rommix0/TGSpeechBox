@@ -79,7 +79,7 @@ settings:
   phraseFinalLengtheningNucleusOnlyMode: false
   phraseFinalLengtheningFinalSyllableScale: 1.05
   phraseFinalLengtheningNucleusScale: 1.15
-  phraseFinalLengtheningNucleusDiphthongScale: 1.05
+  phraseFinalLengtheningNucleusDiphthongScale: 1.0
   phraseFinalLengtheningCodaScale: 1.10
   phraseFinalLengtheningCodaStopScale: 1.0
   phraseFinalLengtheningCodaFricativeScale: 1.12
@@ -181,8 +181,10 @@ settings:
       "e j": 0.95          # FACE — narrow
       "ə w": 0.75          # GOAT — minimal glide; unstressed RP GOAT is near-monophthong
     durationFloorMs: 60
+    rateCompensation: 0.15
     onsetHoldExponent: 1.3
     microFrameIntervalMs: 8
+    onsetSettleMs: 12
 
   lengthContrast:
     enabled: false
@@ -525,6 +527,7 @@ settings:
     enabled: true
     minimumDurations:
       vowelMs: 20
+      diphthongMs: 38
       fricativeMs: 18
       stopMs: 4
       nasalMs: 18

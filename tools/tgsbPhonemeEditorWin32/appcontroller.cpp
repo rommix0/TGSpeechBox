@@ -993,6 +993,7 @@ static std::vector<std::string> knownLanguageSettingKeys() {
     "rateCompStopFloorMs",
     "rateCompTapFloorMs",
     "rateCompTrillFloorMs",
+    "rateCompDiphthongFloorMs",
     "rateCompVoicedConsonantFloorMs",
     "rateCompVowelFloorMs",
     "rateCompWordFinalBonusMs",

@@ -391,6 +391,7 @@ def _getPanelClass():
                 "rateCompensation.enabled",
                 "rateCompensation.floorSpeedScale",
                 "rateCompensation.minimumDurations.affricateMs",
+                "rateCompensation.minimumDurations.diphthongMs",
                 "rateCompensation.minimumDurations.fricativeMs",
                 "rateCompensation.minimumDurations.liquidMs",
                 "rateCompensation.minimumDurations.nasalMs",

@@ -106,7 +106,15 @@ static bool isPenultimateAtWordEnd(const std::vector<Token>& tokens, size_t i) {
 // Get the perceptual floor for a token based on its phoneme class.
 // Returns 0.0 if no floor applies. Check order matches briefing priority.
 static double getClassFloor(const Token& t, const LanguagePack& lang) {
-  if (isVowel(t))      return lang.rateCompVowelFloorMs;
+  if (isVowel(t)) {
+    // Compound diphthongs (single token with endCf sweep) bypass collapse
+    // and need a higher floor than monophthongs for the formant sweep.
+    // Tied/collapsed pairs already have their own durationFloorMs.
+    if (lang.rateCompDiphthongFloorMs > 0.0
+        && t.def && t.def->hasEndCf1)
+      return lang.rateCompDiphthongFloorMs;
+    return lang.rateCompVowelFloorMs;
+  }
   if (isNasal(t))      return lang.rateCompNasalFloorMs;
   if (isLiquid(t))     return lang.rateCompLiquidFloorMs;
   if (isSemivowel(t))  return lang.rateCompSemivowelFloorMs;
