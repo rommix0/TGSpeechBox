@@ -1033,6 +1033,73 @@ NVSP_FRONTEND_API char* nvspFrontend_getAvailableLanguages(nvspFrontend_handle_t
   return out;
 }
 
+// ── Phoneme Preview (direct DSP pump, no pipeline) ────────────────
+
+NVSP_FRONTEND_API int nvspFrontend_previewPhoneme(
+  nvspFrontend_handle_t handle,
+  const char* phonemeKeyUtf8,
+  double pitchHz,
+  double durationMs,
+  nvspFrontend_FrameExCallback cb,
+  void* userData
+) {
+  using namespace nvsp_frontend;
+  Handle* h = asHandle(handle);
+  if (!h || !phonemeKeyUtf8 || !phonemeKeyUtf8[0] || !cb) return 0;
+
+  std::lock_guard<std::mutex> lock(h->mu);
+
+  if (!h->packLoaded) return 0;
+
+  // Look up phoneme directly in the loaded pack.
+  std::u32string phonU32 = utf8ToU32(std::string(phonemeKeyUtf8));
+  auto it = h->pack.phonemes.find(phonU32);
+  if (it == h->pack.phonemes.end()) return 0;
+
+  const PhonemeDef& def = it->second;
+
+  // Build frame directly from PhonemeDef field array.
+  // FieldId enum maps 1:1 to nvspFrontend_Frame struct layout.
+  nvspFrontend_Frame frame;
+  std::memset(&frame, 0, sizeof(frame));
+  static_assert(sizeof(nvspFrontend_Frame) == kFrameFieldCount * sizeof(double),
+    "Frame/FieldId layout mismatch");
+  double* fp = reinterpret_cast<double*>(&frame);
+  for (int i = 0; i < kFrameFieldCount; ++i) {
+    fp[i] = def.field[i];
+  }
+
+  // Override pitch with requested value.
+  frame.voicePitch = pitchHz;
+  frame.endVoicePitch = pitchHz;
+
+  // Set sensible defaults for a steady-state preview.
+  if (frame.preFormantGain <= 0.0) frame.preFormantGain = 1.0;
+  if (frame.outputGain <= 0.0) frame.outputGain = 1.0;
+
+  // Build frameEx from PhonemeDef's optional fields.
+  nvspFrontend_FrameEx frameEx;
+  std::memset(&frameEx, 0, sizeof(frameEx));
+  // Set NAN for end-formant fields (no ramping).
+  frameEx.endCf1 = NAN; frameEx.endCf2 = NAN; frameEx.endCf3 = NAN;
+  frameEx.endPf1 = NAN; frameEx.endPf2 = NAN; frameEx.endPf3 = NAN;
+  if (def.hasCreakiness)  frameEx.creakiness  = def.creakiness;
+  if (def.hasBreathiness) frameEx.breathiness = def.breathiness;
+  if (def.hasJitter)      frameEx.jitter      = def.jitter;
+  if (def.hasShimmer)     frameEx.shimmer     = def.shimmer;
+  if (def.hasSharpness)   frameEx.sharpness   = def.sharpness;
+
+  // Emit a steady-state phoneme frame.
+  if (durationMs <= 0.0) durationMs = 300.0;
+  double fadeMs = 15.0;
+  cb(userData, &frame, &frameEx, durationMs, fadeMs, 0);
+
+  // Trailing silence for clean fade-out.
+  cb(userData, nullptr, nullptr, 0.0, fadeMs, 0);
+
+  return 1;
+}
+
 // ── Generic Data Query API (ABI v5+) ──────────────────────────────
 
 NVSP_FRONTEND_API int nvspFrontend_getDataCount(
@@ -1166,7 +1233,14 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
     if (h->packLoaded) {
       std::u32string phonU32 = utf8ToU32(phonemeKeyUtf8);
       auto it = h->pack.phonemes.find(phonU32);
-      if (it != h->pack.phonemes.end()) {
+      if (it == h->pack.phonemes.end()) {
+#ifdef __ANDROID__
+        // Phoneme key not found in loaded pack.
+#endif
+        h->dataCache.invalidate();
+        return 0;  // phoneme not found — fail explicitly
+      }
+      {
         PhonemeDef& def = it->second;
 
         // Check if it's a frameEx sub-field.
@@ -1230,7 +1304,8 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
           if (parseFieldId(fieldPath, fid)) {
             int idx = static_cast<int>(fid);
             if (idx >= 0 && idx < kFrameFieldCount) {
-              def.field[idx] = std::strtod(value.c_str(), nullptr);
+              double newVal = std::strtod(value.c_str(), nullptr);
+              def.field[idx] = newVal;
               def.setMask |= (1ull << idx);
             }
           }

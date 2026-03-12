@@ -529,6 +529,27 @@ NVSP_FRONTEND_API int nvspFrontend_applySettingOverrides(
 */
 NVSP_FRONTEND_API char* nvspFrontend_getAvailableLanguages(nvspFrontend_handle_t handle);
 
+/*
+  Preview a single phoneme by key, bypassing the full pipeline.
+
+  Looks up the PhonemeDef for phonemeKeyUtf8 in the loaded pack and
+  directly emits one steady-state frame to the callback.  No eSpeak,
+  no allophone rules, no pitch contour — just the raw acoustic frame
+  from the phoneme definition, exactly as modified by setData().
+
+  pitchHz controls the fundamental frequency.
+  durationMs controls how long the phoneme is held (default ~300ms).
+  Returns 1 on success (phoneme found), 0 on failure.
+*/
+NVSP_FRONTEND_API int nvspFrontend_previewPhoneme(
+  nvspFrontend_handle_t handle,
+  const char* phonemeKeyUtf8,
+  double pitchHz,
+  double durationMs,
+  nvspFrontend_FrameExCallback cb,
+  void* userData
+);
+
 /* ============================================================================
  * Generic Data Query API (ABI v5+)
  * ============================================================================
