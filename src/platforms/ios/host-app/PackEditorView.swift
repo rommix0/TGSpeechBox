@@ -8,6 +8,7 @@
  */
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct PackEditorView: View {
     @ObservedObject var engine: TgsbEngine
@@ -86,6 +87,11 @@ private struct PackSettingsListView: View {
     @State private var editingKey: String?
     @State private var editingValue: String = ""
     @State private var showResetAll = false
+    @State private var showImportPicker = false
+    @State private var showExportPicker = false
+    @State private var showImportConfirm = false
+    @State private var pendingImportURL: URL?
+    @State private var statusMessage: String?
     @AccessibilityFocusState private var headerFocused: Bool
 
     var body: some View {
@@ -107,6 +113,16 @@ private struct PackSettingsListView: View {
                 Button("Reset All") { showResetAll = true }
             }
             .padding()
+
+            // Import / Export actions
+            HStack(spacing: 12) {
+                Button("Import Pack") { showImportPicker = true }
+                    .buttonStyle(.bordered)
+                Button("Export Pack") { showExportPicker = true }
+                    .buttonStyle(.bordered)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
 
             if engine.editorSettings.isEmpty {
                 Text("No settings found")
@@ -164,6 +180,47 @@ private struct PackSettingsListView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Remove all custom overrides for this language?")
+        }
+        .fileImporter(
+            isPresented: $showImportPicker,
+            allowedContentTypes: [.yaml, .plainText, .data],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                pendingImportURL = url
+                showImportConfirm = true
+            }
+        }
+        .fileExporter(
+            isPresented: $showExportPicker,
+            document: PackYamlDocument(engine: engine, langTag: langTag),
+            contentType: .yaml,
+            defaultFilename: "\(langTag).yaml"
+        ) { result in
+            if case .success = result {
+                statusMessage = "Exported \(langTag).yaml"
+            } else if case .failure(let error) = result {
+                statusMessage = "Export failed: \(error.localizedDescription)"
+            }
+        }
+        .alert("Import Pack", isPresented: $showImportConfirm) {
+            Button("Import") {
+                if let url = pendingImportURL {
+                    statusMessage = engine.importPackYaml(langTag: langTag, from: url)
+                }
+                pendingImportURL = nil
+            }
+            Button("Cancel", role: .cancel) { pendingImportURL = nil }
+        } message: {
+            Text("Replace the \(langTag) language pack with the selected file? Any existing overrides will be cleared.")
+        }
+        .alert("Result", isPresented: Binding(
+            get: { statusMessage != nil },
+            set: { if !$0 { statusMessage = nil } }
+        )) {
+            Button("OK") { statusMessage = nil }
+        } message: {
+            Text(statusMessage ?? "")
         }
     }
 }
@@ -241,5 +298,30 @@ private struct SettingRowView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - File Document for Export
+
+struct PackYamlDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.yaml, .plainText] }
+
+    let content: String
+
+    init(engine: TgsbEngine, langTag: String) {
+        content = engine.packYamlContent(langTag: langTag) ?? ""
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        if let data = configuration.file.regularFileContents {
+            content = String(data: data, encoding: .utf8) ?? ""
+        } else {
+            content = ""
+        }
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        let data = content.data(using: .utf8) ?? Data()
+        return FileWrapper(regularFileWithContents: data)
     }
 }

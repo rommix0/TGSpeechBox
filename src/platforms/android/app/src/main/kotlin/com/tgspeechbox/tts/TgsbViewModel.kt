@@ -11,11 +11,14 @@
 package com.tgspeechbox.tts
 
 import android.app.Application
+import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -696,5 +699,67 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
             }
             sb.append(c)
         }.toString().replaceFirstChar { it.uppercase() }
+    }
+
+    // ── Pack import / export ───────────────────────────────────────────
+
+    private val _importExportStatus = MutableStateFlow<String?>(null)
+    val importExportStatus: StateFlow<String?> = _importExportStatus
+
+    fun clearImportExportStatus() { _importExportStatus.value = null }
+
+    private fun packFileForLang(context: Context, langTag: String): File =
+        File(context.filesDir, "tgsb/packs/lang/$langTag.yaml")
+
+    fun exportPackYaml(context: Context, langTag: String, destUri: Uri) {
+        val packFile = packFileForLang(context, langTag)
+        if (!packFile.exists()) {
+            _importExportStatus.value = "Pack file not found for $langTag"
+            return
+        }
+        try {
+            context.contentResolver.openOutputStream(destUri)?.use { out ->
+                packFile.inputStream().use { it.copyTo(out) }
+            }
+            _importExportStatus.value = "Exported $langTag.yaml"
+        } catch (e: Exception) {
+            _importExportStatus.value = "Export failed: ${e.message}"
+        }
+    }
+
+    fun importPackYaml(context: Context, langTag: String, sourceUri: Uri): Boolean {
+        val content = try {
+            context.contentResolver.openInputStream(sourceUri)?.use {
+                it.bufferedReader().readText()
+            }
+        } catch (e: Exception) {
+            _importExportStatus.value = "Could not read file: ${e.message}"
+            return false
+        }
+        if (content.isNullOrBlank()) {
+            _importExportStatus.value = "File is empty"
+            return false
+        }
+
+        // Reject phonemes files — they have phoneme-specific keys.
+        if (content.contains("_isVowel:") && content.contains("_isNasal:")) {
+            _importExportStatus.value = context.getString(R.string.editor_import_not_lang_pack)
+            return false
+        }
+
+        try {
+            val destFile = packFileForLang(context, langTag)
+            destFile.writeText(content)
+        } catch (e: Exception) {
+            _importExportStatus.value = "Import failed: ${e.message}"
+            return false
+        }
+
+        // Clear overrides — imported file is the new base.
+        prefs.edit().remove("pack_overrides_$langTag").apply()
+        reloadCurrentLanguage()
+        loadEditorSettings(langTag)
+        _importExportStatus.value = "Imported into $langTag"
+        return true
     }
 }

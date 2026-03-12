@@ -399,6 +399,74 @@ class TgsbEngine: ObservableObject {
         loadEditorSettings(langTag: langTag)
     }
 
+    // MARK: - Pack Import / Export
+
+    /// Return the raw YAML content for a language pack (for export).
+    func packYamlContent(langTag: String) -> String? {
+        guard let path = packFilePath(langTag: langTag) else { return nil }
+        return try? String(contentsOfFile: path, encoding: .utf8)
+    }
+
+    /// Import a YAML file as the language pack for `langTag`.
+    /// Returns a status message string.
+    ///
+    /// NOTE: iOS packs live in the read-only app bundle.  This import saves
+    /// the file to the app group container for future use, but the C engine
+    /// currently loads from the bundle path.  A future C-level change to
+    /// check an override directory will make this fully functional.
+    /// For now, import still applies the settings portion via overrides.
+    func importPackYaml(langTag: String, from url: URL) -> String {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else {
+            return "Could not read file"
+        }
+        if content.isEmpty { return "File is empty" }
+
+        // Reject phonemes files.
+        if content.contains("_isVowel:") && content.contains("_isNasal:") {
+            return "This looks like a phonemes file, not a language pack."
+        }
+
+        // Save to app group container for future override-directory support.
+        if let containerURL = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: kAppGroupId) {
+            let packDir = containerURL.appendingPathComponent("packs/lang", isDirectory: true)
+            try? FileManager.default.createDirectory(at: packDir, withIntermediateDirectories: true)
+            let destURL = packDir.appendingPathComponent("\(langTag).yaml")
+            try? content.write(to: destURL, atomically: true, encoding: .utf8)
+        }
+
+        // Clear existing overrides — imported file is the new base.
+        let d = UserDefaults(suiteName: kAppGroupId)
+        d?.removeObject(forKey: "pack_overrides_\(langTag)")
+        d?.synchronize()
+
+        reloadCurrentLanguage()
+        loadEditorSettings(langTag: langTag)
+        return "Imported into \(langTag)"
+    }
+
+    /// Path to the pack YAML file — checks app group override first, falls back to bundle.
+    private func packFilePath(langTag: String) -> String? {
+        // Check writable app group location first (imported packs).
+        if let containerURL = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: kAppGroupId) {
+            let overridePath = containerURL
+                .appendingPathComponent("packs/lang/\(langTag).yaml").path
+            if FileManager.default.fileExists(atPath: overridePath) {
+                return overridePath
+            }
+        }
+        // Fall back to bundle.
+        if let bundlePath = Bundle.main.path(forResource: "packs/lang/\(langTag)",
+                                              ofType: "yaml") {
+            return bundlePath
+        }
+        return nil
+    }
+
     func applyStoredOverrides(_ tgsbLang: String) {
         guard let eng = engine else { return }
         let overrides = loadOverrides(tgsbLang)

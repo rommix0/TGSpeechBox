@@ -9,6 +9,8 @@
 
 package com.tgspeechbox.tts
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -106,12 +109,31 @@ private fun PackSettingsScreen(
     langTag: String,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val settings by viewModel.editorSettings.collectAsState()
     var editingKey by remember { mutableStateOf<String?>(null) }
     var editingValue by remember { mutableStateOf("") }
     var selectingKey by remember { mutableStateOf<String?>(null) }
     var selectingOptions by remember { mutableStateOf<List<String>>(emptyList()) }
     var showResetAll by remember { mutableStateOf(false) }
+    var showImportConfirm by remember { mutableStateOf(false) }
+    var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val importExportStatus by viewModel.importExportStatus.collectAsState()
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            pendingImportUri = uri
+            showImportConfirm = true
+        }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri?.let { viewModel.exportPackYaml(context, langTag, it) }
+    }
 
     LaunchedEffect(langTag) {
         viewModel.loadEditorSettings(langTag)
@@ -138,6 +160,21 @@ private fun PackSettingsScreen(
             )
             TextButton(onClick = { showResetAll = true }) {
                 Text(stringResource(R.string.editor_reset_all))
+            }
+        }
+
+        // Import / Export actions
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+                Text(stringResource(R.string.editor_import_pack))
+            }
+            OutlinedButton(onClick = { exportLauncher.launch("$langTag.yaml") }) {
+                Text(stringResource(R.string.editor_export_pack))
             }
         }
 
@@ -263,6 +300,40 @@ private fun PackSettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showResetAll = false }) {
                     Text(stringResource(R.string.cancel_button))
+                }
+            }
+        )
+    }
+
+    // Import confirmation
+    if (showImportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showImportConfirm = false; pendingImportUri = null },
+            title = { Text(stringResource(R.string.editor_import_pack)) },
+            text = { Text(stringResource(R.string.editor_import_confirm, langTag)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImportUri?.let { viewModel.importPackYaml(context, langTag, it) }
+                    showImportConfirm = false
+                    pendingImportUri = null
+                }) { Text(stringResource(R.string.editor_import_pack)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportConfirm = false; pendingImportUri = null }) {
+                    Text(stringResource(R.string.cancel_button))
+                }
+            }
+        )
+    }
+
+    // Import/export status
+    if (importExportStatus != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearImportExportStatus() },
+            text = { Text(importExportStatus!!) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearImportExportStatus() }) {
+                    Text("OK")
                 }
             }
         )
