@@ -11,49 +11,54 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Navigation wrapper types so Packs and Phonemes don't clash in a single NavigationStack.
+private struct PackLangNav: Hashable { let lang: String }
+private struct PhonemeNav: Hashable { let key: String }
+
 struct PackEditorView: View {
     @ObservedObject var engine: TgsbEngine
     @Binding var engineStarted: Bool
     @SceneStorage("editorSelectedTab") private var selectedTab = 0
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $selectedTab) {
-                Text("Packs").tag(0)
-                Text("Phonemes").tag(1)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 8)
-
-            switch selectedTab {
-            case 0:
-                PacksTab(engine: engine, engineStarted: $engineStarted)
-            default:
-                PhonemesTab(engine: engine, engineStarted: $engineStarted)
-            }
-        }
-    }
-}
-
-// MARK: - Packs Tab
-
-private struct PacksTab: View {
-    @ObservedObject var engine: TgsbEngine
-    @Binding var engineStarted: Bool
-    @State private var selectedLang: String?
+    @State private var langFilter: String = ""
 
     var body: some View {
         NavigationStack {
-            LanguageListView(
-                engine: engine,
-                engineStarted: $engineStarted,
-                onLanguageSelected: { selectedLang = $0 }
-            )
-            .navigationDestination(item: $selectedLang) { lang in
+            VStack(spacing: 0) {
+                Picker("", selection: $selectedTab) {
+                    Text("Packs").tag(0)
+                    Text("Phonemes").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                switch selectedTab {
+                case 0:
+                    LanguageListView(
+                        engine: engine,
+                        engineStarted: $engineStarted
+                    )
+                default:
+                    PhonemeListView(
+                        engine: engine,
+                        engineStarted: $engineStarted,
+                        langFilter: $langFilter
+                    )
+                }
+            }
+            .navigationDestination(for: PackLangNav.self) { nav in
                 PackSettingsListView(
                     engine: engine,
-                    langTag: lang
+                    langTag: nav.lang
+                )
+#if os(iOS)
+                .toolbar(.hidden, for: .tabBar)
+#endif
+            }
+            .navigationDestination(for: PhonemeNav.self) { nav in
+                PhonemeDetailView(
+                    engine: engine,
+                    phonemeKey: nav.key
                 )
 #if os(iOS)
                 .toolbar(.hidden, for: .tabBar)
@@ -68,7 +73,6 @@ private struct PacksTab: View {
 private struct LanguageListView: View {
     @ObservedObject var engine: TgsbEngine
     @Binding var engineStarted: Bool
-    var onLanguageSelected: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -86,7 +90,7 @@ private struct LanguageListView: View {
                     .padding(.top, 20)
             } else {
                 List(engine.editorLanguages, id: \.self) { lang in
-                    Button(action: { onLanguageSelected(lang) }) {
+                    NavigationLink(value: PackLangNav(lang: lang)) {
                         Text(lang)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -329,42 +333,12 @@ private struct SettingRowView: View {
     }
 }
 
-// MARK: - Phonemes Tab
-
-private struct PhonemesTab: View {
-    @ObservedObject var engine: TgsbEngine
-    @Binding var engineStarted: Bool
-    @State private var selectedPhoneme: String?
-    @State private var langFilter: String = ""
-
-    var body: some View {
-        NavigationStack {
-            PhonemeListView(
-                engine: engine,
-                engineStarted: $engineStarted,
-                langFilter: $langFilter,
-                onPhonemeSelected: { selectedPhoneme = $0 }
-            )
-            .navigationDestination(item: $selectedPhoneme) { phoneme in
-                PhonemeDetailView(
-                    engine: engine,
-                    phonemeKey: phoneme
-                )
-#if os(iOS)
-                .toolbar(.hidden, for: .tabBar)
-#endif
-            }
-        }
-    }
-}
-
 // MARK: - Phoneme List
 
 private struct PhonemeListView: View {
     @ObservedObject var engine: TgsbEngine
     @Binding var engineStarted: Bool
     @Binding var langFilter: String
-    var onPhonemeSelected: (String) -> Void
     @State private var showResetAllPhonemes = false
 
     var body: some View {
@@ -404,7 +378,7 @@ private struct PhonemeListView: View {
                 Spacer()
             } else {
                 List(engine.phonemeList) { entry in
-                    Button(action: { onPhonemeSelected(entry.key) }) {
+                    NavigationLink(value: PhonemeNav(key: entry.key)) {
                         HStack {
                             Text(entry.key)
                                 .font(.title3)
@@ -491,22 +465,6 @@ private struct PhonemeDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Spacer()
-                Button(action: { showAddField = true }) {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("Add field to \(phonemeKey)")
-                Button(action: { engine.previewPhoneme(phonemeKey) }) {
-                    Image(systemName: "play.fill")
-                }
-                .accessibilityLabel("Preview \(phonemeKey)")
-                Button("Reset all") { showResetAll = true }
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
-
             if engine.phonemeFields.isEmpty {
                 Text("No fields")
                     .foregroundColor(.secondary)
@@ -547,8 +505,26 @@ private struct PhonemeDetailView: View {
         }
         .onAppear {
             engine.loadPhonemeFields(phonemeKey: phonemeKey)
+#if os(iOS)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                UIAccessibility.post(notification: .screenChanged, argument: nil)
+            }
+#endif
         }
         .navigationTitle(phonemeKey)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button(action: { showAddField = true }) {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add field to \(phonemeKey)")
+                Button(action: { engine.previewPhoneme(phonemeKey) }) {
+                    Image(systemName: "play.fill")
+                }
+                .accessibilityLabel("Preview \(phonemeKey)")
+                Button("Reset all") { showResetAll = true }
+            }
+        }
         .alert("Edit Value", isPresented: Binding(
             get: { editingKey != nil },
             set: { if !$0 { editingKey = nil } }
