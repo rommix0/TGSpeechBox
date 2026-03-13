@@ -11,6 +11,7 @@ Provides:
 from __future__ import annotations
 
 import ctypes
+import os
 
 from logHandler import log
 from synthDriverHandler import synthDoneSpeaking, synthIndexReached
@@ -27,6 +28,46 @@ from .constants import voices
 _frameFieldNames = {x[0] for x in speechPlayer.Frame._fields_}
 _voiceOps = buildVoiceOps(voices, _frameFieldNames)
 del _frameFieldNames
+
+
+# ---------------------------------------------------------------------------
+# Letter-name dictionaries — per-language TSV files mapping single characters
+# to their spoken names (e.g. Spanish ó → "o acentuada", y → "i griega").
+# Used only for single-character chunks (character-by-character navigation).
+# ---------------------------------------------------------------------------
+_letterNameCache: dict[str, dict[str, str]] = {}  # langTag -> {char -> spokenName}
+
+
+def _loadLetterNames(packsDir: str, langTag: str) -> dict[str, str]:
+    """Load letter names TSV for a language.  Returns empty dict if not found."""
+    if langTag in _letterNameCache:
+        return _letterNameCache[langTag]
+
+    result: dict[str, str] = {}
+    # Try exact tag first (es-mx), then base (es)
+    candidates = [langTag]
+    if "-" in langTag:
+        candidates.append(langTag.split("-")[0])
+
+    for tag in candidates:
+        path = os.path.join(packsDir, "dict", f"{tag}-letters.tsv")
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        parts = line.split("\t", 1)
+                        if len(parts) == 2 and parts[0] and parts[1]:
+                            result[parts[0]] = parts[1]
+                log.debug("TGSpeechBox: loaded %d letter names from %s", len(result), path)
+            except Exception:
+                log.debug("TGSpeechBox: failed to load letter names from %s", path, exc_info=True)
+            break  # found a file, stop looking
+
+    _letterNameCache[langTag] = result
+    return result
 
 
 def _applyVoiceToFrame(frame: speechPlayer.Frame, voiceName: str) -> None:
@@ -251,6 +292,27 @@ class SpeechPipelineMixin:
                         clauseType = None
 
                     punctPauseMs = _punctuationPauseMs(punctToken)
+
+                    # Single-character letter name lookup: if the chunk is
+                    # a lone character and we have a letter-name override for
+                    # this language, replace it with the spoken name before
+                    # eSpeak phonemization.  e.g. Spanish ó → "o acentuada".
+                    stripped = chunk.strip()
+                    if len(stripped) <= 3:
+                        log.debug("TGSpeechBox: short chunk=%r len=%d lang=%r packs=%r",
+                                  stripped, len(stripped),
+                                  getattr(self, "_frontendLangTag", "?"),
+                                  getattr(self, "_packsDir", "?"))
+                    if len(stripped) == 1:
+                        langTag = getattr(self, "_frontendLangTag", "") or ""
+                        packsDir = getattr(self, "_packsDir", "") or ""
+                        if packsDir and langTag:
+                            letterNames = _loadLetterNames(packsDir, langTag)
+                            replacement = letterNames.get(stripped) or letterNames.get(stripped.lower())
+                            log.debug("TGSpeechBox: letter lookup char=%r found=%r (dict has %d entries)",
+                                      stripped, replacement, len(letterNames))
+                            if replacement:
+                                chunk = replacement
 
                     # Pre-eSpeak text normalization: compound splitting, date ordinals, etc.
                     chunk = self._frontend.prepareText(chunk)
