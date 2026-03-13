@@ -752,7 +752,18 @@ int main(int argc, char** argv) {
       if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
       // Skip closing quotes/brackets (ASCII)
       if (c == '"' || c == '\'' || c == ')' || c == ']') continue;
-      // Skip UTF-8 lead byte for smart quotes (U+2019, U+201D)
+      // Skip UTF-8 continuation/lead bytes for smart quotes, ellipsis, etc.
+      // U+2026 (…) backwards: A6 80 E2 — check for the lead byte.
+      if ((unsigned char)c == 0xA6) {
+        auto it2 = it; ++it2;
+        if (it2 != opt.text.rend() && (unsigned char)*it2 == 0x80) {
+          auto it3 = it2; ++it3;
+          if (it3 != opt.text.rend() && (unsigned char)*it3 == 0xE2) {
+            textClauseType = '.';
+            break;
+          }
+        }
+      }
       if ((unsigned char)c >= 0x80) continue;
       if (c == '.' || c == '?' || c == '!' || c == ',') {
         textClauseType = c;
@@ -784,6 +795,14 @@ int main(int argc, char** argv) {
         if (c == '.' || c == '?' || c == '!' || c == ',') {
           clauseType = c;
           p++;
+          break;
+        }
+        // U+2026 ellipsis (UTF-8: E2 80 A6) — treat as period
+        if ((unsigned char)c == 0xE2 &&
+            (unsigned char)*(p+1) == 0x80 &&
+            (unsigned char)*(p+2) == 0xA6) {
+          clauseType = '.';
+          p += 3;
           break;
         }
         // Colon/semicolon only split when followed by whitespace

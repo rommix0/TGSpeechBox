@@ -90,8 +90,9 @@ char detect_clause_type(const wchar_t* start, size_t len)
 }
 
 // Check if a character is clause-ending punctuation.
+// U+2026 (…) is treated as a period so ellipsis triggers a pause.
 bool is_clause_punct(wchar_t c) {
-    return c == L'.' || c == L'?' || c == L'!' || c == L',';
+    return c == L'.' || c == L'?' || c == L'!' || c == L',' || c == L'\u2026';
 }
 
 // Check if a character is a semicolon or colon (clause boundary only
@@ -142,7 +143,7 @@ std::vector<sapi_clause> split_clauses(const std::wstring& text)
                         continue;
                     }
                 }
-                clauseType = static_cast<char>(c);
+                clauseType = (c == L'\u2026') ? '.' : static_cast<char>(c);
                 ++pos;
                 // Consume trailing closing quotes/brackets that belong
                 // to this clause (e.g. the " after great.")

@@ -376,6 +376,14 @@ void tgsb_queue_text(TgsbEngine *engine,
                 p++;
                 break;
             }
+            /* U+2026 ellipsis (UTF-8: E2 80 A6) — treat as period */
+            if ((unsigned char)c == 0xE2 &&
+                (unsigned char)*(p+1) == 0x80 &&
+                (unsigned char)*(p+2) == 0xA6) {
+                clauseType = '.';
+                p += 3;
+                break;
+            }
             /* colon/semicolon only split when followed by whitespace
              * (avoids splitting times like "5:44" or ratios like "3:1") */
             if (c == ';' || c == ':') {

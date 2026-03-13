@@ -17,6 +17,7 @@ static bool isSentenceEnd(wchar_t c) {
     case L'?':
     case L';':
     case L':':
+    case 0x2026: // … (ellipsis)
     case 0x3002: // 。
     case 0xFF01: // ！
     case 0xFF1F: // ？

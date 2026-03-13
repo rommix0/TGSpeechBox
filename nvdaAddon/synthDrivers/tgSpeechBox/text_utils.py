@@ -21,6 +21,11 @@ re_textPause = re.compile(r'(?<=[.?!,:;])[)\]"\u2019\u201D\']*\s', re.DOTALL | r
 _re_lineBreaks = re.compile(r"[\r\n\u2028\u2029]+", re.UNICODE)
 _re_spaceRuns = re.compile(r"[\t \u00A0]+", re.UNICODE)
 
+# Normalize ellipsis: U+2026 → "...", then ensure space after "..." when
+# followed by a word character so re_textPause can split on the boundary.
+_re_ellipsis_normalize = re.compile(r"\u2026")
+_re_ellipsis_space = re.compile(r"\.{2,}(?=[A-Za-z0-9\u00C0-\u024F])")
+
 # Sentence end detection for Say All coalescing
 _SENT_END_RE = re.compile(r"(?:[.!?]+|\.{3})[)\]\"']*\s*$")
 
@@ -34,6 +39,11 @@ def normalizeTextForEspeak(text: str) -> str:
     """
     if not text:
         return ""
+    # Normalize Unicode ellipsis to three dots.
+    text = _re_ellipsis_normalize.sub("...", text)
+    # Insert space after ellipsis glued to next word ("owwwh...I'll" → "owwwh... I'll")
+    # so clause splitting can produce a pause there.
+    text = _re_ellipsis_space.sub(lambda m: m.group() + " ", text)
     # Convert newlines to spaces so line wrapping doesn't introduce pauses.
     text = _re_lineBreaks.sub(" ", text)
     # Collapse other common whitespace runs.
