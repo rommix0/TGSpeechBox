@@ -522,6 +522,24 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
 NVSP_FRONTEND_API void nvspFrontend_freeString(char* str);
 
 /*
+  Export merged YAML for a domain (base file + user overrides).
+  Comments are preserved for unchanged sections via surgical comparison.
+
+  domain: NVSP_DATA_SETTINGS or NVSP_DATA_PHONEMES.
+  langTagUtf8: language tag (e.g. "en-us") for settings; ignored for phonemes.
+  overridesJsonUtf8: JSON object string {"key": "value", ...} of user overrides.
+
+  Returns a malloc'd UTF-8 YAML string. Caller frees with nvspFrontend_freeString().
+  Returns NULL if no base file found or on error.
+*/
+NVSP_FRONTEND_API char* nvspFrontend_exportData(
+    nvspFrontend_handle_t handle,
+    int domain,
+    const char* langTagUtf8,
+    const char* overridesJsonUtf8
+);
+
+/*
   Apply setting overrides on top of the currently loaded language pack.
   yamlSnippetUtf8 is a mini YAML snippet containing "key: value" lines.
   Dot-notation keys (e.g. "boundarySmoothing.enabled: true") are supported.

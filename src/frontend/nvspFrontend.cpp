@@ -18,6 +18,7 @@ Licensed under the MIT License. See LICENSE for details.
 #include <vector>
 
 #include "data_query.h"
+#include "yaml_export.h"
 #include "ipa_engine.h"
 #include "pack.h"
 #include "text_parser.h"
@@ -1004,6 +1005,125 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
 
 NVSP_FRONTEND_API void nvspFrontend_freeString(char* str) {
   std::free(str);
+}
+
+NVSP_FRONTEND_API char* nvspFrontend_exportData(
+    nvspFrontend_handle_t handle,
+    int domain,
+    const char* langTagUtf8,
+    const char* overridesJsonUtf8
+) {
+  using namespace nvsp_frontend;
+  Handle* h = asHandle(handle);
+  if (!h) return nullptr;
+
+  std::lock_guard<std::mutex> lock(h->mu);
+
+  // Parse overrides JSON into vector of (key, value) pairs.
+  std::vector<std::pair<std::string, std::string>> overrides;
+  if (overridesJsonUtf8 && overridesJsonUtf8[0]) {
+    // Simple JSON object parser: {"key": "value", ...}
+    std::string json(overridesJsonUtf8);
+    // Find opening brace.
+    auto brace = json.find('{');
+    if (brace == std::string::npos) return nullptr;
+    size_t pos = brace + 1;
+    while (pos < json.size()) {
+      // Skip whitespace.
+      while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\n' ||
+             json[pos] == '\r' || json[pos] == '\t' || json[pos] == ',')) pos++;
+      if (pos >= json.size() || json[pos] == '}') break;
+      // Parse key (quoted string).
+      if (json[pos] != '"') break;
+      pos++;
+      std::string key;
+      while (pos < json.size() && json[pos] != '"') {
+        if (json[pos] == '\\' && pos + 1 < json.size()) {
+          pos++;
+          switch (json[pos]) {
+            case 'n': key += '\n'; break;
+            case 't': key += '\t'; break;
+            default: key += json[pos]; break;
+          }
+        } else {
+          key += json[pos];
+        }
+        pos++;
+      }
+      if (pos < json.size()) pos++; // skip closing quote
+      // Skip colon.
+      while (pos < json.size() && (json[pos] == ' ' || json[pos] == ':')) pos++;
+      // Parse value (quoted string).
+      if (pos >= json.size() || json[pos] != '"') break;
+      pos++;
+      std::string val;
+      while (pos < json.size() && json[pos] != '"') {
+        if (json[pos] == '\\' && pos + 1 < json.size()) {
+          pos++;
+          switch (json[pos]) {
+            case 'n': val += '\n'; break;
+            case 't': val += '\t'; break;
+            default: val += json[pos]; break;
+          }
+        } else {
+          val += json[pos];
+        }
+        pos++;
+      }
+      if (pos < json.size()) pos++; // skip closing quote
+      overrides.emplace_back(std::move(key), std::move(val));
+    }
+  }
+
+  // Determine base file path.
+  std::string basePath;
+  bool isPhonemes = false;
+
+  if (domain == NVSP_DATA_PHONEMES) {
+    isPhonemes = true;
+    // Check override dir first, then pack dir.
+    if (!h->overrideDir.empty()) {
+      std::string ovPath = h->overrideDir + "/packs/phonemes.yaml";
+      std::ifstream test(ovPath);
+      if (test.good()) basePath = ovPath;
+    }
+    if (basePath.empty()) {
+      basePath = h->packDir + "/phonemes.yaml";
+    }
+  } else if (domain == NVSP_DATA_SETTINGS) {
+    // Find the most-specific language file.
+    std::string lang = langTagUtf8 ? std::string(langTagUtf8) : std::string();
+    if (lang.empty()) return nullptr;
+
+    // Check override dir first, then pack dir.
+    if (!h->overrideDir.empty()) {
+      std::string ovPath = h->overrideDir + "/packs/lang/" + lang + ".yaml";
+      std::ifstream test(ovPath);
+      if (test.good()) basePath = ovPath;
+    }
+    if (basePath.empty()) {
+      basePath = h->packDir + "/lang/" + lang + ".yaml";
+    }
+  } else {
+    return nullptr;  // unsupported domain
+  }
+
+  // Verify file exists.
+  {
+    std::ifstream test(basePath);
+    if (!test.good()) return nullptr;
+  }
+
+  // Call the surgical merge.
+  std::string result = yaml_export::exportMergedYaml(basePath, overrides, isPhonemes);
+  if (result.empty()) return nullptr;
+
+  // Return malloc'd copy.
+  char* out = static_cast<char*>(std::malloc(result.size() + 1));
+  if (!out) return nullptr;
+  std::memcpy(out, result.data(), result.size());
+  out[result.size()] = '\0';
+  return out;
 }
 
 NVSP_FRONTEND_API int nvspFrontend_applySettingOverrides(
