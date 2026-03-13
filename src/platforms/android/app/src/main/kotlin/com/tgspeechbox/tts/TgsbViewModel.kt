@@ -1069,4 +1069,70 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         _importExportStatus.value = "Imported into $langTag"
         return true
     }
+
+    // ── Phoneme overrides import / export ────────────────────────────
+
+    fun exportPhonemeOverrides(context: Context, destUri: Uri) {
+        val overrides = loadPhonemeOverrides()
+        if (overrides.isEmpty()) {
+            _importExportStatus.value = "No phoneme overrides to export"
+            return
+        }
+        try {
+            val obj = org.json.JSONObject()
+            for ((k, v) in overrides) obj.put(k, v)
+            val json = obj.toString(2)  // pretty-print
+            context.contentResolver.openOutputStream(destUri)?.use { out ->
+                out.write(json.toByteArray(Charsets.UTF_8))
+            }
+            _importExportStatus.value = "Exported ${overrides.size} phoneme overrides"
+        } catch (e: Exception) {
+            _importExportStatus.value = "Export failed: ${e.message}"
+        }
+    }
+
+    fun importPhonemeOverrides(context: Context, sourceUri: Uri) {
+        val content = try {
+            context.contentResolver.openInputStream(sourceUri)?.use {
+                it.bufferedReader().readText()
+            }
+        } catch (e: Exception) {
+            _importExportStatus.value = "Could not read file: ${e.message}"
+            return
+        }
+        if (content.isNullOrBlank()) {
+            _importExportStatus.value = "File is empty"
+            return
+        }
+        try {
+            val obj = org.json.JSONObject(content)
+            val overrides = mutableMapOf<String, String>()
+            for (key in obj.keys()) {
+                overrides[key] = obj.getString(key)
+            }
+            savePhonemeOverrides(overrides)
+            reloadCurrentLanguage()
+            reapplyAllPhonemeOverrides()
+            _importExportStatus.value = "Imported ${overrides.size} phoneme overrides"
+        } catch (e: Exception) {
+            _importExportStatus.value = "Invalid phoneme overrides file: ${e.message}"
+        }
+    }
+
+    fun sharePhonemeOverrides(context: Context) {
+        val overrides = loadPhonemeOverrides()
+        if (overrides.isEmpty()) {
+            _importExportStatus.value = "No phoneme overrides to share"
+            return
+        }
+        val obj = org.json.JSONObject()
+        for ((k, v) in overrides) obj.put(k, v)
+        val json = obj.toString(2)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_SUBJECT, "phoneme-overrides.json")
+            putExtra(Intent.EXTRA_TEXT, json)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share phoneme overrides"))
+    }
 }

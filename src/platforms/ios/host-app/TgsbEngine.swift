@@ -771,6 +771,52 @@ class TgsbEngine: ObservableObject {
         reapplyAllPhonemeOverrides()
     }
 
+    // ── Phoneme overrides import / export ────────────────────────────
+
+    /// Returns the phoneme overrides as a pretty-printed JSON string, or nil if empty.
+    func phonemeOverridesJSON() -> String? {
+        let overrides = loadPhonemeOverrides()
+        if overrides.isEmpty { return nil }
+        guard let data = try? JSONSerialization.data(
+            withJSONObject: overrides,
+            options: [.prettyPrinted, .sortedKeys]
+        ) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// Write phoneme overrides JSON to a temp file for sharing.
+    func exportPhonemeOverridesToTempFile() -> URL? {
+        guard let json = phonemeOverridesJSON() else { return nil }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("phoneme-overrides.json")
+        guard let _ = try? json.write(to: url, atomically: true, encoding: .utf8) else {
+            return nil
+        }
+        return url
+    }
+
+    /// Import phoneme overrides from a JSON file. Returns a status message.
+    func importPhonemeOverrides(from url: URL) -> String {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else {
+            return "Could not read file"
+        }
+        if content.isEmpty { return "File is empty" }
+
+        guard let data = content.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        else {
+            return "Invalid phoneme overrides file"
+        }
+
+        savePhonemeOverrides(obj)
+        reloadCurrentLanguage()
+        reapplyAllPhonemeOverrides()
+        return "Imported \(obj.count) phoneme overrides"
+    }
+
     func resetPhonemeOverrides(phonemeKey: String) {
         let prefix = "\(phonemeKey)."
         var overrides = loadPhonemeOverrides()

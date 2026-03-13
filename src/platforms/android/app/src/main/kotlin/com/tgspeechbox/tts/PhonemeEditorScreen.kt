@@ -12,7 +12,10 @@ package com.tgspeechbox.tts
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,9 +67,29 @@ private fun PhonemeListScreen(
     onLangFilterChanged: (String) -> Unit,
     onPhonemeSelected: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val phonemes by viewModel.phonemeList.collectAsState()
     val langs by viewModel.editorLanguages.collectAsState()
     var showResetAllPhonemes by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+    var showImportConfirm by remember { mutableStateOf(false) }
+    var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val importExportStatus by viewModel.importExportStatus.collectAsState()
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            pendingImportUri = uri
+            showImportConfirm = true
+        }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { viewModel.exportPhonemeOverrides(context, it) }
+    }
 
     LaunchedEffect(langFilter) {
         viewModel.loadEditorLanguages()
@@ -124,8 +148,43 @@ private fun PhonemeListScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
-            TextButton(onClick = { showResetAllPhonemes = true }) {
-                Text("Reset All Phonemes")
+            Box {
+                IconButton(onClick = { showMoreMenu = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                }
+                DropdownMenu(
+                    expanded = showMoreMenu,
+                    onDismissRequest = { showMoreMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Export Phoneme Overrides") },
+                        onClick = {
+                            exportLauncher.launch("phoneme-overrides.json")
+                            showMoreMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Import Phoneme Overrides") },
+                        onClick = {
+                            importLauncher.launch(arrayOf("application/json", "*/*"))
+                            showMoreMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Share Phoneme Overrides") },
+                        onClick = {
+                            viewModel.sharePhonemeOverrides(context)
+                            showMoreMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Reset All Phonemes") },
+                        onClick = {
+                            showResetAllPhonemes = true
+                            showMoreMenu = false
+                        }
+                    )
+                }
             }
         }
 
@@ -243,6 +302,41 @@ private fun PhonemeListScreen(
             dismissButton = {
                 TextButton(onClick = { showResetAllPhonemes = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Import confirmation
+    if (showImportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showImportConfirm = false; pendingImportUri = null },
+            title = { Text("Import Phoneme Overrides") },
+            text = { Text("Replace all phoneme overrides with the imported file? Existing overrides will be cleared.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImportUri?.let { viewModel.importPhonemeOverrides(context, it) }
+                    viewModel.loadPhonemeList(langFilter)
+                    showImportConfirm = false
+                    pendingImportUri = null
+                }) { Text("Import") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportConfirm = false; pendingImportUri = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Import/export status
+    if (importExportStatus != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearImportExportStatus() },
+            text = { Text(importExportStatus!!) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearImportExportStatus() }) {
+                    Text("OK")
                 }
             }
         )

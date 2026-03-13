@@ -8,6 +8,7 @@
  */
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Phoneme List
 
@@ -16,6 +17,11 @@ struct PhonemeListView: View {
     @Binding var engineStarted: Bool
     @Binding var langFilter: String
     @State private var showResetAllPhonemes = false
+    @State private var showImportPicker = false
+    @State private var showImportConfirm = false
+    @State private var pendingImportURL: URL?
+    @State private var showExportPicker = false
+    @State private var statusMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -41,8 +47,30 @@ struct PhonemeListView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                Button("Reset All") { showResetAllPhonemes = true }
-                    .font(.caption)
+                Menu {
+                    Button(action: {
+                        showExportPicker = true
+                    }) {
+                        Label("Export Overrides", systemImage: "square.and.arrow.up")
+                    }
+                    Button(action: {
+                        showImportPicker = true
+                    }) {
+                        Label("Import Overrides", systemImage: "square.and.arrow.down")
+                    }
+                    if let url = engine.exportPhonemeOverridesToTempFile() {
+                        ShareLink("Share Overrides", item: url)
+                    }
+                    Button(role: .destructive, action: {
+                        showResetAllPhonemes = true
+                    }) {
+                        Label("Reset All Phonemes", systemImage: "arrow.counterclockwise")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.body)
+                }
+                .accessibilityLabel("More options")
             }
             .padding(.horizontal)
             .padding(.top, 8)
@@ -120,6 +148,73 @@ struct PhonemeListView: View {
             let scope = langFilter.isEmpty ? "all languages" : langFilter
             Text("Reset all phoneme overrides for \(scope) back to defaults?")
         }
+        .fileImporter(
+            isPresented: $showImportPicker,
+            allowedContentTypes: [.json, .plainText, .data],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                pendingImportURL = url
+                showImportConfirm = true
+            }
+        }
+        .fileExporter(
+            isPresented: $showExportPicker,
+            document: PhonemeOverridesDocument(engine: engine),
+            contentType: .json,
+            defaultFilename: "phoneme-overrides.json"
+        ) { result in
+            if case .success = result {
+                statusMessage = "Exported phoneme overrides"
+            } else if case .failure(let error) = result {
+                statusMessage = "Export failed: \(error.localizedDescription)"
+            }
+        }
+        .alert("Import Phoneme Overrides", isPresented: $showImportConfirm) {
+            Button("Import") {
+                if let url = pendingImportURL {
+                    statusMessage = engine.importPhonemeOverrides(from: url)
+                    engine.loadPhonemeList(langTag: langFilter)
+                }
+                pendingImportURL = nil
+            }
+            Button("Cancel", role: .cancel) { pendingImportURL = nil }
+        } message: {
+            Text("Replace all phoneme overrides with the imported file? Existing overrides will be cleared.")
+        }
+        .alert("Result", isPresented: Binding(
+            get: { statusMessage != nil },
+            set: { if !$0 { statusMessage = nil } }
+        )) {
+            Button("OK") { statusMessage = nil }
+        } message: {
+            Text(statusMessage ?? "")
+        }
+    }
+}
+
+// MARK: - Phoneme Overrides Document
+
+struct PhonemeOverridesDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json, .plainText] }
+
+    let content: String
+
+    @MainActor init(engine: TgsbEngine) {
+        content = engine.phonemeOverridesJSON() ?? "{}"
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        if let data = configuration.file.regularFileContents {
+            content = String(data: data, encoding: .utf8) ?? "{}"
+        } else {
+            content = "{}"
+        }
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        let data = content.data(using: .utf8) ?? Data()
+        return FileWrapper(regularFileWithContents: data)
     }
 }
 
