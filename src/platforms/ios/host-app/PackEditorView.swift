@@ -14,7 +14,7 @@ import UniformTypeIdentifiers
 struct PackEditorView: View {
     @ObservedObject var engine: TgsbEngine
     @Binding var engineStarted: Bool
-    @State private var selectedTab = 0
+    @SceneStorage("editorSelectedTab") private var selectedTab = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,18 +44,21 @@ private struct PacksTab: View {
     @State private var selectedLang: String?
 
     var body: some View {
-        if let lang = selectedLang {
-            PackSettingsListView(
-                engine: engine,
-                langTag: lang,
-                onBack: { selectedLang = nil }
-            )
-        } else {
+        NavigationStack {
             LanguageListView(
                 engine: engine,
                 engineStarted: $engineStarted,
                 onLanguageSelected: { selectedLang = $0 }
             )
+            .navigationDestination(item: $selectedLang) { lang in
+                PackSettingsListView(
+                    engine: engine,
+                    langTag: lang
+                )
+#if os(iOS)
+                .toolbar(.hidden, for: .tabBar)
+#endif
+            }
         }
     }
 }
@@ -110,7 +113,7 @@ private struct LanguageListView: View {
 private struct PackSettingsListView: View {
     @ObservedObject var engine: TgsbEngine
     let langTag: String
-    var onBack: () -> Void
+    @Environment(\.dismiss) private var dismiss
 
     @State private var editingKey: String?
     @State private var editingValue: String = ""
@@ -121,28 +124,16 @@ private struct PackSettingsListView: View {
     @State private var showImportConfirm = false
     @State private var pendingImportURL: URL?
     @State private var statusMessage: String?
-    @AccessibilityFocusState private var headerFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button(action: onBack) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                    }
-                }
-                .accessibilityLabel("Back to language list")
-                .accessibilityFocused($headerFocused)
-                Spacer()
-                Text(langTag)
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button("Reset All") { showResetAll = true }
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 8)
 
             // Import / Export actions
             HStack(spacing: 12) {
@@ -188,13 +179,17 @@ private struct PackSettingsListView: View {
         .onAppear {
             engine.loadEditorSettings(langTag: langTag)
             exportFileURL = engine.exportPackToTempFile(langTag: langTag)
-            headerFocused = true
         }
+        .navigationTitle(langTag)
         .alert("Edit Value", isPresented: Binding(
             get: { editingKey != nil },
             set: { if !$0 { editingKey = nil } }
         )) {
+            let isNumeric = engine.editorSettings.first(where: { $0.key == editingKey })?.type == .number
             TextField("Value", text: $editingValue)
+#if os(iOS)
+                .keyboardType(isNumeric ? .decimalPad : .default)
+#endif
             Button("OK") {
                 if let key = editingKey {
                     engine.setEditorOverride(langTag: langTag,
@@ -343,19 +338,22 @@ private struct PhonemesTab: View {
     @State private var langFilter: String = ""
 
     var body: some View {
-        if let phoneme = selectedPhoneme {
-            PhonemeDetailView(
-                engine: engine,
-                phonemeKey: phoneme,
-                onBack: { selectedPhoneme = nil }
-            )
-        } else {
+        NavigationStack {
             PhonemeListView(
                 engine: engine,
                 engineStarted: $engineStarted,
                 langFilter: $langFilter,
                 onPhonemeSelected: { selectedPhoneme = $0 }
             )
+            .navigationDestination(item: $selectedPhoneme) { phoneme in
+                PhonemeDetailView(
+                    engine: engine,
+                    phonemeKey: phoneme
+                )
+#if os(iOS)
+                .toolbar(.hidden, for: .tabBar)
+#endif
+            }
         }
     }
 }
@@ -367,6 +365,7 @@ private struct PhonemeListView: View {
     @Binding var engineStarted: Bool
     @Binding var langFilter: String
     var onPhonemeSelected: (String) -> Void
+    @State private var showResetAllPhonemes = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -391,6 +390,9 @@ private struct PhonemeListView: View {
                 Text("\(engine.phonemeList.count) phonemes")
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                Button("Reset All") { showResetAllPhonemes = true }
+                    .font(.caption)
             }
             .padding(.horizontal)
             .padding(.top, 8)
@@ -427,6 +429,21 @@ private struct PhonemeListView: View {
                         }
                         return desc
                     }())
+                    .contextMenu {
+                        Button(action: { engine.previewPhoneme(entry.key) }) {
+                            Label("Play phoneme", systemImage: "play.fill")
+                        }
+                        Button(action: {
+#if os(iOS)
+                            UIPasteboard.general.string = entry.key
+#elseif os(macOS)
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(entry.key, forType: .string)
+#endif
+                        }) {
+                            Label("Copy phoneme", systemImage: "doc.on.doc")
+                        }
+                    }
                 }
                 .listStyle(.plain)
             }
@@ -443,6 +460,16 @@ private struct PhonemeListView: View {
         .onChange(of: langFilter) { _ in
             engine.loadPhonemeList(langTag: langFilter)
         }
+        .alert("Reset All Phonemes", isPresented: $showResetAllPhonemes) {
+            Button("Reset", role: .destructive) {
+                engine.resetAllPhonemeOverrides(langFilter: langFilter)
+                engine.loadPhonemeList(langTag: langFilter)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            let scope = langFilter.isEmpty ? "all languages" : langFilter
+            Text("Reset all phoneme overrides for \(scope) back to defaults?")
+        }
     }
 }
 
@@ -451,29 +478,16 @@ private struct PhonemeListView: View {
 private struct PhonemeDetailView: View {
     @ObservedObject var engine: TgsbEngine
     let phonemeKey: String
-    var onBack: () -> Void
+    @Environment(\.dismiss) private var dismiss
 
     @State private var editingKey: String?
     @State private var editingValue: String = ""
     @State private var showResetAll = false
-    @AccessibilityFocusState private var headerFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button(action: onBack) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                    }
-                }
-                .accessibilityLabel("Back to phoneme list")
-                .accessibilityFocused($headerFocused)
-                Spacer()
-                Text(phonemeKey)
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button(action: { engine.previewPhoneme(phonemeKey) }) {
                     Image(systemName: "play.fill")
@@ -481,7 +495,8 @@ private struct PhonemeDetailView: View {
                 .accessibilityLabel("Preview \(phonemeKey)")
                 Button("Reset all") { showResetAll = true }
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 8)
 
             if engine.phonemeFields.isEmpty {
                 Text("No fields")
@@ -515,13 +530,16 @@ private struct PhonemeDetailView: View {
         }
         .onAppear {
             engine.loadPhonemeFields(phonemeKey: phonemeKey)
-            headerFocused = true
         }
+        .navigationTitle(phonemeKey)
         .alert("Edit Value", isPresented: Binding(
             get: { editingKey != nil },
             set: { if !$0 { editingKey = nil } }
         )) {
             TextField("Value", text: $editingValue)
+#if os(iOS)
+                .keyboardType(.decimalPad)
+#endif
             Button("OK") {
                 if let key = editingKey {
                     engine.setPhonemeOverride(fullKey: key, value: editingValue)

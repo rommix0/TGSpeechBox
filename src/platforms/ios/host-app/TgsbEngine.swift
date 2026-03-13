@@ -753,6 +753,22 @@ class TgsbEngine: ObservableObject {
         reapplyAllPhonemeOverrides()
     }
 
+    /// Remove all phoneme overrides, optionally filtered to a specific language's phoneme list.
+    func resetAllPhonemeOverrides(langFilter: String = "") {
+        if langFilter.isEmpty {
+            savePhonemeOverrides([:])
+        } else {
+            let phonemeKeys = Set(phonemeList.map { $0.key })
+            var overrides = loadPhonemeOverrides()
+            overrides = overrides.filter { entry in
+                !phonemeKeys.contains(where: { entry.key.hasPrefix("\($0).") })
+            }
+            savePhonemeOverrides(overrides)
+        }
+        reloadCurrentLanguage()
+        reapplyAllPhonemeOverrides()
+    }
+
     func previewPhoneme(_ phonemeKey: String) {
         guard let eng = engine else { return }
         stopSpeaking()

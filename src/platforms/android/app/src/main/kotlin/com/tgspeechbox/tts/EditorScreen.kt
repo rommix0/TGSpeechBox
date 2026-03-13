@@ -12,7 +12,9 @@ package com.tgspeechbox.tts
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,19 +28,29 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.net.Uri
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 
 @Composable
-fun EditorScreen(viewModel: TgsbViewModel) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+fun EditorScreen(viewModel: TgsbViewModel, navController: NavController) {
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabTitles = listOf("Packs", "Phonemes")
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -53,49 +65,34 @@ fun EditorScreen(viewModel: TgsbViewModel) {
         }
 
         when (selectedTab) {
-            0 -> PacksTab(viewModel)
-            1 -> PhonemesTab(viewModel)
+            0 -> PacksTab(viewModel, navController)
+            1 -> PhonemesTab(viewModel, navController)
         }
     }
 }
 
 @Composable
-private fun PacksTab(viewModel: TgsbViewModel) {
-    var selectedLang by remember { mutableStateOf<String?>(null) }
-
-    if (selectedLang != null) {
-        PackSettingsScreen(
-            viewModel = viewModel,
-            langTag = selectedLang!!,
-            onBack = { selectedLang = null }
-        )
-    } else {
-        LanguageListScreen(
-            viewModel = viewModel,
-            onLanguageSelected = { selectedLang = it }
-        )
-    }
+private fun PacksTab(viewModel: TgsbViewModel, navController: NavController) {
+    LanguageListScreen(
+        viewModel = viewModel,
+        onLanguageSelected = {
+            navController.navigate("editor/pack/${Uri.encode(it)}")
+        }
+    )
 }
 
 @Composable
-private fun PhonemesTab(viewModel: TgsbViewModel) {
-    var selectedPhoneme by remember { mutableStateOf<String?>(null) }
+private fun PhonemesTab(viewModel: TgsbViewModel, navController: NavController) {
     var langFilter by remember { mutableStateOf("") }
 
-    if (selectedPhoneme != null) {
-        PhonemeDetailScreen(
-            viewModel = viewModel,
-            phonemeKey = selectedPhoneme!!,
-            onBack = { selectedPhoneme = null }
-        )
-    } else {
-        PhonemeListScreen(
-            viewModel = viewModel,
-            langFilter = langFilter,
-            onLangFilterChanged = { langFilter = it },
-            onPhonemeSelected = { selectedPhoneme = it }
-        )
-    }
+    PhonemeListScreen(
+        viewModel = viewModel,
+        langFilter = langFilter,
+        onLangFilterChanged = { langFilter = it },
+        onPhonemeSelected = {
+            navController.navigate("editor/phoneme/${Uri.encode(it)}")
+        }
+    )
 }
 
 @Composable
@@ -107,6 +104,7 @@ private fun PhonemeListScreen(
 ) {
     val phonemes by viewModel.phonemeList.collectAsState()
     val langs by viewModel.editorLanguages.collectAsState()
+    var showResetAllPhonemes by remember { mutableStateOf(false) }
 
     LaunchedEffect(langFilter) {
         viewModel.loadEditorLanguages()
@@ -155,14 +153,27 @@ private fun PhonemeListScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
-            text = "${phonemes.size} phonemes",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "${phonemes.size} phonemes",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = { showResetAllPhonemes = true }) {
+                Text("Reset All Phonemes")
+            }
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        val context = LocalContext.current
+        var contextMenuKey by remember { mutableStateOf<String?>(null) }
+
+        @OptIn(ExperimentalFoundationApi::class)
         LazyColumn {
             items(phonemes, key = { it.key }) { entry ->
                 val desc = buildString {
@@ -174,46 +185,106 @@ private fun PhonemeListScreen(
                         append(entry.mappingFrom)
                     }
                 }
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onPhonemeSelected(entry.key) }
-                        .semantics { contentDescription = desc },
-                    tonalElevation = 1.dp,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Box {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = { onPhonemeSelected(entry.key) },
+                                onLongClick = { contextMenuKey = entry.key }
+                            )
+                            .semantics {
+                                contentDescription = desc
+                                customActions = listOf(
+                                    CustomAccessibilityAction("Play phoneme") {
+                                        viewModel.previewPhoneme(entry.key)
+                                        true
+                                    },
+                                    CustomAccessibilityAction("Copy phoneme") {
+                                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        cm.setPrimaryClip(ClipData.newPlainText("phoneme", entry.key))
+                                        true
+                                    }
+                                )
+                            },
+                        tonalElevation = 1.dp,
+                        shape = MaterialTheme.shapes.small
                     ) {
-                        Text(
-                            text = entry.key,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.clearAndSetSemantics {}
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier
-                            .weight(1f)
-                            .clearAndSetSemantics {}
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = entry.phonemeClass,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = entry.key,
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.clearAndSetSemantics {}
                             )
-                            if (entry.mappingFrom.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier
+                                .weight(1f)
+                                .clearAndSetSemantics {}
+                            ) {
                                 Text(
-                                    text = "from: ${entry.mappingFrom}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
+                                    text = entry.phonemeClass,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                if (entry.mappingFrom.isNotEmpty()) {
+                                    Text(
+                                        text = "from: ${entry.mappingFrom}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
+                    }
+                    DropdownMenu(
+                        expanded = contextMenuKey == entry.key,
+                        onDismissRequest = { contextMenuKey = null }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Play phoneme") },
+                            onClick = {
+                                viewModel.previewPhoneme(entry.key)
+                                contextMenuKey = null
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Copy phoneme") },
+                            onClick = {
+                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("phoneme", entry.key))
+                                contextMenuKey = null
+                            }
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
             }
         }
+    }
+
+    // Reset all phonemes confirmation
+    if (showResetAllPhonemes) {
+        val scope = if (langFilter.isEmpty()) "all languages" else langFilter
+        AlertDialog(
+            onDismissRequest = { showResetAllPhonemes = false },
+            title = { Text("Reset All Phonemes") },
+            text = { Text("Reset all phoneme overrides for $scope back to defaults?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetAllPhonemeOverrides(langFilter)
+                    viewModel.loadPhonemeList(langFilter)
+                    showResetAllPhonemes = false
+                }) { Text("Reset") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetAllPhonemes = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -280,7 +351,7 @@ private fun fmtVal(v: Float): String {
 }
 
 @Composable
-private fun PhonemeDetailScreen(
+fun PhonemeDetailScreen(
     viewModel: TgsbViewModel,
     phonemeKey: String,
     onBack: () -> Unit
@@ -373,6 +444,7 @@ private fun PhonemeDetailScreen(
                     value = editingValue,
                     onValueChange = { editingValue = it },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -618,7 +690,7 @@ private fun LanguageListScreen(
 }
 
 @Composable
-private fun PackSettingsScreen(
+fun PackSettingsScreen(
     viewModel: TgsbViewModel,
     langTag: String,
     onBack: () -> Unit
@@ -734,6 +806,8 @@ private fun PackSettingsScreen(
 
     // Edit value dialog
     if (editingKey != null) {
+        val editingSetting = settings.find { it.key == editingKey }
+        val isNumeric = editingSetting?.type == TgsbViewModel.SettingType.Number
         AlertDialog(
             onDismissRequest = { editingKey = null },
             title = { Text(editingKey!!) },
@@ -742,6 +816,9 @@ private fun PackSettingsScreen(
                     value = editingValue,
                     onValueChange = { editingValue = it },
                     singleLine = true,
+                    keyboardOptions = if (isNumeric)
+                        KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    else KeyboardOptions.Default,
                     modifier = Modifier.fillMaxWidth()
                 )
             },

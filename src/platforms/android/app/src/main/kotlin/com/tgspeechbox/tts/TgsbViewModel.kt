@@ -912,6 +912,22 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         reapplyAllPhonemeOverrides()
     }
 
+    /** Remove all phoneme overrides, optionally filtered to a specific language's phoneme list. */
+    fun resetAllPhonemeOverrides(langFilter: String = "") {
+        if (langFilter.isEmpty()) {
+            savePhonemeOverrides(emptyMap())
+        } else {
+            val phonemeKeys = phonemeList.value.map { it.key }.toSet()
+            val overrides = loadPhonemeOverrides().toMutableMap()
+            overrides.keys.removeAll { key ->
+                phonemeKeys.any { key.startsWith("$it.") }
+            }
+            savePhonemeOverrides(overrides)
+        }
+        reloadCurrentLanguage()
+        reapplyAllPhonemeOverrides()
+    }
+
     fun previewPhoneme(ipa: String) {
         engine.previewPhoneme(ipa)
     }
