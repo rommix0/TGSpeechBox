@@ -258,6 +258,12 @@ void tgsb_destroy(TgsbEngine *engine)
     free(engine);
 }
 
+void tgsb_set_override_directory(TgsbEngine *engine, const char *overrideDir)
+{
+    if (!engine || !engine->frontend) return;
+    nvspFrontend_setOverrideDirectory(engine->frontend, overrideDir);
+}
+
 int tgsb_set_language(TgsbEngine *engine,
                       const char *espeakLang,
                       const char *tgsbLang)

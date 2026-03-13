@@ -25,6 +25,11 @@ TgsbEngine *tgsb_create(const char *espeakDataPath,
 void tgsb_destroy(TgsbEngine *engine);
 
 /* --- Configuration --- */
+
+/* Set an override directory checked before the bundle for lang YAML files.
+   Call after tgsb_create, before tgsb_set_language. Pass NULL to clear. */
+void tgsb_set_override_directory(TgsbEngine *engine, const char *overrideDir);
+
 int tgsb_set_language(TgsbEngine *engine,
                       const char *espeakLang,
                       const char *tgsbLang);

@@ -70,7 +70,10 @@ struct PhonemeListView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.body)
                 }
+                .accessibilityElement()
                 .accessibilityLabel("More options")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Double tap to show actions")
             }
             .padding(.horizontal)
             .padding(.top, 8)
@@ -284,7 +287,7 @@ struct PhonemeDetailView: View {
         }
         .navigationTitle(phonemeKey)
         .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .automatic) {
                 Button(action: { showAddField = true }) {
                     Image(systemName: "plus")
                 }

@@ -139,6 +139,12 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         guard fm.fileExists(atPath: espeakDataPath),
               fm.fileExists(atPath: packDir) else { return }
         engine = tgsb_create(espeakDataPath, packDir, Int32(dspRate))
+
+        // Override directory: app group container for user-imported packs/dicts.
+        if let containerURL = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.com.tgspeechbox.app") {
+            tgsb_set_override_directory(engine, containerURL.path)
+        }
     }
 
     deinit {

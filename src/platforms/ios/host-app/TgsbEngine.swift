@@ -128,6 +128,15 @@ class TgsbEngine: ObservableObject {
             return false
         }
 
+        // Point override directory at app group container so user-imported
+        // language packs shadow the built-in ones.
+        if let containerURL = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: kAppGroupId) {
+            let overrideDir = containerURL.path
+            tgsb_set_override_directory(engine, overrideDir)
+            print("[TgsbEngine] overrideDir: \(overrideDir)")
+        }
+
         // Set initial language and voice
         tgsb_set_language(engine,
                           selectedLanguage.espeakTag,
