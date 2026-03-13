@@ -383,10 +383,11 @@ Java_com_tgspeechbox_tts_TgsbTtsService_nativeCreate(
     speechPlayer_voicingTone_t tone = speechPlayer_getDefaultVoicingTone();
     speechPlayer_setVoicingTone(player, &tone);
 
-    /* Platform output gain: Android TTS stream is attenuated by the system,
-     * so we apply 3x gain inside the DSP (before the limiter) to match
-     * normal accessibility volume levels. */
-    speechPlayer_setOutputGain(player, 3.0);
+    /* Platform output gain: Android TTS stream is attenuated by the system.
+     * 2.0x keeps speech loud enough while leaving headroom so the limiter
+     * doesn't engage on normal vowels (3.0x caused constant limiting →
+     * buzzy/saturated quality, issue #50). */
+    speechPlayer_setOutputGain(player, 2.0);
 
     TgsbEngine *engine = (TgsbEngine *)calloc(1, sizeof(TgsbEngine));
     engine->player = player;
@@ -736,7 +737,7 @@ Java_com_tgspeechbox_tts_TgsbTtsService_nativeSetSampleRate(
     }
     engine->player = speechPlayer_initialize(sampleRate);
     engine->sampleRate = sampleRate;
-    speechPlayer_setOutputGain(engine->player, 3.0);
+    speechPlayer_setOutputGain(engine->player, 2.0);
 
     /* Re-apply voicing tone settings */
     if (engine->hasUserTone) {

@@ -630,17 +630,26 @@ public:
                     startFadeRemaining--;
                 }
 
-                // Platform output gain: applied before limiter so that
-                // clipping behavior is identical across NVDA/Android/iOS.
+                // Platform output gain: applied before the limiter so the
+                // limiter can protect against clipping at all gain levels.
                 bright *= outputGain;
 
-                // Peak limiter: prevent amplitude spikes from triggering OS
-                // volume ducking.  Fast attack grabs transients, slow release
-                // recovers smoothly so normal speech is unaffected.
+                // Peak limiter: prevent amplitude spikes from clipping.
+                // Threshold scales with outputGain so normal speech passes
+                // through cleanly (no constant gain pumping), but peaks
+                // that would exceed the int16 hard-clip level are caught.
+                // Old bug: fixed threshold 4.0 with Android's 3x gain meant
+                // normal speech (1.5 * 3.0 = 4.5) constantly triggered the
+                // limiter → gritty/saturated quality (issue #50).
                 {
+                    // Hard-clip ceiling in the internal signal domain.
+                    constexpr double kClipLevel = 32767.0 / 6000.0;  // ~5.46
+                    double effThreshold = (limiterThreshold * outputGain < kClipLevel)
+                                        ? limiterThreshold * outputGain
+                                        : kClipLevel;
                     double absBright = fabs(bright);
-                    if (absBright > limiterThreshold) {
-                        double targetGain = limiterThreshold / absBright;
+                    if (absBright > effThreshold) {
+                        double targetGain = effThreshold / absBright;
                         limiterGain += limiterAttackAlpha * (targetGain - limiterGain);
                     } else {
                         limiterGain += limiterReleaseAlpha * (1.0 - limiterGain);
