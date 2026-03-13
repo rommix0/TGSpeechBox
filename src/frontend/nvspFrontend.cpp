@@ -26,6 +26,7 @@ namespace nvsp_frontend {
 
 struct Handle {
   std::string packDir;
+  std::string overrideDir;  // Optional dir checked first for lang YAML files
   PackSet pack;
   bool packLoaded = false;
   // True once we have emitted at least one chunk of speech on this handle.
@@ -118,6 +119,16 @@ NVSP_FRONTEND_API void nvspFrontend_destroy(nvspFrontend_handle_t handle) {
   delete h;
 }
 
+NVSP_FRONTEND_API void nvspFrontend_setOverrideDirectory(
+    nvspFrontend_handle_t handle, const char* overrideDirUtf8) {
+  using namespace nvsp_frontend;
+  Handle* h = asHandle(handle);
+  if (!h) return;
+  std::lock_guard<std::mutex> lock(h->mu);
+  h->overrideDir = (overrideDirUtf8 && overrideDirUtf8[0])
+      ? std::string(overrideDirUtf8) : std::string();
+}
+
 NVSP_FRONTEND_API int nvspFrontend_setLanguage(nvspFrontend_handle_t handle, const char* langTagUtf8) {
   using namespace nvsp_frontend;
   Handle* h = asHandle(handle);
@@ -130,7 +141,7 @@ NVSP_FRONTEND_API int nvspFrontend_setLanguage(nvspFrontend_handle_t handle, con
 
   PackSet pack;
   std::string err;
-  if (!loadPackSet(h->packDir, lang, pack, err)) {
+  if (!loadPackSet(h->packDir, lang, pack, err, h->overrideDir)) {
     setError(h, err.empty() ? "Failed to load pack set" : err);
     return 0;
   }
@@ -192,7 +203,7 @@ NVSP_FRONTEND_API int nvspFrontend_queueIPA(
     // Default to "default" language if the caller didn't call setLanguage.
     PackSet pack;
     std::string err;
-    if (!loadPackSet(h->packDir, "default", pack, err)) {
+    if (!loadPackSet(h->packDir, "default", pack, err, h->overrideDir)) {
       setError(h, err.empty() ? "No language loaded and default load failed" : err);
       return 0;
     }
@@ -387,7 +398,7 @@ static int queueIPA_ExImpl(
   if (!h->packLoaded) {
     PackSet pack;
     std::string err;
-    if (!loadPackSet(h->packDir, "default", pack, err)) {
+    if (!loadPackSet(h->packDir, "default", pack, err, h->overrideDir)) {
       setError(h, err.empty() ? "No language loaded and default load failed" : err);
       return 0;
     }

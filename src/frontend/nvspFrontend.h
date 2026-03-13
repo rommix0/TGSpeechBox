@@ -222,6 +222,15 @@ NVSP_FRONTEND_API nvspFrontend_handle_t nvspFrontend_create(const char* packDirU
 NVSP_FRONTEND_API void nvspFrontend_destroy(nvspFrontend_handle_t handle);
 
 /*
+  Set an optional override directory.  When set, loadPackSet checks
+  <overrideDir>/packs/lang/<file>.yaml before the bundle packDir.
+  This lets the iOS app group container hold user-imported packs that
+  shadow the built-in ones.  Pass NULL or "" to clear.
+*/
+NVSP_FRONTEND_API void nvspFrontend_setOverrideDirectory(nvspFrontend_handle_t handle,
+                                                          const char* overrideDirUtf8);
+
+/*
   Set the language (BCP-47-ish: en, en-us, hu, pl, bg, ...).
   Loads and merges:
     default.yaml, <base>.yaml, <base-region>.yaml, ... up to the most specific tag.

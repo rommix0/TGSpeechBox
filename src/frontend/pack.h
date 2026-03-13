@@ -1264,12 +1264,14 @@ struct PackSet {
 
 // Load phonemes.yaml + merged language packs.
 // packDir is the directory that contains "packs".
+// overrideDir (optional): checked first for lang YAML files.
 // Returns true on success.
 bool loadPackSet(
   const std::string& packDir,
   const std::string& langTag,
   PackSet& out,
-  std::string& outError
+  std::string& outError,
+  const std::string& overrideDir = ""
 );
 
 // Utility: does this pack contain a phoneme key?

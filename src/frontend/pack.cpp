@@ -1948,7 +1948,8 @@ bool loadPackSet(
   const std::string& packDir,
   const std::string& langTag,
   PackSet& out,
-  std::string& outError
+  std::string& outError,
+  const std::string& overrideDir
 ) {
   std::string err;
   fs::path packsRoot = findPacksRoot(packDir, err);
@@ -1967,11 +1968,31 @@ bool loadPackSet(
 
   const fs::path langDir = packsRoot / "lang";
   const auto chain = buildLangFileChain(out.lang.langTag);
+
+  // Optional override directory: check <overrideDir>/packs/lang/ first.
+  fs::path overrideLangDir;
+  if (!overrideDir.empty()) {
+    overrideLangDir = fs::path(overrideDir) / "packs" / "lang";
+  }
+
   for (const auto& name : chain) {
-    fs::path file = langDir / (name + ".yaml");
-    if (fs::exists(file)) {
-      if (!mergeLanguageFile(file, out, outError)) {
-        return false;
+    // Try override dir first, then fall back to bundle.
+    bool loaded = false;
+    if (!overrideLangDir.empty()) {
+      fs::path ovFile = overrideLangDir / (name + ".yaml");
+      if (fs::exists(ovFile)) {
+        if (!mergeLanguageFile(ovFile, out, outError)) {
+          return false;
+        }
+        loaded = true;
+      }
+    }
+    if (!loaded) {
+      fs::path file = langDir / (name + ".yaml");
+      if (fs::exists(file)) {
+        if (!mergeLanguageFile(file, out, outError)) {
+          return false;
+        }
       }
     }
   }
@@ -2009,22 +2030,44 @@ bool loadPackSet(
   }
 
   // Load stress dictionary (if one exists for this language).
+  // Check override dir first, then fall back to bundle.
   {
-    const fs::path dictPath = packsRoot / "dict" / (out.lang.langTag + "-stress.tsv");
-    loadStressDict(dictPath.string(), out.stressDict);
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path ovDict = fs::path(overrideDir) / "packs" / "dict" / (out.lang.langTag + "-stress.tsv");
+      if (fs::exists(ovDict)) {
+        loadStressDict(ovDict.string(), out.stressDict);
+        loaded = true;
+      }
+    }
+    if (!loaded) {
+      const fs::path dictPath = packsRoot / "dict" / (out.lang.langTag + "-stress.tsv");
+      loadStressDict(dictPath.string(), out.stressDict);
+    }
   }
 
   // Load compound word map (if one exists for this language).
+  // Check override dir first, then fall back to bundle.
   {
-    const auto& tag = out.lang.langTag;  // use normalized tag (matches stress dict)
-    const fs::path compoundPath = packsRoot / "dict" / (tag + "-compounds.tsv");
-    loadCompoundMap(compoundPath.string(), out.compoundMap);
-    // Fallback to base language (e.g., "en" for "en-us").
-    if (out.compoundMap.empty()) {
-      const auto dash = tag.find('-');
-      if (dash != std::string::npos) {
-        const fs::path basePath = packsRoot / "dict" / (tag.substr(0, dash) + "-compounds.tsv");
-        loadCompoundMap(basePath.string(), out.compoundMap);
+    const auto& tag = out.lang.langTag;
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path ovComp = fs::path(overrideDir) / "packs" / "dict" / (tag + "-compounds.tsv");
+      if (fs::exists(ovComp)) {
+        loadCompoundMap(ovComp.string(), out.compoundMap);
+        loaded = true;
+      }
+    }
+    if (!loaded) {
+      const fs::path compoundPath = packsRoot / "dict" / (tag + "-compounds.tsv");
+      loadCompoundMap(compoundPath.string(), out.compoundMap);
+      // Fallback to base language (e.g., "en" for "en-us").
+      if (out.compoundMap.empty()) {
+        const auto dash = tag.find('-');
+        if (dash != std::string::npos) {
+          const fs::path basePath = packsRoot / "dict" / (tag.substr(0, dash) + "-compounds.tsv");
+          loadCompoundMap(basePath.string(), out.compoundMap);
+        }
       }
     }
   }
