@@ -7164,7 +7164,7 @@ phonemes:
     cfN0: 250
     cfNP: 200
     voiceAmplitude: 0.90
-    fricationAmplitude: 0.15
+    fricationAmplitude: 0.25
     pa1: 0.20
     pa2: 0.40
     pa3: 0.45

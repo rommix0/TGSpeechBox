@@ -56,6 +56,11 @@ static inline bool tokIsLiquid(const Token& t) {
   return (t.def->flags & kIsLiquid) != 0;
 }
 
+static inline bool tokIsTap(const Token& t) {
+  if (!t.def || t.silence) return false;
+  return (t.def->flags & kIsTap) != 0;
+}
+
 static inline bool tokIsFricative(const Token& t) {
   if (!t.def || t.silence) return false;
   // Check fricationAmplitude > 0 and not a stop/affricate
@@ -173,6 +178,8 @@ bool runBoundarySmoothing(PassContext& ctx, std::vector<Token>& tokens, std::str
     const bool curNasal = tokIsNasal(cur);
     const bool prevLiquid = tokIsLiquid(prev);
     const bool curLiquid = tokIsLiquid(cur);
+    const bool curTap = tokIsTap(cur);
+    const bool prevTap = tokIsTap(prev);
 
     // Within-syllable detection: if both tokens have assigned syllable
     // indices and they match, this transition is WITHIN a syllable.
@@ -198,6 +205,10 @@ bool runBoundarySmoothing(PassContext& ctx, std::vector<Token>& tokens, std::str
       targetFade = v2l;  // Vowel -> Liquid
     } else if (prevLiquid && curVowelLike) {
       targetFade = l2v;  // Liquid -> Vowel
+    } else if (prevVowelLike && curTap) {
+      targetFade = v2l;  // Vowel -> Tap: quick transition like liquid, no gap
+    } else if (prevTap && curVowelLike) {
+      targetFade = l2v;  // Tap -> Vowel: quick recovery
     } else if (prevVowelLike && curVowelLike && !cur.tiedFrom) {
       targetFade = v2v;  // Vowel -> Vowel (hiatus, but not tied diphthongs)
     }

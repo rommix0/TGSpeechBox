@@ -903,7 +903,7 @@ void emitFrames(
       const double recovDur = remainDur - onsetDur;
 
       const int vaIdx = static_cast<int>(FieldId::voiceAmplitude);
-      const double notchAmp = base[vaIdx] * 0.50;
+      const double notchAmp = base[vaIdx] * 0.55;
 
       const double startPitch = base[vp];
       const double pitchDelta = base[evp] - startPitch;
@@ -1936,12 +1936,13 @@ void emitFramesEx(
       const double onsetDur = remainDur * 0.45;
       const double recovDur = remainDur - onsetDur;
 
-      // Amplitude dip: sharper notch (42%) so the tap is clearly audible.
-      // Research: "reduction in amplitude relative to spectral envelope"
-      // is the primary perceptual cue.  60% was too gentle (soft/Russian).
+      // Amplitude dip: 55% notch — audible flick without sounding like
+      // a stop closure.  42% was too deep before weak syllables (schwa/ɚ),
+      // making "pattern", "ladder", "untitled" sound stop-like.
+      // 60% was too gentle (soft/Russian).  55% splits the difference.
       const int vaIdx = static_cast<int>(FieldId::voiceAmplitude);
       const double origAmp = base[vaIdx];
-      const double notchAmp = origAmp * 0.42;
+      const double notchAmp = origAmp * 0.55;
 
       // Formant indices for coarticulation blending.
       const int cf1 = static_cast<int>(FieldId::cf1);
