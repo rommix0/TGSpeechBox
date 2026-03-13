@@ -726,6 +726,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         val displayName: String,  // human-readable e.g. "F2 Frequency"
         val value: String,
         val isOverridden: Boolean,
+        val isUserAdded: Boolean, // true if field only exists in user overrides, not in base phoneme
         val type: SettingType
     )
 
@@ -857,10 +858,12 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         val overrides = loadPhonemeOverrides()
         val arr = org.json.JSONArray(jsonStr)
         val fields = mutableListOf<PhonemeField>()
+        val baseKeys = mutableSetOf<String>()
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
             if (obj.getString("group") != phonemeKey) continue
             val fullKey = obj.getString("key")
+            baseKeys.add(fullKey)
             val fieldName = fullKey.removePrefix("$phonemeKey.")
             val baseValue = obj.get("value").toString()
             val effectiveValue = overrides[fullKey] ?: baseValue
@@ -876,11 +879,38 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
                 displayName = phonemeDisplayName(fieldName),
                 value = effectiveValue,
                 isOverridden = overrides.containsKey(fullKey),
+                isUserAdded = false,
                 type = type
+            ))
+        }
+        // Append user-added fields (overrides that don't exist in the base phoneme).
+        val prefix = "$phonemeKey."
+        for ((fullKey, value) in overrides) {
+            if (!fullKey.startsWith(prefix)) continue
+            if (fullKey in baseKeys) continue
+            val fieldName = fullKey.removePrefix(prefix)
+            // Determine type from field name, not stored value.
+            val isBool = fieldName.startsWith("_is") || fieldName.startsWith("_copy")
+            fields.add(PhonemeField(
+                key = fullKey,
+                fieldName = fieldName,
+                displayName = phonemeDisplayName(fieldName),
+                value = value,
+                isOverridden = true,
+                isUserAdded = true,
+                type = if (isBool) SettingType.Bool else SettingType.Number
             ))
         }
         val maxOrder = phonemeFieldOrder.size
         phonemeFields.value = fields.sortedBy { phonemeFieldOrder[it.fieldName] ?: maxOrder }
+    }
+
+    /** Returns fields from phonemeFieldInfo that are not currently in the phoneme's field list. */
+    fun getAvailableFieldsToAdd(phonemeKey: String): List<Pair<String, String>> {
+        val existingFields = phonemeFields.value.map { it.fieldName }.toSet()
+        return phonemeFieldInfo.entries
+            .filter { it.key !in existingFields }
+            .map { it.key to it.value }
     }
 
     fun setPhonemeOverride(fullKey: String, value: String) {

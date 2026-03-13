@@ -483,12 +483,21 @@ private struct PhonemeDetailView: View {
     @State private var editingKey: String?
     @State private var editingValue: String = ""
     @State private var showResetAll = false
+    @State private var showAddField = false
+    @State private var addingFieldName: String?
+    @State private var addingFieldDisplay: String = ""
+    @State private var addingFieldValue: String = ""
+    @State private var scrollToId: String?
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
                 Spacer()
+                Button(action: { showAddField = true }) {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add field to \(phonemeKey)")
                 Button(action: { engine.previewPhoneme(phonemeKey) }) {
                     Image(systemName: "play.fill")
                 }
@@ -504,28 +513,36 @@ private struct PhonemeDetailView: View {
                     .padding()
                 Spacer()
             } else {
-                List(engine.phonemeFields) { field in
-                    PhonemeFieldRowView(
-                        field: field,
-                        onValueChanged: { newVal in
-                            engine.setPhonemeOverride(fullKey: field.key, value: newVal)
-                        },
-                        onEdit: {
-                            editingKey = field.key
-                            editingValue = field.value
-                        },
-                        onToggle: { newVal in
-                            engine.setPhonemeOverride(fullKey: field.key, value: newVal)
-                            engine.loadPhonemeFields(phonemeKey: phonemeKey)
-                        },
-                        onReset: {
-                            engine.removePhonemeOverride(fullKey: field.key)
-                            engine.loadPhonemeFields(phonemeKey: phonemeKey)
-                        },
-                        onPreview: { engine.previewPhoneme(phonemeKey) }
-                    )
+                ScrollViewReader { proxy in
+                    List(engine.phonemeFields) { field in
+                        PhonemeFieldRowView(
+                            field: field,
+                            onValueChanged: { newVal in
+                                engine.setPhonemeOverride(fullKey: field.key, value: newVal)
+                            },
+                            onEdit: {
+                                editingKey = field.key
+                                editingValue = field.value
+                            },
+                            onToggle: { newVal in
+                                engine.setPhonemeOverride(fullKey: field.key, value: newVal)
+                                engine.loadPhonemeFields(phonemeKey: phonemeKey)
+                            },
+                            onReset: {
+                                engine.removePhonemeOverride(fullKey: field.key)
+                                engine.loadPhonemeFields(phonemeKey: phonemeKey)
+                            },
+                            onPreview: { engine.previewPhoneme(phonemeKey) }
+                        )
+                    }
+                    .listStyle(.plain)
+                    .onChange(of: scrollToId) { target in
+                        if let id = target {
+                            withAnimation { proxy.scrollTo(id, anchor: .bottom) }
+                            scrollToId = nil
+                        }
+                    }
                 }
-                .listStyle(.plain)
             }
         }
         .onAppear {
@@ -563,6 +580,88 @@ private struct PhonemeDetailView: View {
         } message: {
             Text("Reset all overrides on this phoneme back to the original values?")
         }
+        .sheet(isPresented: $showAddField) {
+            AddFieldPickerView(engine: engine, phonemeKey: phonemeKey) { fieldName, displayName in
+                addingFieldName = fieldName
+                addingFieldDisplay = displayName
+                addingFieldValue = fieldName.hasPrefix("_is") ? "false" : "0"
+                showAddField = false
+            }
+        }
+        .alert("Add \(addingFieldDisplay)", isPresented: Binding(
+            get: { addingFieldName != nil && !(addingFieldName?.hasPrefix("_is") ?? false) && !(addingFieldName?.hasPrefix("_copy") ?? false) },
+            set: { if !$0 { addingFieldName = nil } }
+        )) {
+            TextField("Value", text: $addingFieldValue)
+#if os(iOS)
+                .keyboardType(.decimalPad)
+#endif
+            Button("Add") {
+                if let name = addingFieldName {
+                    let fullKey = "\(phonemeKey).\(name)"
+                    engine.setPhonemeOverride(fullKey: fullKey, value: addingFieldValue)
+                    engine.loadPhonemeFields(phonemeKey: phonemeKey)
+                    scrollToId = fullKey
+                }
+                addingFieldName = nil
+            }
+            Button("Cancel", role: .cancel) { addingFieldName = nil }
+        } message: {
+            Text("Enter value for \(addingFieldDisplay)")
+        }
+        .alert("Add \(addingFieldDisplay)", isPresented: Binding(
+            get: { addingFieldName != nil && (addingFieldName?.hasPrefix("_is") ?? false || addingFieldName?.hasPrefix("_copy") ?? false) },
+            set: { if !$0 { addingFieldName = nil } }
+        )) {
+            Button("Set True") {
+                if let name = addingFieldName {
+                    let fullKey = "\(phonemeKey).\(name)"
+                    engine.setPhonemeOverride(fullKey: fullKey, value: "true")
+                    engine.loadPhonemeFields(phonemeKey: phonemeKey)
+                    scrollToId = fullKey
+                }
+                addingFieldName = nil
+            }
+            Button("Set False") {
+                if let name = addingFieldName {
+                    let fullKey = "\(phonemeKey).\(name)"
+                    engine.setPhonemeOverride(fullKey: fullKey, value: "false")
+                    engine.loadPhonemeFields(phonemeKey: phonemeKey)
+                    scrollToId = fullKey
+                }
+                addingFieldName = nil
+            }
+            Button("Cancel", role: .cancel) { addingFieldName = nil }
+        } message: {
+            Text("Choose value for \(addingFieldDisplay)")
+        }
+    }
+}
+
+/// Sheet view for picking a field to add.
+private struct AddFieldPickerView: View {
+    @ObservedObject var engine: TgsbEngine
+    let phonemeKey: String
+    var onFieldSelected: (String, String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            let available = engine.getAvailableFieldsToAdd()
+            if available.isEmpty {
+                Text("All fields are already present.")
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                List(available, id: \.0) { fieldName, displayName in
+                    Button(displayName) {
+                        onFieldSelected(fieldName, displayName)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -663,8 +762,10 @@ private struct PhonemeFieldRowView: View {
             }
 
             if field.isOverridden {
-                Button("Reset \(field.displayName)") { onReset() }
-                    .font(.caption)
+                Button(field.isUserAdded ? "Remove \(field.displayName)" : "Reset \(field.displayName)") {
+                    onReset()
+                }
+                .font(.caption)
             }
         }
         .padding(.vertical, 4)
@@ -672,7 +773,7 @@ private struct PhonemeFieldRowView: View {
 
     private var boolRow: some View {
         let checked = field.value == "true"
-        let overriddenSuffix = field.isOverridden ? ", overridden" : ""
+        let overriddenSuffix = field.isUserAdded ? ", added" : field.isOverridden ? ", overridden" : ""
         return Toggle(isOn: Binding(
             get: { checked },
             set: { onToggle($0 ? "true" : "false") }
@@ -686,7 +787,7 @@ private struct PhonemeFieldRowView: View {
         let baseValue = Float(field.value) ?? 0
         let range = phonemeFieldRange(field.fieldName, baseValue)
         let step = phonemeFieldStep(field.fieldName)
-        let overriddenSuffix = field.isOverridden ? ", overridden" : ""
+        let overriddenSuffix = field.isUserAdded ? ", added" : field.isOverridden ? ", overridden" : ""
         return PhonemeSliderRow(
             displayName: field.displayName,
             baseValue: baseValue,
@@ -701,7 +802,7 @@ private struct PhonemeFieldRowView: View {
     }
 
     private var textRow: some View {
-        let overriddenSuffix = field.isOverridden ? ", overridden" : ""
+        let overriddenSuffix = field.isUserAdded ? ", added" : field.isOverridden ? ", overridden" : ""
         return HStack {
             Text(field.displayName)
                 .font(.body)

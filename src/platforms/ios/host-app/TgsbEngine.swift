@@ -574,6 +574,7 @@ class TgsbEngine: ObservableObject {
         let displayName: String
         let value: String
         let isOverridden: Bool
+        let isUserAdded: Bool    // true if field only exists in user overrides, not in base phoneme
         let type: SettingType
     }
 
@@ -695,9 +696,11 @@ class TgsbEngine: ObservableObject {
         else { return }
 
         var fields: [PhonemeField] = []
+        var baseKeys = Set<String>()
         for obj in arr {
             guard let group = obj["group"] as? String, group == phonemeKey,
                   let fullKey = obj["key"] as? String else { continue }
+            baseKeys.insert(fullKey)
             let fieldName = String(fullKey.dropFirst(phonemeKey.count + 1)) // remove "key."
             let jsonType = obj["type"] as? String ?? "string"
             let baseValue: String
@@ -715,7 +718,25 @@ class TgsbEngine: ObservableObject {
                 displayName: phonemeDisplayName(fieldName),
                 value: effectiveValue,
                 isOverridden: overrides[fullKey] != nil,
+                isUserAdded: false,
                 type: type))
+        }
+
+        // Append user-added fields (overrides that don't exist in the base phoneme).
+        let prefix = "\(phonemeKey)."
+        for (fullKey, value) in overrides {
+            guard fullKey.hasPrefix(prefix), !baseKeys.contains(fullKey) else { continue }
+            let fieldName = String(fullKey.dropFirst(prefix.count))
+            // Determine type from field name, not stored value.
+            let isBool = fieldName.hasPrefix("_is") || fieldName.hasPrefix("_copy")
+            fields.append(PhonemeField(
+                id: fullKey, key: fullKey,
+                fieldName: fieldName,
+                displayName: phonemeDisplayName(fieldName),
+                value: value,
+                isOverridden: true,
+                isUserAdded: true,
+                type: isBool ? .bool_ : .number))
         }
 
         let maxOrder = Self.phonemeFieldOrder.count
@@ -724,6 +745,12 @@ class TgsbEngine: ObservableObject {
             let ob = Self.phonemeFieldOrder[b.fieldName] ?? maxOrder
             return oa < ob
         }
+    }
+
+    /// Returns fields from phonemeFieldInfo that are not currently in the phoneme's field list.
+    func getAvailableFieldsToAdd() -> [(String, String)] {
+        let existing = Set(phonemeFields.map { $0.fieldName })
+        return Self.phonemeFieldInfo.filter { !existing.contains($0.0) }
     }
 
     func setPhonemeOverride(fullKey: String, value: String) {

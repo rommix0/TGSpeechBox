@@ -18,12 +18,15 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
@@ -360,6 +363,12 @@ fun PhonemeDetailScreen(
     var editingKey by remember { mutableStateOf<String?>(null) }
     var editingValue by remember { mutableStateOf("") }
     var showResetAll by remember { mutableStateOf(false) }
+    var showAddField by remember { mutableStateOf(false) }
+    var addingFieldName by remember { mutableStateOf<String?>(null) }
+    var addingFieldDisplay by remember { mutableStateOf("") }
+    var addingFieldValue by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(phonemeKey) {
         viewModel.loadPhonemeFields(phonemeKey)
@@ -384,6 +393,15 @@ fun PhonemeDetailScreen(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f)
             )
+            // Add field button
+            IconButton(
+                onClick = { showAddField = true },
+                modifier = Modifier.semantics {
+                    contentDescription = "Add field to $phonemeKey"
+                }
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+            }
             // Preview button
             IconButton(
                 onClick = { viewModel.previewPhoneme(phonemeKey) },
@@ -406,6 +424,7 @@ fun PhonemeDetailScreen(
             )
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
                 items(fields, key = { it.key }) { field ->
@@ -484,6 +503,102 @@ fun PhonemeDetailScreen(
             }
         )
     }
+
+    // Add field picker
+    if (showAddField) {
+        val available = viewModel.getAvailableFieldsToAdd(phonemeKey)
+        AlertDialog(
+            onDismissRequest = { showAddField = false },
+            title = { Text("Add Field") },
+            text = {
+                if (available.isEmpty()) {
+                    Text("All fields are already present.")
+                } else {
+                    LazyColumn {
+                        items(available, key = { it.first }) { (fieldName, displayName) ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        addingFieldName = fieldName
+                                        addingFieldDisplay = displayName
+                                        addingFieldValue = if (fieldName.startsWith("_is")) "false" else "0"
+                                        showAddField = false
+                                    }
+                                    .padding(vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = displayName,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showAddField = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Add field value entry
+    if (addingFieldName != null) {
+        val isBoolField = addingFieldName!!.startsWith("_is")
+        AlertDialog(
+            onDismissRequest = { addingFieldName = null },
+            title = { Text(addingFieldDisplay) },
+            text = {
+                if (isBoolField) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = addingFieldValue == "true",
+                                onValueChange = { addingFieldValue = if (it) "true" else "false" },
+                                role = androidx.compose.ui.semantics.Role.Switch
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Enabled", modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = addingFieldValue == "true",
+                            onCheckedChange = null
+                        )
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = addingFieldValue,
+                        onValueChange = { addingFieldValue = it },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val fullKey = "$phonemeKey.${addingFieldName!!}"
+                    viewModel.setPhonemeOverride(fullKey, addingFieldValue)
+                    viewModel.loadPhonemeFields(phonemeKey)
+                    addingFieldName = null
+                    // Scroll to the newly added field (last in list)
+                    coroutineScope.launch {
+                        val count = viewModel.phonemeFields.value.size
+                        if (count > 0) listState.animateScrollToItem(count - 1)
+                    }
+                }) { Text("Add") }
+            },
+            dismissButton = {
+                TextButton(onClick = { addingFieldName = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -501,8 +616,8 @@ private fun PhonemeFieldRow(
     if (isBool) {
         // Boolean toggle row
         val checked = field.value == "true"
-        val overriddenSuffix = if (field.isOverridden) ", overridden" else ""
-        val rowDesc = "${field.displayName}, ${if (checked) "on" else "off"}$overriddenSuffix"
+        val statusSuffix = if (field.isUserAdded) ", added" else if (field.isOverridden) ", overridden" else ""
+        val rowDesc = "${field.displayName}, ${if (checked) "on" else "off"}$statusSuffix"
 
         Row(
             modifier = Modifier
@@ -529,7 +644,10 @@ private fun PhonemeFieldRow(
         }
         if (field.isOverridden) {
             TextButton(onClick = onReset) {
-                Text("Reset", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    if (field.isUserAdded) "Remove" else "Reset",
+                    style = MaterialTheme.typography.labelSmall
+                )
             }
         }
     } else if (isNumber) {
@@ -540,7 +658,7 @@ private fun PhonemeFieldRow(
         }
         val range = phonemeFieldRange(field.fieldName, baseValue)
         val steps = phonemeFieldSteps(field.fieldName, range)
-        val overriddenSuffix = if (field.isOverridden) ", overridden" else ""
+        val statusSuffix = if (field.isUserAdded) ", added" else if (field.isOverridden) ", overridden" else ""
 
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             // Label with current value (visual only, hidden from TalkBack)
@@ -595,20 +713,23 @@ private fun PhonemeFieldRow(
                         .weight(1f)
                         .semantics {
                             contentDescription =
-                                "${field.displayName}$overriddenSuffix, ${fmtVal(sliderValue)}"
+                                "${field.displayName}$statusSuffix, ${fmtVal(sliderValue)}"
                         }
                 )
             }
             if (field.isOverridden) {
                 TextButton(onClick = onReset) {
-                    Text("Reset", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        if (field.isUserAdded) "Remove" else "Reset",
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
             }
         }
     } else {
         // Text field row (non-numeric, non-bool)
-        val overriddenSuffix = if (field.isOverridden) ", overridden" else ""
-        val rowDesc = "${field.displayName}, ${field.value}$overriddenSuffix"
+        val statusSuffix = if (field.isUserAdded) ", added" else if (field.isOverridden) ", overridden" else ""
+        val rowDesc = "${field.displayName}, ${field.value}$statusSuffix"
 
         Row(
             modifier = Modifier
@@ -632,7 +753,10 @@ private fun PhonemeFieldRow(
         }
         if (field.isOverridden) {
             TextButton(onClick = onReset) {
-                Text("Reset", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    if (field.isUserAdded) "Remove" else "Reset",
+                    style = MaterialTheme.typography.labelSmall
+                )
             }
         }
     }
