@@ -384,10 +384,10 @@ Java_com_tgspeechbox_tts_TgsbTtsService_nativeCreate(
     speechPlayer_setVoicingTone(player, &tone);
 
     /* Platform output gain: Android TTS stream is attenuated by the system.
-     * 2.0x keeps speech loud enough while leaving headroom so the limiter
-     * doesn't engage on normal vowels (3.0x caused constant limiting →
-     * buzzy/saturated quality, issue #50). */
-    speechPlayer_setOutputGain(player, 2.0);
+     * 1.7x keeps speech loud enough while leaving headroom so the limiter
+     * doesn't engage on hot vowels like /æ/ (3.0x caused constant limiting →
+     * buzzy/saturated quality, 2.0x still clipped /æ/ — issue #50). */
+    speechPlayer_setOutputGain(player, 1.7);
 
     TgsbEngine *engine = (TgsbEngine *)calloc(1, sizeof(TgsbEngine));
     engine->player = player;
@@ -737,7 +737,7 @@ Java_com_tgspeechbox_tts_TgsbTtsService_nativeSetSampleRate(
     }
     engine->player = speechPlayer_initialize(sampleRate);
     engine->sampleRate = sampleRate;
-    speechPlayer_setOutputGain(engine->player, 2.0);
+    speechPlayer_setOutputGain(engine->player, 1.7);
 
     /* Re-apply voicing tone settings */
     if (engine->hasUserTone) {
