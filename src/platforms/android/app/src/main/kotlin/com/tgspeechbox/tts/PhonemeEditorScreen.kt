@@ -86,9 +86,9 @@ private fun PhonemeListScreen(
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
-        uri?.let { viewModel.exportPhonemeOverrides(context, it) }
+        uri?.let { viewModel.exportPhonemeYaml(context, it) }
     }
 
     LaunchedEffect(langFilter) {
@@ -157,23 +157,23 @@ private fun PhonemeListScreen(
                     onDismissRequest = { showMoreMenu = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Export Phoneme Overrides") },
+                        text = { Text("Export Phonemes") },
                         onClick = {
-                            exportLauncher.launch("phoneme-overrides.json")
+                            exportLauncher.launch("phonemes.yaml")
                             showMoreMenu = false
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Import Phoneme Overrides") },
+                        text = { Text("Import Phonemes") },
                         onClick = {
                             importLauncher.launch(arrayOf("application/json", "*/*"))
                             showMoreMenu = false
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Share Phoneme Overrides") },
+                        text = { Text("Share Phonemes") },
                         onClick = {
-                            viewModel.sharePhonemeOverrides(context)
+                            viewModel.sharePhonemeYaml(context)
                             showMoreMenu = false
                         }
                     )
@@ -311,7 +311,7 @@ private fun PhonemeListScreen(
     if (showImportConfirm) {
         AlertDialog(
             onDismissRequest = { showImportConfirm = false; pendingImportUri = null },
-            title = { Text("Import Phoneme Overrides") },
+            title = { Text("Import Phonemes") },
             text = { Text("Replace all phoneme overrides with the imported file? Existing overrides will be cleared.") },
             confirmButton = {
                 TextButton(onClick = {

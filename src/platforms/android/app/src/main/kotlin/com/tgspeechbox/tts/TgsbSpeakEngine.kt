@@ -108,6 +108,7 @@ class TgsbSpeakEngine(private val context: Context) {
     private external fun nativeGetDataCount(handle: Long, domain: Int, langTag: String): Int
     private external fun nativeQueryData(handle: Long, domain: Int, langTag: String, offset: Int, limit: Int): String?
     private external fun nativeSetData(handle: Long, domain: Int, langTag: String, key: String, value: String): Int
+    private external fun nativeExportData(handle: Long, domain: Int, langTag: String, overridesJson: String): String?
 
     // ── Lifecycle ────────────────────────────────────────────────────
 
@@ -344,6 +345,11 @@ class TgsbSpeakEngine(private val context: Context) {
     fun setData(domain: Int, langTag: String, key: String, value: String): Boolean {
         if (nativeHandle == 0L) return false
         return nativeSetData(nativeHandle, domain, langTag, key, value) != 0
+    }
+
+    fun exportData(domain: Int, langTag: String, overridesJson: String): String? {
+        if (nativeHandle == 0L) return null
+        return nativeExportData(nativeHandle, domain, langTag, overridesJson)
     }
 
     fun stop() {

@@ -1169,4 +1169,31 @@ Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeSetData(
         env, thiz, handle, domain, langTag, key, value);
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_tgspeechbox_tts_TgsbTtsService_nativeExportData(
+    JNIEnv *env, jobject thiz, jlong handle,
+    jint domain, jstring langTag, jstring overridesJson
+) {
+    TgsbEngine *engine = (TgsbEngine *)(intptr_t)handle;
+    if (!engine || !engine->frontend) return nullptr;
+    const char *lang = langTag ? env->GetStringUTFChars(langTag, nullptr) : nullptr;
+    const char *json = overridesJson ? env->GetStringUTFChars(overridesJson, nullptr) : nullptr;
+    char *result = nvspFrontend_exportData(engine->frontend, domain, lang, json);
+    if (lang) env->ReleaseStringUTFChars(langTag, lang);
+    if (json) env->ReleaseStringUTFChars(overridesJson, json);
+    if (!result) return nullptr;
+    jstring jResult = env->NewStringUTF(result);
+    nvspFrontend_freeString(result);
+    return jResult;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeExportData(
+    JNIEnv *env, jobject thiz, jlong handle,
+    jint domain, jstring langTag, jstring overridesJson
+) {
+    return Java_com_tgspeechbox_tts_TgsbTtsService_nativeExportData(
+        env, thiz, handle, domain, langTag, overridesJson);
+}
+
 } /* extern "C" */

@@ -264,6 +264,14 @@ void tgsb_set_override_directory(TgsbEngine *engine, const char *overrideDir)
     nvspFrontend_setOverrideDirectory(engine->frontend, overrideDir);
 }
 
+char *tgsb_export_data(TgsbEngine *engine, int domain,
+                       const char *langTag, const char *overridesJson)
+{
+    if (!engine || !engine->frontend) return nullptr;
+    return nvspFrontend_exportData(engine->frontend, domain,
+                                   langTag, overridesJson);
+}
+
 int tgsb_set_language(TgsbEngine *engine,
                       const char *espeakLang,
                       const char *tgsbLang)

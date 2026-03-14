@@ -1000,15 +1000,25 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     private fun packFileForLang(context: Context, langTag: String): File =
         File(context.filesDir, "tgsb/packs/lang/$langTag.yaml")
 
+    private fun packOverridesJson(langTag: String): String {
+        val overrides = loadOverrides(langTag)
+        if (overrides.isEmpty()) return "{}"
+        val obj = org.json.JSONObject()
+        for ((k, v) in overrides) obj.put(k, v)
+        return obj.toString()
+    }
+
     fun exportPackYaml(context: Context, langTag: String, destUri: Uri) {
-        val packFile = packFileForLang(context, langTag)
-        if (!packFile.exists()) {
-            _importExportStatus.value = "Pack file not found for $langTag"
+        val yaml = engine.exportData(
+            TgsbSpeakEngine.DATA_SETTINGS, langTag, packOverridesJson(langTag)
+        )
+        if (yaml == null) {
+            _importExportStatus.value = "Export failed — no pack data found"
             return
         }
         try {
             context.contentResolver.openOutputStream(destUri)?.use { out ->
-                packFile.inputStream().use { it.copyTo(out) }
+                out.write(yaml.toByteArray(Charsets.UTF_8))
             }
             _importExportStatus.value = "Exported $langTag.yaml"
         } catch (e: Exception) {
@@ -1017,19 +1027,17 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun sharePackYaml(context: Context, langTag: String) {
-        val packFile = packFileForLang(context, langTag)
-        if (!packFile.exists()) {
-            _importExportStatus.value = "Pack file not found for $langTag"
-            return
-        }
-        val content = try { packFile.readText() } catch (e: Exception) {
-            _importExportStatus.value = "Could not read pack: ${e.message}"
+        val yaml = engine.exportData(
+            TgsbSpeakEngine.DATA_SETTINGS, langTag, packOverridesJson(langTag)
+        )
+        if (yaml == null) {
+            _importExportStatus.value = "No pack data to share"
             return
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_SUBJECT, "$langTag.yaml")
-            putExtra(Intent.EXTRA_TEXT, content)
+            putExtra(Intent.EXTRA_TEXT, yaml)
         }
         context.startActivity(Intent.createChooser(intent, "Share $langTag pack"))
     }
@@ -1072,20 +1080,27 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Phoneme overrides import / export ────────────────────────────
 
-    fun exportPhonemeOverrides(context: Context, destUri: Uri) {
+    private fun phonemeOverridesJson(): String {
         val overrides = loadPhonemeOverrides()
-        if (overrides.isEmpty()) {
-            _importExportStatus.value = "No phoneme overrides to export"
+        if (overrides.isEmpty()) return "{}"
+        val obj = org.json.JSONObject()
+        for ((k, v) in overrides) obj.put(k, v)
+        return obj.toString()
+    }
+
+    fun exportPhonemeYaml(context: Context, destUri: Uri) {
+        val yaml = engine.exportData(
+            TgsbSpeakEngine.DATA_PHONEMES, "", phonemeOverridesJson()
+        )
+        if (yaml == null) {
+            _importExportStatus.value = "Export failed — no phoneme data found"
             return
         }
         try {
-            val obj = org.json.JSONObject()
-            for ((k, v) in overrides) obj.put(k, v)
-            val json = obj.toString(2)  // pretty-print
             context.contentResolver.openOutputStream(destUri)?.use { out ->
-                out.write(json.toByteArray(Charsets.UTF_8))
+                out.write(yaml.toByteArray(Charsets.UTF_8))
             }
-            _importExportStatus.value = "Exported ${overrides.size} phoneme overrides"
+            _importExportStatus.value = "Exported phonemes.yaml"
         } catch (e: Exception) {
             _importExportStatus.value = "Export failed: ${e.message}"
         }
@@ -1119,20 +1134,19 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun sharePhonemeOverrides(context: Context) {
-        val overrides = loadPhonemeOverrides()
-        if (overrides.isEmpty()) {
-            _importExportStatus.value = "No phoneme overrides to share"
+    fun sharePhonemeYaml(context: Context) {
+        val yaml = engine.exportData(
+            TgsbSpeakEngine.DATA_PHONEMES, "", phonemeOverridesJson()
+        )
+        if (yaml == null) {
+            _importExportStatus.value = "No phoneme data to share"
             return
         }
-        val obj = org.json.JSONObject()
-        for ((k, v) in overrides) obj.put(k, v)
-        val json = obj.toString(2)
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
-            putExtra(Intent.EXTRA_SUBJECT, "phoneme-overrides.json")
-            putExtra(Intent.EXTRA_TEXT, json)
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "phonemes.yaml")
+            putExtra(Intent.EXTRA_TEXT, yaml)
         }
-        context.startActivity(Intent.createChooser(intent, "Share phoneme overrides"))
+        context.startActivity(Intent.createChooser(intent, "Share phonemes"))
     }
 }

@@ -51,15 +51,15 @@ struct PhonemeListView: View {
                     Button(action: {
                         showExportPicker = true
                     }) {
-                        Label("Export Overrides", systemImage: "square.and.arrow.up")
+                        Label("Export Phonemes", systemImage: "square.and.arrow.up")
                     }
                     Button(action: {
                         showImportPicker = true
                     }) {
-                        Label("Import Overrides", systemImage: "square.and.arrow.down")
+                        Label("Import Phonemes", systemImage: "square.and.arrow.down")
                     }
-                    if let url = engine.exportPhonemeOverridesToTempFile() {
-                        ShareLink("Share Overrides", item: url)
+                    if let url = engine.exportPhonemeYamlToTempFile() {
+                        ShareLink("Share Phonemes", item: url)
                     }
                     Button(role: .destructive, action: {
                         showResetAllPhonemes = true
@@ -163,9 +163,9 @@ struct PhonemeListView: View {
         }
         .fileExporter(
             isPresented: $showExportPicker,
-            document: PhonemeOverridesDocument(engine: engine),
-            contentType: .json,
-            defaultFilename: "phoneme-overrides.json"
+            document: PhonemeYamlDocument(engine: engine),
+            contentType: .yaml,
+            defaultFilename: "phonemes.yaml"
         ) { result in
             if case .success = result {
                 statusMessage = "Exported phoneme overrides"
@@ -198,13 +198,13 @@ struct PhonemeListView: View {
 
 // MARK: - Phoneme Overrides Document
 
-struct PhonemeOverridesDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json, .plainText] }
+struct PhonemeYamlDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.yaml, .plainText] }
 
     let content: String
 
     @MainActor init(engine: TgsbEngine) {
-        content = engine.phonemeOverridesJSON() ?? "{}"
+        content = engine.phonemeYamlContent() ?? ""
     }
 
     init(configuration: ReadConfiguration) throws {

@@ -413,10 +413,23 @@ class TgsbEngine: ObservableObject {
 
     // MARK: - Pack Import / Export
 
-    /// Return the raw YAML content for a language pack (for export).
+    /// Return merged YAML content for a language pack (base + overrides).
     func packYamlContent(langTag: String) -> String? {
-        guard let path = packFilePath(langTag: langTag) else { return nil }
-        return try? String(contentsOfFile: path, encoding: .utf8)
+        guard let eng = engine else { return nil }
+        let overrides = loadOverrides(langTag)
+        let json: String
+        if overrides.isEmpty {
+            json = "{}"
+        } else if let data = try? JSONSerialization.data(withJSONObject: overrides),
+                  let s = String(data: data, encoding: .utf8) {
+            json = s
+        } else {
+            json = "{}"
+        }
+        guard let ptr = tgsb_export_data(eng, TGSB_DATA_SETTINGS, langTag, json) else { return nil }
+        let result = String(cString: ptr)
+        free(ptr)
+        return result
     }
 
     /// Write pack YAML to a temp file for sharing via share sheet.
@@ -783,22 +796,31 @@ class TgsbEngine: ObservableObject {
     // ── Phoneme overrides import / export ────────────────────────────
 
     /// Returns the phoneme overrides as a pretty-printed JSON string, or nil if empty.
-    func phonemeOverridesJSON() -> String? {
+    /// Return merged phonemes YAML content (base + overrides).
+    func phonemeYamlContent() -> String? {
+        guard let eng = engine else { return nil }
         let overrides = loadPhonemeOverrides()
-        if overrides.isEmpty { return nil }
-        guard let data = try? JSONSerialization.data(
-            withJSONObject: overrides,
-            options: [.prettyPrinted, .sortedKeys]
-        ) else { return nil }
-        return String(data: data, encoding: .utf8)
+        let json: String
+        if overrides.isEmpty {
+            json = "{}"
+        } else if let data = try? JSONSerialization.data(withJSONObject: overrides),
+                  let s = String(data: data, encoding: .utf8) {
+            json = s
+        } else {
+            json = "{}"
+        }
+        guard let ptr = tgsb_export_data(eng, TGSB_DATA_PHONEMES, "", json) else { return nil }
+        let result = String(cString: ptr)
+        free(ptr)
+        return result
     }
 
-    /// Write phoneme overrides JSON to a temp file for sharing.
-    func exportPhonemeOverridesToTempFile() -> URL? {
-        guard let json = phonemeOverridesJSON() else { return nil }
+    /// Write merged phonemes YAML to a temp file for sharing.
+    func exportPhonemeYamlToTempFile() -> URL? {
+        guard let yaml = phonemeYamlContent() else { return nil }
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("phoneme-overrides.json")
-        guard let _ = try? json.write(to: url, atomically: true, encoding: .utf8) else {
+            .appendingPathComponent("phonemes.yaml")
+        guard let _ = try? yaml.write(to: url, atomically: true, encoding: .utf8) else {
             return nil
         }
         return url

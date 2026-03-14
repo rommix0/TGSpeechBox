@@ -30,6 +30,11 @@ void tgsb_destroy(TgsbEngine *engine);
    Call after tgsb_create, before tgsb_set_language. Pass NULL to clear. */
 void tgsb_set_override_directory(TgsbEngine *engine, const char *overrideDir);
 
+/* Export merged YAML (base + overrides) for a domain.
+   Returns malloc'd string — caller must free(). Returns NULL on error. */
+char *tgsb_export_data(TgsbEngine *engine, int domain,
+                       const char *langTag, const char *overridesJson);
+
 int tgsb_set_language(TgsbEngine *engine,
                       const char *espeakLang,
                       const char *tgsbLang);
