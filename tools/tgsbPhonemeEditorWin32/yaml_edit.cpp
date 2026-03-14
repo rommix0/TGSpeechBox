@@ -5,6 +5,7 @@ Licensed under the MIT License. See LICENSE for details.
 */
 
 #include "yaml_edit.h"
+#include "yaml_export.h"
 
 #include <algorithm>
 #include <cctype>
@@ -12,6 +13,8 @@ Licensed under the MIT License. See LICENSE for details.
 #include <locale>
 #include <sstream>
 #include <unordered_set>
+
+namespace ye = nvsp_frontend::yaml_export;
 
 namespace tgsb_editor {
 
@@ -146,87 +149,6 @@ bool LanguageYaml::load(const std::string& path, std::string& outError) {
   return true;
 }
 
-// Forward declarations for surgical language save.
-static void dumpNode(const Node& node, std::string& out, int ind);
-static std::string dumpKey(const std::string& s);
-
-// Serialize a single top-level key and its value (for comparison).
-static std::string dumpSingleTopLevelKey(const std::string& key, const Node& value) {
-  std::string out;
-  out += dumpKey(key) + ":";
-  if (value.isScalar()) {
-    out += " " + value.scalar + "\n";
-  } else {
-    out += "\n";
-    dumpNode(value, out, 2);
-  }
-  return out;
-}
-
-// Find top-level key line ranges in original file text.
-struct TopLevelRange {
-  std::string key;
-  size_t startLine = 0;  // first line of this key's block (the "key:" line)
-  size_t endLine = 0;    // one past the last line before the next top-level key
-};
-
-static void findTopLevelRanges(const std::vector<std::string>& lines,
-                               std::vector<TopLevelRange>& ranges,
-                               size_t& headerEnd) {
-  headerEnd = 0;
-  // Find top-level keys: lines starting with a non-space, non-comment char containing ':'.
-  for (size_t i = 0; i < lines.size(); ++i) {
-    const std::string& ln = lines[i];
-    if (ln.empty()) continue;
-    if (ln[0] == ' ' || ln[0] == '#' || ln[0] == '\r') continue;
-    auto colon = ln.find(':');
-    if (colon == std::string::npos) continue;
-
-    TopLevelRange r;
-    r.key = ln.substr(0, colon);
-    r.startLine = i;
-
-    // Close previous range.
-    if (!ranges.empty()) {
-      ranges.back().endLine = i;
-    } else {
-      headerEnd = i;  // everything before first key is the header
-    }
-    ranges.push_back(r);
-  }
-  // Close last range.
-  if (!ranges.empty()) {
-    ranges.back().endLine = lines.size();
-  }
-}
-
-// Strip comments and blank lines from a block of text for data comparison.
-static std::string stripForComparison(const std::vector<std::string>& lines,
-                                      size_t start, size_t end) {
-  std::string out;
-  for (size_t i = start; i < end; ++i) {
-    std::string ln = lines[i];
-    // Trim trailing whitespace.
-    while (!ln.empty() && (ln.back() == ' ' || ln.back() == '\r')) ln.pop_back();
-    // Skip pure blank lines.
-    size_t firstNonSpace = ln.find_first_not_of(' ');
-    if (firstNonSpace == std::string::npos) continue;
-    // Skip pure comment lines.
-    if (ln[firstNonSpace] == '#') continue;
-    // Strip inline comments (but be careful with quoted strings).
-    // Simple approach: find " #" (space-hash) outside quotes.
-    size_t hashPos = ln.find(" #", firstNonSpace);
-    if (hashPos != std::string::npos) {
-      ln = ln.substr(0, hashPos);
-      while (!ln.empty() && ln.back() == ' ') ln.pop_back();
-    }
-    out += ln;
-    out += "\n";
-  }
-  // Trim trailing newlines.
-  while (!out.empty() && out.back() == '\n') out.pop_back();
-  return out;
-}
 
 bool LanguageYaml::save(std::string& outError) const {
   if (m_path.empty()) {
@@ -262,9 +184,9 @@ bool LanguageYaml::save(std::string& outError) const {
   }
 
   // Find top-level key ranges in original.
-  std::vector<TopLevelRange> ranges;
+  std::vector<ye::TopLevelRange> ranges;
   size_t headerEnd = 0;
-  findTopLevelRanges(origLines, ranges, headerEnd);
+  ye::findTopLevelRanges(origLines, ranges, headerEnd);
 
   // Build output.
   std::string output;
@@ -289,10 +211,10 @@ bool LanguageYaml::save(std::string& outError) const {
     }
 
     // Serialize in-memory version for comparison.
-    std::string serialized = dumpSingleTopLevelKey(range.key, *memNode);
+    std::string serialized = ye::dumpSingleTopLevelKey(range.key, *memNode);
 
     // Strip both for comparison (ignore comments, trailing whitespace).
-    std::string origStripped = stripForComparison(origLines, range.startLine, range.endLine);
+    std::string origStripped = ye::stripForComparison(origLines, range.startLine, range.endLine);
     std::string serStripped = serialized;
     while (!serStripped.empty() && serStripped.back() == '\n') serStripped.pop_back();
 
@@ -319,7 +241,7 @@ bool LanguageYaml::save(std::string& outError) const {
       if (outputKeys.find(k) != outputKeys.end()) continue;
       const Node* n = m_root.get(k);
       if (n) {
-        output += dumpSingleTopLevelKey(k, *n);
+        output += ye::dumpSingleTopLevelKey(k, *n);
       }
     }
   }
@@ -1338,498 +1260,13 @@ void LanguageYaml::setSpecialCoarticRules(const std::vector<SpecialCoarticRuleEn
 }
 
 // -------------------------
-// YAML dump
+// YAML dump (delegates to yaml_export)
 // -------------------------
 
-static bool looksLikeNumber(const std::string& s) {
-  if (s.empty()) return false;
-  // Accept leading +/-.
-  size_t i = 0;
-  if (s[0] == '+' || s[0] == '-') i = 1;
-  if (i >= s.size()) return false;
-
-  // Fast reject for obvious non-number.
-  bool anyDigit = false;
-  bool dot = false;
-  for (; i < s.size(); ++i) {
-    char c = s[i];
-    if (c >= '0' && c <= '9') {
-      anyDigit = true;
-      continue;
-    }
-    if (c == '.' && !dot) {
-      dot = true;
-      continue;
-    }
-    if (c == 'e' || c == 'E') {
-      // allow scientific, but keep it simple
-      return true;
-    }
-    return false;
-  }
-  return anyDigit;
-}
-
-static bool looksLikeBool(const std::string& s) {
-  if (s.empty()) return false;
-  std::string t;
-  t.reserve(s.size());
-  for (char c : s) t.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-  return (t == "true" || t == "false" || t == "yes" || t == "no" || t == "on" || t == "off" || t == "0" || t == "1");
-}
-
-static bool needsQuotes(const std::string& s) {
-  if (s.empty()) return true;
-
-  // Leading/trailing spaces.
-  if (!s.empty() && (std::isspace(static_cast<unsigned char>(s.front())) || std::isspace(static_cast<unsigned char>(s.back())))) {
-    return true;
-  }
-
-  // YAML structural / comment chars.
-  for (char c : s) {
-    unsigned char u = static_cast<unsigned char>(c);
-    if (u < 0x20 || u == 0x7F) return true;
-    if (u >= 0x80) return true; // non-ASCII (IPA) -> quote
-    if (c == ':' || c == '#' || c == '\n' || c == '\r' || c == '\t') return true;
-    if (c == '[' || c == ']' || c == '{' || c == '}' || c == ',' ) return true;
-  }
-
-  if (s[0] == '-' || s[0] == '?' || s[0] == '!' || s[0] == '*') return true;
-  if (s.find("//") != std::string::npos) return true;
-
-  // If it's a clean number/bool, we can keep it unquoted.
-  // Otherwise, keep it unquoted as well; this check isn't about typing.
-  return false;
-}
-
-static std::string quote(const std::string& s) {
-  std::string out;
-  out.reserve(s.size() + 2);
-  out.push_back('"');
-  for (char c : s) {
-    switch (c) {
-      case '\\': out += "\\\\"; break;
-      case '"': out += "\\\""; break;
-      case '\n': out += "\\n"; break;
-      case '\r': out += "\\r"; break;
-      case '\t': out += "\\t"; break;
-      default: out.push_back(c); break;
-    }
-  }
-  out.push_back('"');
-  return out;
-}
-
-static std::string dumpScalar(const std::string& s) {
-  // Keep plain numbers/bools unquoted unless quotes are required.
-  if (!needsQuotes(s) && (looksLikeNumber(s) || looksLikeBool(s))) {
-    return s;
-  }
-  if (!needsQuotes(s)) {
-    return s;
-  }
-  return quote(s);
-}
-
-static std::string dumpKey(const std::string& s) {
-  // Keys: be a bit more conservative; quote any non-ASCII.
-  if (needsQuotes(s)) return quote(s);
-  return s;
-}
-
-static void indent(std::string& out, int n) {
-  out.append(static_cast<size_t>(n), ' ');
-}
-
-static void dumpNode(const Node& node, std::string& out, int ind);
-
-static std::vector<std::string> sortedKeys(const Node& mapNode) {
-  std::vector<std::string> keys;
-  keys.reserve(mapNode.map.size());
-  for (const auto& kv : mapNode.map) keys.push_back(kv.first);
-  std::sort(keys.begin(), keys.end());
-  return keys;
-}
-
-// Return insertion-order keys if available, else fall back to sorted.
-static std::vector<std::string> orderedKeys(const Node& mapNode) {
-  if (!mapNode.keyOrder.empty()) {
-    // keyOrder may be stale if keys were added programmatically without
-    // updating it.  Build a set of what's in keyOrder, then append any
-    // missing map keys at the end (sorted) to be safe.
-    std::vector<std::string> result;
-    result.reserve(mapNode.map.size());
-    std::unordered_set<std::string> seen;
-    for (const auto& k : mapNode.keyOrder) {
-      if (mapNode.map.find(k) != mapNode.map.end() && seen.insert(k).second) {
-        result.push_back(k);
-      }
-    }
-    if (result.size() < mapNode.map.size()) {
-      // Some keys were added without keyOrder.  Append them sorted.
-      std::vector<std::string> extra;
-      for (const auto& kv : mapNode.map) {
-        if (seen.find(kv.first) == seen.end()) extra.push_back(kv.first);
-      }
-      std::sort(extra.begin(), extra.end());
-      for (auto& k : extra) result.push_back(std::move(k));
-    }
-    return result;
-  }
-  return sortedKeys(mapNode);
-}
-
-// Returns a priority for top-level language YAML keys.
-// Lower number = comes first. Keys not in the list get a high number (alphabetical after).
-static int topLevelKeyPriority(const std::string& key) {
-  // Preferred ordering for language YAML files:
-  // 1. settings (most important configuration)
-  // 2. normalization (IPA rules)
-  // 3. transforms
-  // 4. intonation
-  // 5. toneContours
-  // 6. everything else alphabetically
-  if (key == "settings") return 0;
-  if (key == "normalization") return 1;
-  if (key == "transforms") return 2;
-  if (key == "intonation") return 3;
-  if (key == "toneContours") return 4;
-  return 100; // everything else
-}
-
-static std::vector<std::string> sortedKeysTopLevel(const Node& mapNode) {
-  std::vector<std::string> keys;
-  keys.reserve(mapNode.map.size());
-  for (const auto& kv : mapNode.map) keys.push_back(kv.first);
-
-  std::sort(keys.begin(), keys.end(), [](const std::string& a, const std::string& b) {
-    int pa = topLevelKeyPriority(a);
-    int pb = topLevelKeyPriority(b);
-    if (pa != pb) return pa < pb;
-    return a < b; // alphabetical for same priority
-  });
-  return keys;
-}
-
-// Emit a map in flow style: {key: val, key: val}
-static void dumpFlowMap(const Node& node, std::string& out) {
-  out += "{";
-  auto keys = orderedKeys(node);
-  bool first = true;
-  for (const auto& k : keys) {
-    if (!first) out += ", ";
-    first = false;
-    out += dumpKey(k);
-    out += ": ";
-    const Node& v = node.map.at(k);
-    if (v.isScalar()) {
-      out += dumpScalar(v.scalar);
-    } else if (v.isSeq() && v.flowStyle) {
-      // Nested flow seq inside flow map.
-      out += "[";
-      bool firstItem = true;
-      for (const auto& item : v.seq) {
-        if (!firstItem) out += ", ";
-        firstItem = false;
-        out += dumpScalar(item.scalar);
-      }
-      out += "]";
-    } else {
-      // Shouldn't happen in well-formed flow maps, but be safe.
-      out += dumpScalar(v.isScalar() ? v.scalar : "");
-    }
-  }
-  out += "}";
-}
-
-// Emit a seq in flow style: [val, val, val]
-static void dumpFlowSeq(const Node& node, std::string& out) {
-  out += "[";
-  bool first = true;
-  for (const auto& item : node.seq) {
-    if (!first) out += ", ";
-    first = false;
-    out += dumpScalar(item.scalar);
-  }
-  out += "]";
-}
-
-static void dumpMap(const Node& node, std::string& out, int ind) {
-  // Use special ordering for top-level keys (settings before normalization, etc.)
-  // Preserve insertion order for non-top-level maps.
-  auto keys = (ind == 0) ? sortedKeysTopLevel(node) : orderedKeys(node);
-
-  for (const auto& k : keys) {
-    const Node& v = node.map.at(k);
-    indent(out, ind);
-    out += dumpKey(k);
-
-    if (v.type == Node::Type::Scalar) {
-      out += ": ";
-      out += dumpScalar(v.scalar);
-      out += "\n";
-      continue;
-    }
-
-    // Flow-style map: emit inline {k: v, ...}
-    if (v.isMap() && v.flowStyle) {
-      out += ": ";
-      dumpFlowMap(v, out);
-      out += "\n";
-      continue;
-    }
-
-    // Flow-style seq: emit inline [v, v, ...]
-    if (v.isSeq() && v.flowStyle) {
-      out += ": ";
-      dumpFlowSeq(v, out);
-      out += "\n";
-      continue;
-    }
-
-    // Null / Map / Seq (block style)
-    out += ":\n";
-    dumpNode(v, out, ind + 2);
-  }
-}
-
-static void dumpSeqItemMapInlineFirstKey(const Node& item, std::string& out, int ind) {
-  // Pick a good first key: prefer insertion order, else "from"/"key".
-  auto keys = orderedKeys(item);
-  std::string first;
-  if (!keys.empty()) {
-    // Use insertion-order first key if it's a scalar.
-    if (item.map.at(keys[0]).type == Node::Type::Scalar) {
-      first = keys[0];
-    }
-  }
-  // Fallback: prefer "from" or "key" for readability.
-  if (first.empty()) {
-    if (item.map.find("from") != item.map.end()) first = "from";
-    else if (item.map.find("key") != item.map.end()) first = "key";
-    else if (!keys.empty()) first = keys[0];
-  }
-
-  if (first.empty() || item.map.at(first).type != Node::Type::Scalar) {
-    out += "\n";
-    dumpMap(item, out, ind + 2);
-    return;
-  }
-
-  out += " ";
-  out += dumpKey(first);
-  out += ": ";
-  out += dumpScalar(item.map.at(first).scalar);
-  out += "\n";
-
-  // Remaining keys in insertion order.
-  for (const auto& k : keys) {
-    if (k == first) continue;
-    const Node& v = item.map.at(k);
-    indent(out, ind + 2);
-    out += dumpKey(k);
-    if (v.type == Node::Type::Scalar) {
-      out += ": ";
-      out += dumpScalar(v.scalar);
-      out += "\n";
-    } else if (v.isMap() && v.flowStyle) {
-      out += ": ";
-      dumpFlowMap(v, out);
-      out += "\n";
-    } else if (v.isSeq() && v.flowStyle) {
-      out += ": ";
-      dumpFlowSeq(v, out);
-      out += "\n";
-    } else {
-      out += ":\n";
-      dumpNode(v, out, ind + 4);
-    }
-  }
-}
-
-static void dumpSeq(const Node& node, std::string& out, int ind) {
-  for (const auto& item : node.seq) {
-    indent(out, ind);
-    out += "-";
-
-    if (item.type == Node::Type::Scalar) {
-      out += " ";
-      out += dumpScalar(item.scalar);
-      out += "\n";
-      continue;
-    }
-
-    if (item.type == Node::Type::Map) {
-      if (item.map.empty()) {
-        out += " {}\n";
-      } else if (item.flowStyle) {
-        // Emit as inline flow map: - {key: val, key: val}
-        out += " ";
-        dumpFlowMap(item, out);
-        out += "\n";
-      } else {
-        dumpSeqItemMapInlineFirstKey(item, out, ind);
-      }
-      continue;
-    }
-
-    if (item.type == Node::Type::Seq) {
-      if (item.flowStyle) {
-        out += " ";
-        dumpFlowSeq(item, out);
-        out += "\n";
-      } else {
-        out += "\n";
-        dumpSeq(item, out, ind + 2);
-      }
-      continue;
-    }
-
-    // Null
-    out += "\n";
-  }
-}
-
-static void dumpNode(const Node& node, std::string& out, int ind) {
-  switch (node.type) {
-    case Node::Type::Map:
-      dumpMap(node, out, ind);
-      break;
-    case Node::Type::Seq:
-      dumpSeq(node, out, ind);
-      break;
-    case Node::Type::Scalar:
-      indent(out, ind);
-      out += dumpScalar(node.scalar);
-      out += "\n";
-      break;
-    case Node::Type::Null:
-    default:
-      // nothing
-      break;
-  }
-}
-
 std::string dumpYaml(const Node& root) {
-  std::string out;
-  out += "# Edited by tgsbPhonemeEditor (Win32)\n";
-  out += "\n";
-
-  dumpNode(root, out, 0);
+  std::string out = "# Edited by tgsbPhonemeEditor (Win32)\n\n";
+  out += ye::dumpYaml(root);
   return out;
-}
-
-// Serialize a single phoneme node as YAML lines at 4-space indent (under "phonemes:\n  key:\n").
-static std::string dumpSinglePhoneme(const std::string& key, const Node& node) {
-  std::string out;
-  // Phoneme key line at 2-space indent.
-  out += "  ";
-  out += dumpKey(key);
-  out += ":\n";
-  // Fields at 4-space indent.
-  if (node.isMap()) {
-    auto keys = orderedKeys(node);
-    for (const auto& k : keys) {
-      const Node& v = node.map.at(k);
-      out += "    ";
-      out += dumpKey(k);
-      if (v.type == Node::Type::Scalar) {
-        out += ": ";
-        out += dumpScalar(v.scalar);
-        out += "\n";
-      } else if (v.isMap() && v.flowStyle) {
-        out += ": ";
-        dumpFlowMap(v, out);
-        out += "\n";
-      } else if (v.isSeq() && v.flowStyle) {
-        out += ": ";
-        dumpFlowSeq(v, out);
-        out += "\n";
-      } else {
-        out += ":\n";
-        dumpNode(v, out, 6);
-      }
-    }
-  }
-  return out;
-}
-
-// Find the line range [start, end) for a phoneme key within the phonemes: block.
-// The phoneme key is at 2-space indent, its fields at 4+ spaces.
-// Returns false if not found.
-struct PhonemeLineRange {
-  std::string key;         // unquoted phoneme key
-  size_t startLine = 0;    // index of the "  key:" line
-  size_t endLine = 0;      // one past the last line of this phoneme's fields
-};
-
-// Parse the original file to find all phoneme blocks and their line ranges.
-static void findPhonemeRanges(const std::vector<std::string>& lines,
-                              std::vector<PhonemeLineRange>& ranges,
-                              size_t& phonemesBlockStart,
-                              size_t& phonemesBlockEnd) {
-  phonemesBlockStart = 0;
-  phonemesBlockEnd = lines.size();
-
-  // Find "phonemes:" top-level key.
-  size_t pStart = SIZE_MAX;
-  for (size_t i = 0; i < lines.size(); ++i) {
-    const std::string& ln = lines[i];
-    if (ln.size() >= 9 && ln.substr(0, 9) == "phonemes:") {
-      pStart = i;
-      phonemesBlockStart = i;
-      break;
-    }
-  }
-  if (pStart == SIZE_MAX) return;
-
-  // Walk lines after "phonemes:" looking for 2-space-indented keys (phoneme names).
-  PhonemeLineRange cur;
-  bool inPhoneme = false;
-  for (size_t i = pStart + 1; i < lines.size(); ++i) {
-    const std::string& ln = lines[i];
-
-    // A line with no leading space = new top-level key -> end of phonemes block.
-    if (!ln.empty() && ln[0] != ' ' && ln[0] != '#') {
-      phonemesBlockEnd = i;
-      if (inPhoneme) {
-        cur.endLine = i;
-        ranges.push_back(cur);
-      }
-      return;
-    }
-
-    // Check for 2-space-indented key (phoneme name).
-    if (ln.size() >= 3 && ln[0] == ' ' && ln[1] == ' ' && ln[2] != ' ' && ln[2] != '#') {
-      // This is a phoneme key line like "  ɑ:" or "  \"ɑ\":"
-      if (inPhoneme) {
-        cur.endLine = i;
-        ranges.push_back(cur);
-      }
-      // Parse the key (strip quotes, strip trailing ':').
-      std::string rawKey = ln.substr(2);
-      // Trim trailing whitespace.
-      while (!rawKey.empty() && (rawKey.back() == ' ' || rawKey.back() == '\r')) rawKey.pop_back();
-      // Strip trailing colon.
-      if (!rawKey.empty() && rawKey.back() == ':') rawKey.pop_back();
-      // Unquote.
-      if (rawKey.size() >= 2 && rawKey.front() == '"' && rawKey.back() == '"') {
-        rawKey = rawKey.substr(1, rawKey.size() - 2);
-      }
-
-      cur = PhonemeLineRange();
-      cur.key = rawKey;
-      cur.startLine = i;
-      inPhoneme = true;
-    }
-  }
-  // End of file.
-  phonemesBlockEnd = lines.size();
-  if (inPhoneme) {
-    cur.endLine = lines.size();
-    ranges.push_back(cur);
-  }
 }
 
 bool PhonemesYaml::save(std::string& outError) const {
@@ -1867,10 +1304,10 @@ bool PhonemesYaml::save(std::string& outError) const {
   }
 
   // Find phoneme line ranges in the original file.
-  std::vector<PhonemeLineRange> ranges;
+  std::vector<ye::PhonemeLineRange> ranges;
   size_t phonemesBlockStart = 0;
   size_t phonemesBlockEnd = origLines.size();
-  findPhonemeRanges(origLines, ranges, phonemesBlockStart, phonemesBlockEnd);
+  ye::findPhonemeRanges(origLines, ranges, phonemesBlockStart, phonemesBlockEnd);
 
   // Build a map of original phoneme key -> range index for fast lookup.
   std::unordered_map<std::string, size_t> origKeyToRange;
@@ -1915,64 +1352,19 @@ bool PhonemesYaml::save(std::string& outError) const {
   // 2. Each phoneme: either original lines (if unchanged) or re-serialized.
   for (const auto& pkey : orderedPhonemeKeys) {
     const Node& memNode = phonemesNode->map.at(pkey);
-    std::string serialized = dumpSinglePhoneme(pkey, memNode);
+    std::string serialized = ye::dumpSinglePhoneme(pkey, memNode);
 
     auto origIt = origKeyToRange.find(pkey);
     if (origIt != origKeyToRange.end()) {
       // This phoneme existed in the original file.
-      const PhonemeLineRange& range = ranges[origIt->second];
-      // Reconstruct original lines for comparison.
-      std::string origBlock;
-      for (size_t i = range.startLine; i < range.endLine; ++i) {
-        // Skip pure comment/blank lines for comparison purposes,
-        // but include them in the original block output.
-        origBlock += origLines[i];
-        origBlock += "\n";
-      }
+      const ye::PhonemeLineRange& range = ranges[origIt->second];
 
-      // Compare stripped versions (ignore trailing whitespace differences).
-      // If the data is the same, keep original (preserves comments, spacing).
-      // Simple comparison: strip all lines and compare key-value content.
-      bool changed = false;
-
-      // Quick comparison: serialize from memory and compare text.
-      // This won't match if original had comments or different formatting,
-      // so we do a data-level comparison instead.
-      // Parse both blocks' key-value data and compare.
-      // Simplest approach: if the serialized phoneme differs from the
-      // stripped original, it was modified.
-      // For robustness, compare the in-memory Node to a freshly-parsed
-      // version of the original block.
-      // But that's complex.  Instead, use a simpler heuristic:
-      // serialize the in-memory node and compare to original text
-      // with comments stripped.  If they match, keep original.
-
-      // Strip comments and blank lines from original for comparison.
-      std::string origStripped;
-      for (size_t i = range.startLine; i < range.endLine; ++i) {
-        const std::string& ln = origLines[i];
-        std::string trimmed = ln;
-        // Trim trailing whitespace.
-        while (!trimmed.empty() && (trimmed.back() == ' ' || trimmed.back() == '\r')) trimmed.pop_back();
-        // Skip pure comment lines and blank lines.
-        size_t firstNonSpace = trimmed.find_first_not_of(' ');
-        if (firstNonSpace == std::string::npos) continue;
-        if (trimmed[firstNonSpace] == '#') continue;
-        // Strip inline comments for comparison.
-        origStripped += trimmed;
-        origStripped += "\n";
-      }
-
-      // Strip trailing whitespace from serialized too.
-      std::string serStripped;
-      for (size_t i = 0; i < serialized.size(); ++i) {
-        serStripped += serialized[i];
-      }
-      // Normalize: remove trailing newline for comparison.
-      while (!origStripped.empty() && origStripped.back() == '\n') origStripped.pop_back();
+      // Strip comments and compare data content.
+      std::string origStripped = ye::stripForComparison(origLines, range.startLine, range.endLine);
+      std::string serStripped = serialized;
       while (!serStripped.empty() && serStripped.back() == '\n') serStripped.pop_back();
 
-      changed = (origStripped != serStripped);
+      bool changed = (origStripped != serStripped);
 
       if (!changed) {
         // Keep original lines verbatim (with comments, spacing, etc.).

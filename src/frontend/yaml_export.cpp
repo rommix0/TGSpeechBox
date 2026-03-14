@@ -374,13 +374,7 @@ std::string dumpSinglePhoneme(const std::string& key, const Node& node) {
 
 // ── Surgical comparison helpers ───────────────────────────────────
 
-struct TopLevelRange {
-    std::string key;
-    size_t startLine = 0;
-    size_t endLine = 0;
-};
-
-static void findTopLevelRanges(const std::vector<std::string>& lines,
+void findTopLevelRanges(const std::vector<std::string>& lines,
                                std::vector<TopLevelRange>& ranges,
                                size_t& headerEnd) {
     headerEnd = 0;
@@ -405,7 +399,7 @@ static void findTopLevelRanges(const std::vector<std::string>& lines,
     }
 }
 
-static std::string stripForComparison(const std::vector<std::string>& lines,
+std::string stripForComparison(const std::vector<std::string>& lines,
                                       size_t start, size_t end) {
     std::string out;
     for (size_t i = start; i < end; ++i) {
@@ -426,13 +420,7 @@ static std::string stripForComparison(const std::vector<std::string>& lines,
     return out;
 }
 
-struct PhonemeLineRange {
-    std::string key;
-    size_t startLine = 0;
-    size_t endLine = 0;
-};
-
-static void findPhonemeRanges(const std::vector<std::string>& lines,
+void findPhonemeRanges(const std::vector<std::string>& lines,
                               std::vector<PhonemeLineRange>& ranges,
                               size_t& phonemesBlockStart,
                               size_t& phonemesBlockEnd) {

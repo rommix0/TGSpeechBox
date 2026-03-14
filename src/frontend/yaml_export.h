@@ -32,6 +32,33 @@ std::string dumpSingleTopLevelKey(const std::string& key, const Node& value);
 /// Serialize a single phoneme definition (at 2-space indent under "phonemes:").
 std::string dumpSinglePhoneme(const std::string& key, const Node& node);
 
+// ── Surgical save helpers ─────────────────────────────────────────
+// Exposed for reuse by the Win32 phoneme editor's save paths.
+
+struct TopLevelRange {
+    std::string key;
+    size_t startLine = 0;
+    size_t endLine = 0;
+};
+
+struct PhonemeLineRange {
+    std::string key;
+    size_t startLine = 0;
+    size_t endLine = 0;
+};
+
+void findTopLevelRanges(const std::vector<std::string>& lines,
+                        std::vector<TopLevelRange>& ranges,
+                        size_t& headerEnd);
+
+void findPhonemeRanges(const std::vector<std::string>& lines,
+                       std::vector<PhonemeLineRange>& ranges,
+                       size_t& phonemesBlockStart,
+                       size_t& phonemesBlockEnd);
+
+std::string stripForComparison(const std::vector<std::string>& lines,
+                               size_t start, size_t end);
+
 // ── Surgical merge ────────────────────────────────────────────────
 
 /// Read a base YAML file, apply key-value overrides at the Node level,
