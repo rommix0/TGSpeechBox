@@ -284,44 +284,9 @@ settings:
       # When a stop is immediately followed by the same stop (from Cː→CC
       # normalization), suppress the first stop's burst so the pair sounds
       # like a single extended closure rather than two separate stop events.
-      - name: geminate_t
-        phonemes: [t]
-        before: [t]
-        action: scale
-        fieldScales: {fricationAmplitude: 0.0, pa1: 0.0, pa2: 0.0, pa3: 0.0, pa4: 0.0, pa5: 0.0, pa6: 0.0}
-      - name: geminate_p
-        phonemes: [p]
-        before: [p]
-        action: scale
-        fieldScales: {fricationAmplitude: 0.0, pa1: 0.0, pa2: 0.0, pa3: 0.0, pa4: 0.0, pa5: 0.0, pa6: 0.0}
-      - name: geminate_b
-        phonemes: [b]
-        before: [b]
-        action: scale
-        fieldScales: {fricationAmplitude: 0.0, pa1: 0.0, pa2: 0.0, pa3: 0.0, pa4: 0.0, pa5: 0.0, pa6: 0.0}
-      - name: geminate_d
-        phonemes: [d]
-        before: [d]
-        action: scale
-        fieldScales: {fricationAmplitude: 0.0, pa1: 0.0, pa2: 0.0, pa3: 0.0, pa4: 0.0, pa5: 0.0, pa6: 0.0}
-      - name: geminate_k
-        phonemes: [k]
-        before: [k]
-        action: scale
-        fieldScales: {fricationAmplitude: 0.0, pa1: 0.0, pa2: 0.0, pa3: 0.0, pa4: 0.0, pa5: 0.0, pa6: 0.0}
-      - name: geminate_ɡ
-        phonemes: ["ɡ"]
-        before: ["ɡ"]
-        action: scale
-        fieldScales: {fricationAmplitude: 0.0, pa1: 0.0, pa2: 0.0, pa3: 0.0, pa4: 0.0, pa5: 0.0, pa6: 0.0}
-      - name: geminate_c
-        phonemes: [c]
-        before: [c]
-        action: scale
-        fieldScales: {fricationAmplitude: 0.0, pa1: 0.0, pa2: 0.0, pa3: 0.0, pa4: 0.0, pa5: 0.0, pa6: 0.0}
-      - name: geminate_ɟ
-        phonemes: ["ɟ"]
-        before: ["ɟ"]
+      - name: geminate_stop_burst_suppress
+        flags: [isStop]
+        beforeSamePhoneme: true
         action: scale
         fieldScales: {fricationAmplitude: 0.0, pa1: 0.0, pa2: 0.0, pa3: 0.0, pa4: 0.0, pa5: 0.0, pa6: 0.0}
   # === NASALIZATION ===

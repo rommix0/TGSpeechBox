@@ -265,6 +265,8 @@ struct AllophoneRule {
 
     std::vector<std::u32string> after;      // prev phoneme key filter
     std::vector<std::u32string> before;     // next phoneme key filter
+    bool beforeSamePhoneme = false;         // next phoneme must be same as current
+    bool afterSamePhoneme  = false;         // prev phoneme must be same as current
 
     // Neighbor flag filters (check flags on prev/next phoneme).
     // These complement the key-based after/before filters above.

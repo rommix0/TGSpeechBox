@@ -359,6 +359,21 @@ static bool ruleMatches(
     }
     if (!found) return false;
   }
+  if (rule.beforeSamePhoneme) {
+    if (!t.def || !next || !next->def) return false;
+    if (next->def->key != t.def->key) return false;
+  }
+  if (rule.afterSamePhoneme) {
+    if (!t.def) return false;
+    const Token* checkPrev = prev;
+    if (rule.tokenType == "aspiration" && prev) {
+      int parentIdx = prevPhonemeIndex(tokens, i);
+      if (parentIdx >= 0) checkPrev = prevPhoneme(tokens, parentIdx);
+      else checkPrev = nullptr;
+    }
+    if (!checkPrev || !checkPrev->def) return false;
+    if (checkPrev->def->key != t.def->key) return false;
+  }
 
   // 8) Neighbor flag filters
   //    For aspiration tokens, use the same "look past parent stop" logic.

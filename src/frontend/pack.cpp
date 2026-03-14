@@ -1218,6 +1218,8 @@ if (const yaml_min::Node* ar = settings.get("allophoneRules"); ar && ar->isMap()
           if (el.isScalar()) rule.before.push_back(utf8ToU32(el.scalar));
         }
       }
+      getBoolFrom(item, "beforeSamePhoneme", rule.beforeSamePhoneme);
+      getBoolFrom(item, "afterSamePhoneme",  rule.afterSamePhoneme);
       // Parse neighbor flag filters
       if (const yaml_min::Node* af2 = item.get("afterFlags"); af2 && af2->isSeq()) {
         for (const auto& el : af2->seq) {
