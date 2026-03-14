@@ -297,6 +297,8 @@ static INT_PTR CALLBACK AllophoneRuleEditDlgProc(HWND hDlg, UINT msg, WPARAM wPa
     setDlgItemUtf8(hDlg, IDC_AR_NOTAFTERFLAGS, joinStrVec(r.notAfterFlags));
     setDlgItemUtf8(hDlg, IDC_AR_BEFOREFLAGS, joinStrVec(r.beforeFlags));
     setDlgItemUtf8(hDlg, IDC_AR_NOTBEFOREFLAGS, joinStrVec(r.notBeforeFlags));
+    CheckDlgButton(hDlg, IDC_AR_BEFORESAME, r.beforeSamePhoneme ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_AR_AFTERSAME, r.afterSamePhoneme ? BST_CHECKED : BST_UNCHECKED);
 
     addComboStrings(hDlg, IDC_AR_TOKENTYPE, kTokenTypes, 3);
     selectComboByText(hDlg, IDC_AR_TOKENTYPE, r.tokenType);
@@ -373,6 +375,8 @@ static INT_PTR CALLBACK AllophoneRuleEditDlgProc(HWND hDlg, UINT msg, WPARAM wPa
       r.notAfterFlags = splitCommaSeparated(getDlgItemUtf8(hDlg, IDC_AR_NOTAFTERFLAGS));
       r.beforeFlags = splitCommaSeparated(getDlgItemUtf8(hDlg, IDC_AR_BEFOREFLAGS));
       r.notBeforeFlags = splitCommaSeparated(getDlgItemUtf8(hDlg, IDC_AR_NOTBEFOREFLAGS));
+      r.beforeSamePhoneme = (IsDlgButtonChecked(hDlg, IDC_AR_BEFORESAME) == BST_CHECKED);
+      r.afterSamePhoneme  = (IsDlgButtonChecked(hDlg, IDC_AR_AFTERSAME) == BST_CHECKED);
       r.action = getComboSelText(hDlg, IDC_AR_ACTION);
 
       // Replace

@@ -1081,6 +1081,8 @@ std::vector<AllophoneRuleEntry> LanguageYaml::allophoneRules() const {
     r.notAfterFlags = readStringSeq(item.get("notAfterFlags"));
     r.beforeFlags = readStringSeq(item.get("beforeFlags"));
     r.notBeforeFlags = readStringSeq(item.get("notBeforeFlags"));
+    r.beforeSamePhoneme = readBoolNode(item.get("beforeSamePhoneme"));
+    r.afterSamePhoneme  = readBoolNode(item.get("afterSamePhoneme"));
     if (const Node* n = item.get("action")) if (n->isScalar()) r.action = n->scalar;
     // Replace params
     if (const Node* n = item.get("replaceTo")) if (n->isScalar()) r.replaceTo = n->scalar;
@@ -1156,6 +1158,8 @@ void LanguageYaml::setAllophoneRules(const std::vector<AllophoneRuleEntry>& rule
     if (!r.notAfterFlags.empty()) mapSet(item, "notAfterFlags", makeStringSeqNode(r.notAfterFlags));
     if (!r.beforeFlags.empty()) mapSet(item, "beforeFlags", makeStringSeqNode(r.beforeFlags));
     if (!r.notBeforeFlags.empty()) mapSet(item, "notBeforeFlags", makeStringSeqNode(r.notBeforeFlags));
+    if (r.beforeSamePhoneme) mapSet(item, "beforeSamePhoneme", makeScalar("true"));
+    if (r.afterSamePhoneme) mapSet(item, "afterSamePhoneme", makeScalar("true"));
     if (!r.action.empty()) mapSet(item, "action", makeScalar(r.action));
     // Replace
     if (!r.replaceTo.empty()) mapSet(item, "replaceTo", makeScalar(r.replaceTo));

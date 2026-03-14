@@ -61,6 +61,8 @@ struct AllophoneRuleEntry {
   std::vector<std::string> notAfterFlags;
   std::vector<std::string> beforeFlags;
   std::vector<std::string> notBeforeFlags;
+  bool beforeSamePhoneme = false;
+  bool afterSamePhoneme  = false;
   // Action
   std::string action;                  // "replace"/"scale"/"shift"/"insert-before"/"insert-after"
   // Replace params

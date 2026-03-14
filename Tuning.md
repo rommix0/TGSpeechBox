@@ -391,6 +391,8 @@ settings:
 | `notAfterFlags` | list | Exclude if previous phoneme has ANY listed flag |
 | `beforeFlags` | list | Next phoneme must have ALL listed flags |
 | `notBeforeFlags` | list | Exclude if next phoneme has ANY listed flag |
+| `beforeSamePhoneme` | bool | Next phoneme must have the same IPA key as the current token. Replaces N per-phoneme rules with one flag-based rule — used for geminate stop burst suppression. |
+| `afterSamePhoneme` | bool | Previous phoneme must have the same IPA key as the current token. |
 | `afterClass` | string | Previous phoneme's base char must be in named class (e.g. `VOWELS`) |
 | `notAfterClass` | string | Previous phoneme's base char must NOT be in named class |
 | `beforeClass` | string | Next phoneme's base char must be in named class |
@@ -1817,6 +1819,7 @@ settings:
       tapMs: 4               # quick by nature
       trillMs: 12            # needs modulation cycles
       voicedConsonantMs: 10  # catch-all voiced C
+      diphthongFloorMs: 0    # merged diphthongs (endCf sweep); 0 = use vowelMs
 
     wordFinalBonusMs: 5      # extra floor at word end (morphology)
     floorSpeedScale: 0.0     # 0.0 = rigid floors (recommended)
@@ -2020,6 +2023,22 @@ settings:
         fieldScales:
           fricationAmplitude: 0.4
           aspirationAmplitude: 0.3
+
+      # Geminate stop burst suppression: when a stop is followed by
+      # the same stop (from Cː→CC normalization), suppress the first
+      # stop's burst so the pair sounds like one extended closure.
+      - name: geminate_stop_burst_suppress
+        flags: [isStop]
+        beforeSamePhoneme: true
+        action: scale
+        fieldScales:
+          fricationAmplitude: 0.0
+          pa1: 0.0
+          pa2: 0.0
+          pa3: 0.0
+          pa4: 0.0
+          pa5: 0.0
+          pa6: 0.0
 ```
 
 ### Clause-final fade

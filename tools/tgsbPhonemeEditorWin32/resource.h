@@ -261,6 +261,8 @@ Licensed under the MIT License. See LICENSE for details.
 #define IDC_AR_NOTAFTERFLAGS     3471
 #define IDC_AR_BEFOREFLAGS       3472
 #define IDC_AR_NOTBEFOREFLAGS    3473
+#define IDC_AR_BEFORESAME        3475
+#define IDC_AR_AFTERSAME         3476
 // Replace action controls
 #define IDC_AR_REPLACE_TO         3420
 #define IDC_AR_REPLACE_DURMS      3421
