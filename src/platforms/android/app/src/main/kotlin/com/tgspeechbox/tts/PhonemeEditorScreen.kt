@@ -72,18 +72,7 @@ private fun PhonemeListScreen(
     val langs by viewModel.editorLanguages.collectAsState()
     var showResetAllPhonemes by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
-    var showImportConfirm by remember { mutableStateOf(false) }
-    var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
     val importExportStatus by viewModel.importExportStatus.collectAsState()
-
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            pendingImportUri = uri
-            showImportConfirm = true
-        }
-    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -160,13 +149,6 @@ private fun PhonemeListScreen(
                         text = { Text("Export Phonemes") },
                         onClick = {
                             exportLauncher.launch("phonemes.yaml")
-                            showMoreMenu = false
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Import Phonemes") },
-                        onClick = {
-                            importLauncher.launch(arrayOf("application/json", "*/*"))
                             showMoreMenu = false
                         }
                     )
@@ -307,29 +289,7 @@ private fun PhonemeListScreen(
         )
     }
 
-    // Import confirmation
-    if (showImportConfirm) {
-        AlertDialog(
-            onDismissRequest = { showImportConfirm = false; pendingImportUri = null },
-            title = { Text("Import Phonemes") },
-            text = { Text("Replace all phoneme overrides with the imported file? Existing overrides will be cleared.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingImportUri?.let { viewModel.importPhonemeOverrides(context, it) }
-                    viewModel.loadPhonemeList(langFilter)
-                    showImportConfirm = false
-                    pendingImportUri = null
-                }) { Text("Import") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showImportConfirm = false; pendingImportUri = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Import/export status
+    // Export status
     if (importExportStatus != null) {
         AlertDialog(
             onDismissRequest = { viewModel.clearImportExportStatus() },
