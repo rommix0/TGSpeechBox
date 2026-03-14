@@ -11,11 +11,24 @@ Licensed under the MIT License. See LICENSE for details.
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <locale>
 #include <mutex>
 #include <new>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
+
+// Locale-independent double parse — NVDA may set process locale to one that
+// uses ',' as decimal separator (Hungarian, Polish, etc.), which would cause
+// std::strtod/atof to misread YAML values like "0.15" as 0.0.
+static double parseDouble(const std::string& s) {
+  std::istringstream iss(s);
+  iss.imbue(std::locale::classic());
+  double v = 0.0;
+  iss >> v;
+  return v;
+}
 
 #include "data_query.h"
 #include "yaml_export.h"
@@ -1390,7 +1403,7 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
         // Check if it's a frameEx sub-field.
         if (fieldPath.substr(0, 8) == "frameEx.") {
           std::string fxField = fieldPath.substr(8);
-          double num = std::strtod(value.c_str(), nullptr);
+          double num = parseDouble(value);
           if (fxField == "creakiness")  { def.hasCreakiness = true; def.creakiness = num; }
           else if (fxField == "breathiness") { def.hasBreathiness = true; def.breathiness = num; }
           else if (fxField == "jitter")      { def.hasJitter = true; def.jitter = num; }
@@ -1424,23 +1437,23 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
         }
         // Check micro-event fields.
         else if (fieldPath == "burstDurationMs") {
-          def.hasBurstDurationMs = true; def.burstDurationMs = std::strtod(value.c_str(), nullptr);
+          def.hasBurstDurationMs = true; def.burstDurationMs = parseDouble(value);
         } else if (fieldPath == "burstDecayRate") {
-          def.hasBurstDecayRate = true; def.burstDecayRate = std::strtod(value.c_str(), nullptr);
+          def.hasBurstDecayRate = true; def.burstDecayRate = parseDouble(value);
         } else if (fieldPath == "burstSpectralTilt") {
-          def.hasBurstSpectralTilt = true; def.burstSpectralTilt = std::strtod(value.c_str(), nullptr);
+          def.hasBurstSpectralTilt = true; def.burstSpectralTilt = parseDouble(value);
         } else if (fieldPath == "voiceBarAmplitude") {
-          def.hasVoiceBarAmplitude = true; def.voiceBarAmplitude = std::strtod(value.c_str(), nullptr);
+          def.hasVoiceBarAmplitude = true; def.voiceBarAmplitude = parseDouble(value);
         } else if (fieldPath == "voiceBarF1") {
-          def.hasVoiceBarF1 = true; def.voiceBarF1 = std::strtod(value.c_str(), nullptr);
+          def.hasVoiceBarF1 = true; def.voiceBarF1 = parseDouble(value);
         } else if (fieldPath == "releaseSpreadMs") {
-          def.hasReleaseSpreadMs = true; def.releaseSpreadMs = std::strtod(value.c_str(), nullptr);
+          def.hasReleaseSpreadMs = true; def.releaseSpreadMs = parseDouble(value);
         } else if (fieldPath == "fricAttackMs") {
-          def.hasFricAttackMs = true; def.fricAttackMs = std::strtod(value.c_str(), nullptr);
+          def.hasFricAttackMs = true; def.fricAttackMs = parseDouble(value);
         } else if (fieldPath == "fricDecayMs") {
-          def.hasFricDecayMs = true; def.fricDecayMs = std::strtod(value.c_str(), nullptr);
+          def.hasFricDecayMs = true; def.fricDecayMs = parseDouble(value);
         } else if (fieldPath == "durationScale") {
-          def.hasDurationScale = true; def.durationScale = std::strtod(value.c_str(), nullptr);
+          def.hasDurationScale = true; def.durationScale = parseDouble(value);
         }
         // Frame fields (FieldId-based).
         else {
@@ -1448,7 +1461,7 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
           if (parseFieldId(fieldPath, fid)) {
             int idx = static_cast<int>(fid);
             if (idx >= 0 && idx < kFrameFieldCount) {
-              double newVal = std::strtod(value.c_str(), nullptr);
+              double newVal = parseDouble(value);
               def.field[idx] = newVal;
               def.setMask |= (1ull << idx);
             }

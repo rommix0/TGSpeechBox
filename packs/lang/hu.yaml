@@ -336,6 +336,49 @@ normalization:
     - from: "ʲ"
       to: ""
 
+    # === GEMINATE CONSONANTS ===
+    # eSpeak Hungarian uses Cː (length mark) for geminate stops and some
+    # fricatives. Our phoneme table has no Cː entries — map to doubled
+    # consonants so the tokenizer produces two tokens (longer closure).
+    - from: "tː"
+      to: "tt"
+    - from: "dː"
+      to: "dd"
+    - from: "pː"
+      to: "pp"
+    - from: "bː"
+      to: "bb"
+    - from: "kː"
+      to: "kk"
+    - from: "ɡː"
+      to: "ɡɡ"
+    - from: "cː"
+      to: "cc"
+    - from: "ɟː"
+      to: "ɟɟ"
+    - from: "fː"
+      to: "ff"
+    - from: "vː"
+      to: "vv"
+    - from: "sː"
+      to: "ss"
+    - from: "ʃː"
+      to: "ʃʃ"
+    - from: "zː"
+      to: "zz"
+    - from: "ʒː"
+      to: "ʒʒ"
+    - from: "nː"
+      to: "nn"
+    - from: "mː"
+      to: "mm"
+    - from: "lː"
+      to: "ll"
+    - from: "rː"
+      to: "rr"
+    - from: "ɲː"
+      to: "ɲɲ"
+
     # === GY (ɟ) STRESS HANDLING ===
     # Move stress marker after word-initial gy/dzs so the stop closure
     # gets proper timing without the stress marker sitting on it.

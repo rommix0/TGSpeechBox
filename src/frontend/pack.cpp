@@ -390,7 +390,7 @@ static void mergeSettings(LanguagePack& lp, const yaml_min::Node& settings) {
 auto getNumFrom = [&](const yaml_min::Node& map, const char* k, double& out) {
   const yaml_min::Node* n = map.get(k);
   if (n && n->isScalar()) {
-    out = std::atof(n->scalar.c_str());
+    n->asNumber(out);
   }
 };
 
@@ -1259,7 +1259,7 @@ if (const yaml_min::Node* ar = settings.get("allophoneRules"); ar && ar->isMap()
         for (const auto& kv : fs->map) {
           double val = 1.0;
           if (kv.second.isScalar()) {
-            try { val = std::stod(kv.second.scalar); } catch (...) {}
+            kv.second.asNumber(val);
           }
           rule.fieldScales.emplace_back(kv.first, val);
         }
