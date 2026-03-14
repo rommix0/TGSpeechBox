@@ -1079,33 +1079,46 @@ NVSP_FRONTEND_API char* nvspFrontend_exportData(
   std::string basePath;
   bool isPhonemes = false;
 
+  // Resolve packsRoot the same way pack.cpp does (check both direct and nested).
+  auto findRoot = [](const std::string& dir) -> std::string {
+    if (dir.empty()) return {};
+    std::string direct = dir + "/phonemes.yaml";
+    { std::ifstream t(direct); if (t.good()) return dir; }
+    std::string nested = dir + "/packs/phonemes.yaml";
+    { std::ifstream t(nested); if (t.good()) return dir + "/packs"; }
+    return {};
+  };
+
   if (domain == NVSP_DATA_PHONEMES) {
     isPhonemes = true;
     // Check override dir first, then pack dir.
     if (!h->overrideDir.empty()) {
-      std::string ovPath = h->overrideDir + "/packs/phonemes.yaml";
-      std::ifstream test(ovPath);
-      if (test.good()) basePath = ovPath;
+      std::string ovRoot = findRoot(h->overrideDir);
+      if (!ovRoot.empty()) basePath = ovRoot + "/phonemes.yaml";
     }
     if (basePath.empty()) {
-      basePath = h->packDir + "/phonemes.yaml";
+      std::string root = findRoot(h->packDir);
+      if (!root.empty()) basePath = root + "/phonemes.yaml";
     }
   } else if (domain == NVSP_DATA_SETTINGS) {
-    // Find the most-specific language file.
     std::string lang = langTagUtf8 ? std::string(langTagUtf8) : std::string();
     if (lang.empty()) return nullptr;
 
     // Check override dir first, then pack dir.
     if (!h->overrideDir.empty()) {
-      std::string ovPath = h->overrideDir + "/packs/lang/" + lang + ".yaml";
-      std::ifstream test(ovPath);
-      if (test.good()) basePath = ovPath;
+      std::string ovRoot = findRoot(h->overrideDir);
+      if (!ovRoot.empty()) {
+        std::string ovPath = ovRoot + "/lang/" + lang + ".yaml";
+        std::ifstream test(ovPath);
+        if (test.good()) basePath = ovPath;
+      }
     }
     if (basePath.empty()) {
-      basePath = h->packDir + "/lang/" + lang + ".yaml";
+      std::string root = findRoot(h->packDir);
+      if (!root.empty()) basePath = root + "/lang/" + lang + ".yaml";
     }
   } else {
-    return nullptr;  // unsupported domain
+    return nullptr;
   }
 
   // Verify file exists.
