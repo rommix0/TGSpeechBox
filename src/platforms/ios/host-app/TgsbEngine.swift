@@ -443,14 +443,10 @@ class TgsbEngine: ObservableObject {
         return url
     }
 
-    /// Import a YAML file as the language pack for `langTag`.
+    /// Import a YAML file's settings into the language pack for `langTag`.
+    /// Only the settings: block is imported as per-key overrides —
+    /// normalization rules, allophone rules, etc. are skipped.
     /// Returns a status message string.
-    ///
-    /// NOTE: iOS packs live in the read-only app bundle.  This import saves
-    /// the file to the app group container for future use, but the C engine
-    /// currently loads from the bundle path.  A future C-level change to
-    /// check an override directory will make this fully functional.
-    /// For now, import still applies the settings portion via overrides.
     func importPackYaml(langTag: String, from url: URL) -> String {
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
@@ -465,23 +461,104 @@ class TgsbEngine: ObservableObject {
             return "This looks like a phonemes file, not a language pack."
         }
 
-        // Save to app group container for future override-directory support.
-        if let containerURL = FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: kAppGroupId) {
-            let packDir = containerURL.appendingPathComponent("packs/lang", isDirectory: true)
-            try? FileManager.default.createDirectory(at: packDir, withIntermediateDirectories: true)
-            let destURL = packDir.appendingPathComponent("\(langTag).yaml")
-            try? content.write(to: destURL, atomically: true, encoding: .utf8)
+        let settings = extractSettingsFromYaml(content)
+        if settings.isEmpty {
+            return "No settings found in file"
         }
 
-        // Clear existing overrides — imported file is the new base.
+        // Clear existing overrides and apply imported settings.
+        guard let eng = engine else { return "Engine not started" }
         let d = UserDefaults(suiteName: kAppGroupId)
         d?.removeObject(forKey: "pack_overrides_\(langTag)")
         d?.synchronize()
 
+        for (key, value) in settings {
+            tgsb_set_data(eng, TGSB_DATA_SETTINGS, langTag, key, value)
+        }
+        saveOverrides(langTag: langTag, overrides: settings)
+
         reloadCurrentLanguage()
         loadEditorSettings(langTag: langTag)
-        return "Imported into \(langTag)"
+        return "Imported \(settings.count) settings into \(langTag)"
+    }
+
+    /// Parse a YAML file and extract the settings: block as flat dot-notation
+    /// key-value pairs. Handles up to 3 levels of nesting.
+    private func extractSettingsFromYaml(_ yaml: String) -> [String: String] {
+        var result: [String: String] = [:]
+        let lines = yaml.components(separatedBy: .newlines)
+        var inSettings = false
+        var keyStack: [(Int, String)] = []  // (indent, key)
+
+        for line in lines {
+            let trimmed = line.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
+            if trimmed.isEmpty || trimmed.trimmingCharacters(in: .whitespaces).hasPrefix("#") { continue }
+
+            let stripped = trimmed.drop(while: { $0 == " " })
+            let indent = trimmed.count - stripped.count
+
+            // Detect top-level blocks.
+            if indent == 0 && trimmed.contains(":") {
+                let topKey = String(trimmed.prefix(while: { $0 != ":" })).trimmingCharacters(in: .whitespaces)
+                inSettings = (topKey == "settings")
+                keyStack.removeAll()
+                continue
+            }
+
+            if !inSettings { continue }
+
+            guard let colonRange = trimmed.range(of: ":") else { continue }
+            let colonPos = trimmed.distance(from: trimmed.startIndex, to: colonRange.lowerBound)
+
+            var key = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: indent)..<colonRange.lowerBound])
+                .trimmingCharacters(in: .whitespaces)
+            // Unquote.
+            if key.hasPrefix("\"") && key.hasSuffix("\"") && key.count >= 2 {
+                key = String(key.dropFirst().dropLast())
+            }
+
+            var afterColon = String(trimmed[trimmed.index(after: colonRange.lowerBound)...])
+                .trimmingCharacters(in: .whitespaces)
+            // Strip inline comments.
+            if let hashRange = afterColon.range(of: " #") {
+                afterColon = String(afterColon[..<hashRange.lowerBound])
+                    .trimmingCharacters(in: .whitespaces)
+            }
+
+            // Pop keyStack to current indent level.
+            while let last = keyStack.last, last.0 >= indent {
+                keyStack.removeLast()
+            }
+
+            if afterColon.isEmpty {
+                // Parent key — push to stack.
+                keyStack.append((indent, key))
+            } else {
+                // Leaf value — build dot-notation key.
+                let prefix = keyStack.map { $0.1 }.joined(separator: ".")
+                let fullKey = prefix.isEmpty ? key : "\(prefix).\(key)"
+                var value = afterColon
+                if value.hasPrefix("\"") && value.hasSuffix("\"") && value.count >= 2 {
+                    value = String(value.dropFirst().dropLast())
+                }
+                result[fullKey] = value
+            }
+        }
+        return result
+    }
+
+    /// Save pack overrides for a language tag.
+    private func saveOverrides(langTag: String, overrides: [String: String]) {
+        let d = UserDefaults(suiteName: kAppGroupId)
+        if overrides.isEmpty {
+            d?.removeObject(forKey: "pack_overrides_\(langTag)")
+        } else if let data = try? JSONSerialization.data(withJSONObject: overrides),
+                  let json = String(data: data, encoding: .utf8) {
+            d?.set(json, forKey: "pack_overrides_\(langTag)")
+        }
+        let ver = (d?.integer(forKey: "adv_settingsVersion") ?? 0) + 1
+        d?.set(ver, forKey: "adv_settingsVersion")
+        d?.synchronize()
     }
 
     /// Path to the pack YAML file — checks app group override first, falls back to bundle.

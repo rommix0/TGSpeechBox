@@ -1062,20 +1062,84 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
             return false
         }
 
-        try {
-            val destFile = packFileForLang(context, langTag)
-            destFile.writeText(content)
-        } catch (e: Exception) {
-            _importExportStatus.value = "Import failed: ${e.message}"
+        // Extract settings from the YAML and apply as per-key overrides.
+        // Only the settings: block is imported — normalization rules,
+        // allophone rules, etc. are skipped (they reference phonemes
+        // that may not exist in the user's phoneme table).
+        val settings = extractSettingsFromYaml(content)
+        if (settings.isEmpty()) {
+            _importExportStatus.value = "No settings found in file"
             return false
         }
 
-        // Clear overrides — imported file is the new base.
+        // Clear existing overrides and apply imported settings.
         prefs.edit().remove("pack_overrides_$langTag").apply()
+        for ((key, value) in settings) {
+            engine.setData(TgsbSpeakEngine.DATA_SETTINGS, langTag, key, value)
+        }
+        saveOverrides(langTag, settings)
         reloadCurrentLanguage()
         loadEditorSettings(langTag)
-        _importExportStatus.value = "Imported into $langTag"
+        _importExportStatus.value = "Imported ${settings.size} settings into $langTag"
         return true
+    }
+
+    /**
+     * Parse a YAML file and extract the settings: block as flat dot-notation
+     * key-value pairs. Handles up to 3 levels of nesting.
+     * Ignores normalization, transforms, allophone rules, etc.
+     */
+    private fun extractSettingsFromYaml(yaml: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val lines = yaml.lines()
+        var inSettings = false
+        val keyStack = mutableListOf<Pair<Int, String>>()  // (indent, key)
+
+        for (line in lines) {
+            val trimmed = line.trimEnd()
+            if (trimmed.isEmpty() || trimmed.trimStart().startsWith("#")) continue
+
+            val indent = trimmed.length - trimmed.trimStart().length
+
+            // Detect top-level blocks.
+            if (indent == 0 && trimmed.contains(":")) {
+                val topKey = trimmed.substringBefore(":").trim()
+                inSettings = (topKey == "settings")
+                keyStack.clear()
+                continue
+            }
+
+            if (!inSettings) continue
+
+            // Settings line: parse key: value at this indent level.
+            val colonPos = trimmed.indexOf(":")
+            if (colonPos < 0) continue
+
+            val key = trimmed.substring(indent, colonPos).trim()
+                .removeSurrounding("\"")
+            val afterColon = trimmed.substring(colonPos + 1).trim()
+                .let { v -> // strip inline comments
+                    val hashPos = v.indexOf(" #")
+                    if (hashPos >= 0) v.substring(0, hashPos).trim() else v
+                }
+
+            // Pop keyStack to current indent level.
+            while (keyStack.isNotEmpty() && keyStack.last().first >= indent) {
+                keyStack.removeAt(keyStack.size - 1)
+            }
+
+            if (afterColon.isEmpty()) {
+                // This is a parent key (e.g. "boundarySmoothing:") — push to stack.
+                keyStack.add(indent to key)
+            } else {
+                // This is a leaf value — build the dot-notation key.
+                val prefix = keyStack.joinToString(".") { it.second }
+                val fullKey = if (prefix.isEmpty()) key else "$prefix.$key"
+                val value = afterColon.removeSurrounding("\"")
+                result[fullKey] = value
+            }
+        }
+        return result
     }
 
     // ── Phoneme overrides import / export ────────────────────────────
