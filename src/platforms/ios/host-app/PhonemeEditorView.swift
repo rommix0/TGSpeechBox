@@ -62,10 +62,12 @@ struct PhonemeListView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.body)
                 }
-                .accessibilityElement()
                 .accessibilityLabel("More options")
+#if os(iOS)
+                .accessibilityElement()
                 .accessibilityAddTraits(.isButton)
                 .accessibilityHint("Double tap to show actions")
+#endif
             }
             .padding(.horizontal)
             .padding(.top, 8)
