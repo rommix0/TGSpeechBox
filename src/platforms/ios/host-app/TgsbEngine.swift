@@ -1042,9 +1042,10 @@ class TgsbEngine: ObservableObject {
         return selectedLanguage.tgsbTag
     }
 
-    func loadDictTypes() {
+    func loadDictTypes(langTag: String = "") {
         guard let eng = engine else { return }
-        guard let ptr = tgsb_query_data(eng, TGSB_DATA_DICTIONARY, "types", 0, 0) else {
+        let tag = langTag.isEmpty ? "types" : "types:\(langTag)"
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_DICTIONARY, tag, 0, 0) else {
             dictTypes = []
             return
         }

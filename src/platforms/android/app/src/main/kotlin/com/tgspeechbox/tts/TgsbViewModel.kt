@@ -746,8 +746,9 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         return languages[idx].langDef.tgsbLang
     }
 
-    fun loadDictTypes() {
-        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_DICTIONARY, "types", 0, 0) ?: run {
+    fun loadDictTypes(langTag: String = "") {
+        val tag = if (langTag.isNotEmpty()) "types:$langTag" else "types"
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_DICTIONARY, tag, 0, 0) ?: run {
             dictTypes.value = emptyList()
             return
         }

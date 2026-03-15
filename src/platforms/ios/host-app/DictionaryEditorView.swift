@@ -401,7 +401,7 @@ struct DictionaryEditorView: View {
         guard !langFilter.isEmpty, !selectedType.isEmpty else { return }
         // Cross-language browsing: C++ backend loads dict files from disk
         // for non-current languages via getDictRefs(), no language switch needed.
-        engine.loadDictTypes()
+        engine.loadDictTypes(langTag: langFilter)
         engine.loadDictionary(
             langTag: langFilter,
             subType: selectedType,

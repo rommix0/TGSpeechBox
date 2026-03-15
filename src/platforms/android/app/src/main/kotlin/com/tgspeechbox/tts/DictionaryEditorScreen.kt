@@ -156,6 +156,11 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
         }
     }
 
+    // Reload types and entries when language changes
+    LaunchedEffect(langFilter) {
+        if (langFilter.isNotEmpty()) viewModel.loadDictTypes(langFilter)
+    }
+
     // Reload entries when type, language, or active search changes
     LaunchedEffect(selectedType, langFilter, activeSearch) {
         if (selectedType.isNotEmpty() && langFilter.isNotEmpty()) {
