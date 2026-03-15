@@ -16,8 +16,8 @@ if(NOT WIN32 AND NOT ANDROID)
 endif()
 
 # --- libtgsbFrontend.a (IPA -> Frames) ---
-file(GLOB FRONTEND_CPP "${TGSB_DIR}/src/frontend/*.cpp")
-file(GLOB PASSES_CPP "${TGSB_DIR}/src/frontend/passes/*.cpp")
+file(GLOB FRONTEND_CPP CONFIGURE_DEPENDS "${TGSB_DIR}/src/frontend/*.cpp")
+file(GLOB PASSES_CPP CONFIGURE_DEPENDS "${TGSB_DIR}/src/frontend/passes/*.cpp")
 
 add_library(tgsbFrontend_static STATIC ${FRONTEND_CPP} ${PASSES_CPP})
 target_include_directories(tgsbFrontend_static PUBLIC
