@@ -2224,6 +2224,77 @@ bool loadPackSet(
   return true;
 }
 
+void loadDictFiles(
+  const std::string& packDir,
+  const std::string& langTag,
+  std::unordered_map<std::string, std::vector<int>>& stressDict,
+  std::unordered_map<std::string, std::vector<std::string>>& compoundMap,
+  PronDict& pronDict,
+  std::unordered_map<std::string, std::string>& letterDict,
+  const std::string& overrideDir)
+{
+  namespace fs = std::filesystem;
+  // packDir may be either the parent containing "packs/" or the packs dir itself.
+  const fs::path candidate = fs::path(packDir) / "packs";
+  const fs::path packsRoot = fs::exists(candidate) ? candidate : fs::path(packDir);
+  const std::string tag = normalizeLangTag(langTag);
+  const auto dash = tag.find('-');
+  const std::string baseTag = (dash != std::string::npos) ? tag.substr(0, dash) : "";
+
+  // Stress dict.
+  {
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path p = fs::path(overrideDir) / "packs" / "dict" / (tag + "-stress.tsv");
+      if (fs::exists(p)) { loadStressDict(p.string(), stressDict); loaded = true; }
+    }
+    if (!loaded) {
+      loadStressDict((packsRoot / "dict" / (tag + "-stress.tsv")).string(), stressDict);
+      if (stressDict.empty() && !baseTag.empty())
+        loadStressDict((packsRoot / "dict" / (baseTag + "-stress.tsv")).string(), stressDict);
+    }
+  }
+  // Compound map.
+  {
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path p = fs::path(overrideDir) / "packs" / "dict" / (tag + "-compounds.tsv");
+      if (fs::exists(p)) { loadCompoundMap(p.string(), compoundMap); loaded = true; }
+    }
+    if (!loaded) {
+      loadCompoundMap((packsRoot / "dict" / (tag + "-compounds.tsv")).string(), compoundMap);
+      if (compoundMap.empty() && !baseTag.empty())
+        loadCompoundMap((packsRoot / "dict" / (baseTag + "-compounds.tsv")).string(), compoundMap);
+    }
+  }
+  // Pronunciation dict.
+  {
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path p = fs::path(overrideDir) / "packs" / "dict" / (tag + "-dict.tsv");
+      if (fs::exists(p)) { loadPronDict(p.string(), pronDict, "main"); loaded = true; }
+    }
+    if (!loaded) {
+      loadPronDict((packsRoot / "dict" / (tag + "-dict.tsv")).string(), pronDict, "main");
+      if (pronDict.entries.empty() && !baseTag.empty())
+        loadPronDict((packsRoot / "dict" / (baseTag + "-dict.tsv")).string(), pronDict, "main");
+    }
+  }
+  // Letter/character dict.
+  {
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path p = fs::path(overrideDir) / "packs" / "dict" / (tag + "-letters.tsv");
+      if (fs::exists(p)) { loadLetterDict(p.string(), letterDict); loaded = true; }
+    }
+    if (!loaded) {
+      loadLetterDict((packsRoot / "dict" / (tag + "-letters.tsv")).string(), letterDict);
+      if (letterDict.empty() && !baseTag.empty())
+        loadLetterDict((packsRoot / "dict" / (baseTag + "-letters.tsv")).string(), letterDict);
+    }
+  }
+}
+
 bool hasPhoneme(const PackSet& pack, const std::u32string& key) {
   return pack.phonemes.find(key) != pack.phonemes.end();
 }

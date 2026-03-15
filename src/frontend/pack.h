@@ -1303,6 +1303,19 @@ bool loadPackSet(
   const std::string& overrideDir = ""
 );
 
+// Load only dictionary files for a language (stress, compound, pronDict, letterDict).
+// Much lighter than loadPackSet — skips YAML, phonemes, voice profiles.
+// Used for cross-language dictionary browsing without switching engine language.
+void loadDictFiles(
+  const std::string& packDir,
+  const std::string& langTag,
+  std::unordered_map<std::string, std::vector<int>>& stressDict,
+  std::unordered_map<std::string, std::vector<std::string>>& compoundMap,
+  PronDict& pronDict,
+  std::unordered_map<std::string, std::string>& letterDict,
+  const std::string& overrideDir = ""
+);
+
 // Utility: does this pack contain a phoneme key?
 bool hasPhoneme(const PackSet& pack, const std::u32string& key);
 

@@ -75,13 +75,15 @@ struct DataCache {
 
   std::vector<DictRecord> dictionary;
   bool dictionaryValid = false;
-  std::string dictionarySubType;  // "", "stress", or "compound"
+  std::string dictionarySubType;  // "", "stress", "compound", or "character"
+  std::string dictionaryLangTag;  // which language the cache was built for
 
   void invalidate() {
     settingsValid = false;
     phonemesValid = false;
     dictionaryValid = false;
     dictionarySubType.clear();
+    dictionaryLangTag.clear();
   }
 };
 

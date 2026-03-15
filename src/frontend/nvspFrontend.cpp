@@ -58,6 +58,17 @@ struct Handle {
   // Per-language disabled dictionary types (e.g., {"en-us": {"stress", "compound"}}).
   // Set via setData(DICTIONARY, "config:langTag", type, "false"/"true").
   std::unordered_map<std::string, std::unordered_set<std::string>> disabledDictTypes;
+
+  // Temporary dict data for cross-language browsing (when lang != langTag).
+  // Loaded on demand via loadDictFiles(), cached until lang changes.
+  struct CrossLangDicts {
+    std::string lang;  // which language this was loaded for
+    std::unordered_map<std::string, std::vector<int>> stressDict;
+    std::unordered_map<std::string, std::vector<std::string>> compoundMap;
+    PronDict pronDict;
+    std::unordered_map<std::string, std::string> letterDict;
+  };
+  std::unique_ptr<CrossLangDicts> crossLangDicts;
   
   // Per-handle trajectory limiting state for formant smoothing.
   // This is NOT static - each handle has its own state to avoid data races
@@ -1324,6 +1335,35 @@ static void parseDictLangTag(const char* langTagUtf8,
   }
 }
 
+// Helper: get dict data for a language, loading from disk if needed for
+// cross-language browsing.  Returns pointers to the appropriate dicts.
+struct DictRefs {
+  const std::unordered_map<std::string, std::vector<int>>* stressDict;
+  const std::unordered_map<std::string, std::vector<std::string>>* compoundMap;
+  const nvsp_frontend::PronDict* pronDict;
+  const std::unordered_map<std::string, std::string>* letterDict;
+};
+
+static DictRefs getDictRefs(nvsp_frontend::Handle* h, const std::string& lang) {
+  using namespace nvsp_frontend;
+  if (lang.empty() || lang == h->langTag) {
+    return { &h->pack.stressDict, &h->pack.compoundMap,
+             &h->pack.pronDict, &h->pack.letterDict };
+  }
+  if (!h->crossLangDicts || h->crossLangDicts->lang != lang) {
+    h->crossLangDicts = std::make_unique<Handle::CrossLangDicts>();
+    h->crossLangDicts->lang = lang;
+    loadDictFiles(h->packDir, lang,
+                  h->crossLangDicts->stressDict,
+                  h->crossLangDicts->compoundMap,
+                  h->crossLangDicts->pronDict,
+                  h->crossLangDicts->letterDict,
+                  h->overrideDir);
+  }
+  return { &h->crossLangDicts->stressDict, &h->crossLangDicts->compoundMap,
+           &h->crossLangDicts->pronDict, &h->crossLangDicts->letterDict };
+}
+
 NVSP_FRONTEND_API int nvspFrontend_getDataCount(
   nvspFrontend_handle_t handle,
   int domain,
@@ -1367,39 +1407,35 @@ NVSP_FRONTEND_API int nvspFrontend_getDataCount(
       return 4;
     }
 
-    if (subType == "character") {
-      if (search.empty()) return static_cast<int>(h->pack.letterDict.size());
-      if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != "character") {
-        tgsb_data::buildCharacterDictCache(h->dataCache, h->pack.letterDict);
-        h->dataCache.dictionarySubType = "character";
+    auto refs = getDictRefs(h, lang);
+    std::string effectiveSub = subType.empty() ? "" : subType;
+
+    // Fast path: no search, just return size.
+    if (search.empty()) {
+      if (subType == "character") return static_cast<int>(refs.letterDict->size());
+      if (subType == "stress")   return static_cast<int>(refs.stressDict->size());
+      if (subType == "compound") return static_cast<int>(refs.compoundMap->size());
+      // pronDict
+      if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != effectiveSub ||
+          h->dataCache.dictionaryLangTag != lang) {
+        tgsb_data::buildDictionaryCache(h->dataCache, *refs.pronDict);
+        h->dataCache.dictionarySubType = effectiveSub;
+        h->dataCache.dictionaryLangTag = lang;
       }
-      return tgsb_data::countDictionaryMatches(h->dataCache, search);
-    }
-    if (subType == "stress") {
-      if (search.empty()) return static_cast<int>(h->pack.stressDict.size());
-      // Build cache for search counting.
-      if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != "stress") {
-        tgsb_data::buildStressDictCache(h->dataCache, h->pack.stressDict);
-        h->dataCache.dictionarySubType = "stress";
-      }
-      return tgsb_data::countDictionaryMatches(h->dataCache, search);
-    }
-    if (subType == "compound") {
-      if (search.empty()) return static_cast<int>(h->pack.compoundMap.size());
-      if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != "compound") {
-        tgsb_data::buildCompoundDictCache(h->dataCache, h->pack.compoundMap);
-        h->dataCache.dictionarySubType = "compound";
-      }
-      return tgsb_data::countDictionaryMatches(h->dataCache, search);
+      return static_cast<int>(h->dataCache.dictionary.size());
     }
 
-    // Default: pronDict (backward compatible).
-    if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != "") {
-      tgsb_data::buildDictionaryCache(h->dataCache, h->pack.pronDict);
-      h->dataCache.dictionarySubType = "";
+    // Search path: build cache if needed, then count matches.
+    if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != effectiveSub ||
+        h->dataCache.dictionaryLangTag != lang) {
+      if (subType == "character") tgsb_data::buildCharacterDictCache(h->dataCache, *refs.letterDict);
+      else if (subType == "stress") tgsb_data::buildStressDictCache(h->dataCache, *refs.stressDict);
+      else if (subType == "compound") tgsb_data::buildCompoundDictCache(h->dataCache, *refs.compoundMap);
+      else tgsb_data::buildDictionaryCache(h->dataCache, *refs.pronDict);
+      h->dataCache.dictionarySubType = effectiveSub;
+      h->dataCache.dictionaryLangTag = lang;
     }
-    if (!search.empty()) return tgsb_data::countDictionaryMatches(h->dataCache, search);
-    return static_cast<int>(h->dataCache.dictionary.size());
+    return tgsb_data::countDictionaryMatches(h->dataCache, search);
   }
 
   // Unsupported domain.
@@ -1478,25 +1514,18 @@ NVSP_FRONTEND_API char* nvspFrontend_queryData(
     }
 
     if (subType == "types") {
-      // Return JSON array of available dict types with counts.
+      // Return JSON array of available dict types with counts for requested lang.
+      auto refs = getDictRefs(h, lang);
       std::string json = "[";
-      bool first = true;
-      // Always include character (users can add overrides even if no base file).
       json += "{\"type\":\"character\",\"count\":";
-      json += std::to_string(h->pack.letterDict.size());
-      json += '}';
-      first = false;
-      // Always include all types so users can add overrides for any language.
-      json += ",{\"type\":\"compound\",\"count\":";
-      json += std::to_string(h->pack.compoundMap.size());
-      json += '}';
-      json += ",{\"type\":\"pronounce\",\"count\":";
-      json += std::to_string(h->pack.pronDict.entries.size());
-      json += '}';
-      json += ",{\"type\":\"stress\",\"count\":";
-      json += std::to_string(h->pack.stressDict.size());
-      json += '}';
-      json += ']';
+      json += std::to_string(refs.letterDict->size());
+      json += "},{\"type\":\"compound\",\"count\":";
+      json += std::to_string(refs.compoundMap->size());
+      json += "},{\"type\":\"pronounce\",\"count\":";
+      json += std::to_string(refs.pronDict->entries.size());
+      json += "},{\"type\":\"stress\",\"count\":";
+      json += std::to_string(refs.stressDict->size());
+      json += "}]";
 
       char* out = static_cast<char*>(std::malloc(json.size() + 1));
       if (!out) return nullptr;
@@ -1504,19 +1533,17 @@ NVSP_FRONTEND_API char* nvspFrontend_queryData(
       return out;
     }
 
-    // Rebuild cache if invalid or sub-type changed.
+    // Rebuild cache if invalid, sub-type changed, or language changed.
+    auto refs = getDictRefs(h, lang);
     std::string effectiveSubType = subType.empty() ? "" : subType;
-    if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != effectiveSubType) {
-      if (subType == "stress") {
-        tgsb_data::buildStressDictCache(h->dataCache, h->pack.stressDict);
-      } else if (subType == "compound") {
-        tgsb_data::buildCompoundDictCache(h->dataCache, h->pack.compoundMap);
-      } else if (subType == "character") {
-        tgsb_data::buildCharacterDictCache(h->dataCache, h->pack.letterDict);
-      } else {
-        tgsb_data::buildDictionaryCache(h->dataCache, h->pack.pronDict);
-      }
+    if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != effectiveSubType ||
+        h->dataCache.dictionaryLangTag != lang) {
+      if (subType == "stress") tgsb_data::buildStressDictCache(h->dataCache, *refs.stressDict);
+      else if (subType == "compound") tgsb_data::buildCompoundDictCache(h->dataCache, *refs.compoundMap);
+      else if (subType == "character") tgsb_data::buildCharacterDictCache(h->dataCache, *refs.letterDict);
+      else tgsb_data::buildDictionaryCache(h->dataCache, *refs.pronDict);
       h->dataCache.dictionarySubType = effectiveSubType;
+      h->dataCache.dictionaryLangTag = lang;
     }
 
     std::string json = tgsb_data::serializeDictionaryJson(h->dataCache, offset, limit, search);
