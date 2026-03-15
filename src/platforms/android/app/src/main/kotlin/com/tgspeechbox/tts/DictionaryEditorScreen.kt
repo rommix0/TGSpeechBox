@@ -656,6 +656,13 @@ private fun DictAddDialog(
     var fromText by rememberSaveable { mutableStateOf("") }
     var toText by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("") }
+    var caseSensitive by rememberSaveable { mutableStateOf(false) }
+
+    // On save: lowercase the word if case-sensitive is off (default).
+    val finalFromText = {
+        val w = fromText.trim()
+        if (!caseSensitive && dictType == "pronounce") w.lowercase() else w
+    }
 
     val title = "Add Entry"
     val toLabel: String
@@ -724,11 +731,20 @@ private fun DictAddDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+                if (dictType == "pronounce") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Match capitalization", modifier = Modifier.weight(1f))
+                        Switch(checked = caseSensitive, onCheckedChange = { caseSensitive = it })
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(fromText.trim(), toText.trim(), category.trim()) },
+                onClick = { onConfirm(finalFromText(), toText.trim(), category.trim()) },
                 enabled = fromText.isNotBlank() && toText.isNotBlank()
             ) { Text("Save") }
         },
@@ -748,6 +764,10 @@ private fun DictEditDialog(
     var fromText by rememberSaveable { mutableStateOf(entry.fromText) }
     var toText by rememberSaveable { mutableStateOf(entry.toText) }
     var category by rememberSaveable { mutableStateOf(entry.category) }
+    // Default case-sensitive ON if the existing entry has uppercase chars.
+    var caseSensitive by rememberSaveable {
+        mutableStateOf(entry.fromText != entry.fromText.lowercase())
+    }
 
     val title = "Edit Entry"
     val toLabel: String
@@ -802,11 +822,24 @@ private fun DictEditDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+                if (dictType == "pronounce") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Match capitalization", modifier = Modifier.weight(1f))
+                        Switch(checked = caseSensitive, onCheckedChange = { caseSensitive = it })
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(fromText.trim(), toText.trim(), category.trim()) },
+                onClick = {
+                    val word = if (!caseSensitive && dictType == "pronounce")
+                        fromText.trim().lowercase() else fromText.trim()
+                    onConfirm(word, toText.trim(), category.trim())
+                },
                 enabled = fromText.isNotBlank() && toText.isNotBlank()
             ) { Text("Save") }
         },

@@ -532,6 +532,7 @@ private struct DictEntrySheet: View {
     @State var fromText: String = ""
     @State var toText: String = ""
     @State var category: String = ""
+    @State var caseSensitive: Bool = false
     var isEdit: Bool = false
     let onSave: (String, String, String) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -545,6 +546,7 @@ private struct DictEntrySheet: View {
         self._fromText = State(initialValue: initialFrom)
         self._toText = State(initialValue: initialTo)
         self._category = State(initialValue: initialCategory)
+        self._caseSensitive = State(initialValue: initialFrom != initialFrom.lowercased())
         self.isEdit = isEdit
         self.onSave = onSave
     }
@@ -580,9 +582,8 @@ private struct DictEntrySheet: View {
             Form {
                 Section(fromLabel) {
                     TextField(fromLabel, text: $fromText)
-                        .disabled(isEdit)
                         .autocorrectionDisabled()
-                        .accessibilityLabel(isEdit ? "\(fromLabel), \(fromText)" : fromLabel)
+                        .accessibilityLabel(fromLabel)
                         .onChange(of: fromText) { newValue in
                             if dictType == "character" {
                                 let stripped = newValue.replacingOccurrences(of: " ", with: "")
@@ -605,6 +606,11 @@ private struct DictEntrySheet: View {
                             .autocorrectionDisabled()
                     }
                 }
+                if dictType == "pronounce" {
+                    Section {
+                        Toggle("Match capitalization", isOn: $caseSensitive)
+                    }
+                }
             }
             .navigationTitle(title)
 #if os(iOS)
@@ -616,8 +622,12 @@ private struct DictEntrySheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        var word = fromText.trimmingCharacters(in: .whitespaces)
+                        if !caseSensitive && dictType == "pronounce" {
+                            word = word.lowercased()
+                        }
                         onSave(
-                            fromText.trimmingCharacters(in: .whitespaces),
+                            word,
                             toText.trimmingCharacters(in: .whitespaces),
                             category.trimmingCharacters(in: .whitespaces)
                         )
