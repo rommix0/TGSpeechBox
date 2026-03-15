@@ -1024,20 +1024,65 @@ class TgsbEngine: ObservableObject {
         let masked: Bool
     }
 
+    struct DictType: Identifiable {
+        let id: String  // type name
+        let type: String
+        let count: Int
+    }
+
     @Published var dictionaryEntries: [DictEntry] = []
     @Published var dictionaryTotalCount: Int = 0
     @Published var dictionaryCategories: [String] = []
+    @Published var dictTypes: [DictType] = []
     private var dictLangTag: String = ""
+    private var dictSubType: String = ""
 
-    func loadDictionary(langTag: String, offset: Int = 0, limit: Int = 100) {
+    /// Returns the engine's current language tag (tgsb tag).
+    func currentEngineLangTag() -> String {
+        return selectedLanguage.tgsbTag
+    }
+
+    func loadDictTypes() {
+        guard let eng = engine else { return }
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_DICTIONARY, "types", 0, 0) else {
+            dictTypes = []
+            return
+        }
+        let jsonStr = String(cString: ptr)
+        tgsb_free_string(ptr)
+        guard let data = jsonStr.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else {
+            dictTypes = []
+            return
+        }
+        dictTypes = arr.compactMap { obj in
+            guard let type = obj["type"] as? String,
+                  let count = obj["count"] as? Int else { return nil }
+            return DictType(id: type, type: type, count: count)
+        }
+    }
+
+    /// Build prefixed langTag: "stress:en-us" or just "en-us" for pronounce.
+    private func prefixedLangTag(_ subType: String, _ langTag: String) -> String {
+        if subType.isEmpty || subType == "pronounce" { return langTag }
+        return "\(subType):\(langTag)"
+    }
+
+    func loadDictionary(langTag: String, subType: String = "", offset: Int = 0,
+                        limit: Int = 100, search: String = "", append: Bool = false) {
         guard let eng = engine else { return }
         dictLangTag = langTag
+        dictSubType = subType
 
-        dictionaryTotalCount = Int(tgsb_get_data_count(eng, TGSB_DATA_DICTIONARY, langTag))
+        var tag = prefixedLangTag(subType, langTag)
+        if !search.isEmpty { tag += "?\(search)" }
 
-        guard let ptr = tgsb_query_data(eng, TGSB_DATA_DICTIONARY, langTag,
+        dictionaryTotalCount = Int(tgsb_get_data_count(eng, TGSB_DATA_DICTIONARY, tag))
+
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_DICTIONARY, tag,
                                          Int32(offset), Int32(limit)) else {
-            dictionaryEntries = []
+            if !append { dictionaryEntries = [] }
             return
         }
         let jsonStr = String(cString: ptr)
@@ -1064,38 +1109,45 @@ class TgsbEngine: ObservableObject {
             entries.append(entry)
             if !entry.category.isEmpty { cats.insert(entry.category) }
         }
-        dictionaryEntries = entries
+        if append {
+            dictionaryEntries.append(contentsOf: entries)
+        } else {
+            dictionaryEntries = entries
+        }
         dictionaryCategories = cats.sorted()
     }
 
     func addDictEntry(fromText: String, toText: String, category: String = "") {
         guard let eng = engine, !fromText.isEmpty, !toText.isEmpty else { return }
+        let tag = prefixedLangTag(dictSubType, dictLangTag)
         var dict: [String: Any] = ["toText": toText]
         if !category.isEmpty { dict["category"] = category }
         if let data = try? JSONSerialization.data(withJSONObject: dict),
            let str = String(data: data, encoding: .utf8) {
-            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, dictLangTag, fromText, str)
+            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, fromText, str)
             saveDictOverride(dictLangTag, key: fromText, value: str)
         }
-        loadDictionary(langTag: dictLangTag)
+        loadDictionary(langTag: dictLangTag, subType: dictSubType)
     }
 
     func maskDictEntry(fromText: String, masked: Bool) {
         guard let eng = engine else { return }
+        let tag = prefixedLangTag(dictSubType, dictLangTag)
         let dict: [String: Any] = ["masked": masked]
         if let data = try? JSONSerialization.data(withJSONObject: dict),
            let str = String(data: data, encoding: .utf8) {
-            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, dictLangTag, fromText, str)
+            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, fromText, str)
             saveDictOverride(dictLangTag, key: fromText, value: str)
         }
-        loadDictionary(langTag: dictLangTag)
+        loadDictionary(langTag: dictLangTag, subType: dictSubType)
     }
 
     func deleteDictEntry(fromText: String) {
         guard let eng = engine else { return }
-        tgsb_set_data(eng, TGSB_DATA_DICTIONARY, dictLangTag, fromText, "")
+        let tag = prefixedLangTag(dictSubType, dictLangTag)
+        tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, fromText, "")
         removeDictOverride(dictLangTag, key: fromText)
-        loadDictionary(langTag: dictLangTag)
+        loadDictionary(langTag: dictLangTag, subType: dictSubType)
     }
 
     // ── Dictionary override persistence ────────────────────────────

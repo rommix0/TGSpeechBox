@@ -104,6 +104,17 @@ struct PhonemeListView: View {
                         }
                         return desc
                     }())
+                    .accessibilityAction(named: "Play phoneme") {
+                        engine.previewPhoneme(entry.key)
+                    }
+                    .accessibilityAction(named: "Copy phoneme") {
+#if os(iOS)
+                        UIPasteboard.general.string = entry.key
+#elseif os(macOS)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(entry.key, forType: .string)
+#endif
+                    }
                     .contextMenu {
                         Button(action: { engine.previewPhoneme(entry.key) }) {
                             Label("Play phoneme", systemImage: "play.fill")

@@ -27,7 +27,7 @@ struct PackEditorView: View {
                 Picker("", selection: $selectedTab) {
                     Text("Packs").tag(0)
                     Text("Phonemes").tag(1)
-                    Text("Words").tag(2)
+                    Text("Pronounce").tag(2)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
@@ -147,7 +147,7 @@ private struct PackSettingsListView: View {
 
             // Import / Export actions
             HStack(spacing: 12) {
-                Button("Import") { showImportPicker = true }
+                Button("Import Settings") { showImportPicker = true }
                     .buttonStyle(.bordered)
                 Button("Export") { showExportPicker = true }
                     .buttonStyle(.bordered)
@@ -241,7 +241,7 @@ private struct PackSettingsListView: View {
                 statusMessage = "Export failed: \(error.localizedDescription)"
             }
         }
-        .alert("Import Pack", isPresented: $showImportConfirm) {
+        .alert("Import Settings", isPresented: $showImportConfirm) {
             Button("Import") {
                 if let url = pendingImportURL {
                     statusMessage = engine.importPackYaml(langTag: langTag, from: url)
@@ -250,7 +250,7 @@ private struct PackSettingsListView: View {
             }
             Button("Cancel", role: .cancel) { pendingImportURL = nil }
         } message: {
-            Text("Replace the \(langTag) language pack with the selected file? Any existing overrides will be cleared.")
+            Text("Import pack settings for \(langTag) from the selected file? This imports settings only, not the full language pack.")
         }
         .alert("Result", isPresented: Binding(
             get: { statusMessage != nil },
