@@ -718,6 +718,11 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Dictionary editor ─────────────────────────────────────────────
 
+    data class DictType(
+        val type: String,    // "compound", "pronounce", "stress"
+        val count: Int
+    )
+
     data class DictEntry(
         val fromText: String,
         val toText: String,
@@ -728,16 +733,58 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         val masked: Boolean = false
     )
 
+    val dictTypes = MutableStateFlow<List<DictType>>(emptyList())
     val dictionaryEntries = MutableStateFlow<List<DictEntry>>(emptyList())
     val dictionaryTotalCount = MutableStateFlow(0)
     val dictionaryCategories = MutableStateFlow<List<String>>(emptyList())
     private var dictLangTag: String = ""
+    private var dictSubType: String = ""
 
-    fun loadDictionary(langTag: String, offset: Int = 0, limit: Int = 100) {
+    /** Returns the current engine language tag (e.g. "en-us"). */
+    fun currentEngineLangTag(): String {
+        val idx = selectedLanguageIndex.value.coerceIn(0, languages.size - 1)
+        return languages[idx].langDef.tgsbLang
+    }
+
+    fun loadDictTypes() {
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_DICTIONARY, "types", 0, 0) ?: run {
+            dictTypes.value = emptyList()
+            return
+        }
+        try {
+            val arr = org.json.JSONArray(jsonStr)
+            val types = mutableListOf<DictType>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                types.add(DictType(
+                    type = obj.optString("type", ""),
+                    count = obj.optInt("count", 0)
+                ))
+            }
+            dictTypes.value = types
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse dict types: ${e.message}")
+            dictTypes.value = emptyList()
+        }
+    }
+
+    /**
+     * Build the prefixed langTag for the data query API.
+     * "pronounce" type uses bare langTag, others use "type:langTag".
+     */
+    private fun prefixedLangTag(subType: String, langTag: String): String {
+        return if (subType.isEmpty() || subType == "pronounce") langTag
+        else "$subType:$langTag"
+    }
+
+    fun loadDictionary(langTag: String, subType: String = "", offset: Int = 0, limit: Int = 100, append: Boolean = false, search: String = "") {
         dictLangTag = langTag
-        dictionaryTotalCount.value = engine.getDataCount(TgsbSpeakEngine.DATA_DICTIONARY, langTag)
-        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_DICTIONARY, langTag, offset, limit) ?: run {
-            dictionaryEntries.value = emptyList()
+        dictSubType = subType
+        val prefixed = prefixedLangTag(subType, langTag) +
+            if (search.isNotEmpty()) "?$search" else ""
+        dictionaryTotalCount.value = engine.getDataCount(TgsbSpeakEngine.DATA_DICTIONARY, prefixed)
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, offset, limit) ?: run {
+            if (!append) dictionaryEntries.value = emptyList()
             return
         }
         val arr = org.json.JSONArray(jsonStr)
@@ -757,34 +804,41 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
             entries.add(entry)
             if (entry.category.isNotEmpty()) cats.add(entry.category)
         }
-        dictionaryEntries.value = entries
+        if (append) {
+            dictionaryEntries.value = dictionaryEntries.value + entries
+        } else {
+            dictionaryEntries.value = entries
+        }
         dictionaryCategories.value = cats.sorted()
     }
 
     fun addDictEntry(fromText: String, toText: String, category: String = "") {
         if (fromText.isBlank() || toText.isBlank()) return
+        val prefixed = prefixedLangTag(dictSubType, dictLangTag)
         val json = org.json.JSONObject().apply {
             put("toText", toText)
-            put("category", category)
+            if (category.isNotEmpty()) put("category", category)
         }
-        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, dictLangTag, fromText, json.toString())
-        saveDictOverride(dictLangTag, fromText, json.toString())
-        loadDictionary(dictLangTag)
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, json.toString())
+        saveDictOverride(prefixed, fromText, json.toString())
+        loadDictionary(dictLangTag, dictSubType)
     }
 
     fun maskDictEntry(fromText: String, masked: Boolean) {
+        val prefixed = prefixedLangTag(dictSubType, dictLangTag)
         val json = org.json.JSONObject().apply {
             put("masked", masked)
         }
-        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, dictLangTag, fromText, json.toString())
-        saveDictOverride(dictLangTag, fromText, json.toString())
-        loadDictionary(dictLangTag)
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, json.toString())
+        saveDictOverride(prefixed, fromText, json.toString())
+        loadDictionary(dictLangTag, dictSubType)
     }
 
     fun deleteDictEntry(fromText: String) {
-        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, dictLangTag, fromText, "")
-        removeDictOverride(dictLangTag, fromText)
-        loadDictionary(dictLangTag)
+        val prefixed = prefixedLangTag(dictSubType, dictLangTag)
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, "")
+        removeDictOverride(prefixed, fromText)
+        loadDictionary(dictLangTag, dictSubType)
     }
 
     private fun loadDictOverrides(langTag: String): Map<String, String> {
