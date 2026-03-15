@@ -5074,6 +5074,8 @@ phonemes:
     # Spanish velar approximant [ɣ̞]. Voiced continuant, not a full fricative.
     # Raised voicing to 0.80, cf3 raised to 2500 (was 1500 — unnaturally low).
     # Light frication for velar coloring.
+    # cf2 raised 1200→1350: old value was too back, creating /u/-like percept
+    # before front vowels (issue #53: "siguiente" heard as "sigüiente").
     _isAfricate: false
     _isLiquid: false
     _isNasal: false
@@ -5091,7 +5093,7 @@ phonemes:
     cbN0: 100
     cbNP: 100
     cf1: 450
-    cf2: 1200
+    cf2: 1350
     cf3: 2500
     cf4: 3300
     cf5: 3750
@@ -7190,6 +7192,8 @@ phonemes:
     # by singleWordFinalHold and sounds nasal (voiced alveolar closure
     # with no release ≈ /n/). This allophone adds fricationAmplitude
     # for a tongue-flick release and raises cf2 to push away from /n/.
+    # cf1 raised 220→340: 220 was in nasal F1 territory (issue #53).
+    # fricationAmplitude 0.03→0.05: slightly more audible tongue-flick.
     _isLiquid: false
     _isNasal: false
     _isSemivowel: false
@@ -7207,7 +7211,7 @@ phonemes:
     cb6: 1400
     cbN0: 100
     cbNP: 100
-    cf1: 220
+    cf1: 340
     cf2: 1720
     cf3: 2600
     cf4: 3300
@@ -7215,7 +7219,7 @@ phonemes:
     cf6: 4900
     cfN0: 250
     cfNP: 200
-    fricationAmplitude: 0.03
+    fricationAmplitude: 0.05
     pa1: 0
     pa2: 0.22
     pa3: 0.22

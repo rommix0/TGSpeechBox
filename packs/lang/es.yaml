@@ -297,9 +297,10 @@ normalization:
       to: "sᵊɡ"
     - from: "sɣ"
       to: "sᵊɣ"
-    # Velar + lateral (regla = /reɣla/)
+    # Velar + lateral (regla = /reɣla/): use full stop [ɡ] in pre-lateral
+    # clusters — Spanish /ɡ/ stays a stop before liquids, never approximant.
     - from: "ɣl"
-      to: "ɣᵊl"
+      to: "ɡᵊl"
     - from: "ɡl"
       to: "ɡᵊl"
     # Set our own r trill r. The default one lacks naturalness.
