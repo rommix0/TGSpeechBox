@@ -1565,12 +1565,22 @@ static std::string dictReplaceInText(
       continue;
     }
 
-    TPLOG("  dictReplace: \"%s\" → \"%s\"\n",
-          it->second.fromText.c_str(), it->second.toText.c_str());
+    // Convert hyphens to spaces in toText — users write them as pronunciation
+    // guides ("shi-kah-go") but eSpeak treats hyphens inconsistently as word
+    // boundaries in isolation vs phrase context.  Converting to spaces makes
+    // "shi-kah-go" and "shi kah go" produce identical results.
+    std::string replacement;
+    replacement.reserve(it->second.toText.size());
+    for (char c : it->second.toText) {
+      replacement += (c == '-') ? ' ' : c;
+    }
 
-    // Replace core with toText, preserving surrounding punctuation.
+    TPLOG("  dictReplace: \"%s\" → \"%s\"\n",
+          it->second.fromText.c_str(), replacement.c_str());
+
+    // Replace core with cleaned toText, preserving surrounding punctuation.
     result += token.substr(0, lo);
-    result += it->second.toText;
+    result += replacement;
     result += token.substr(hi);
   }
 
