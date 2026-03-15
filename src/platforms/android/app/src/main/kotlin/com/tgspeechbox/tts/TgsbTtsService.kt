@@ -278,30 +278,38 @@ class TgsbTtsService : TextToSpeechService() {
     /** Apply pack setting overrides saved by the editor via per-key setData. */
     private fun applyStoredOverrides(tgsbLang: String) {
         if (nativeHandle == 0L) return
-        val json = prefs.getString("pack_overrides_$tgsbLang", null) ?: return
-        val overrides = try {
-            val obj = org.json.JSONObject(json)
-            obj.keys().asSequence().associateWith { obj.getString(it) }
-        } catch (e: Exception) { return }
-        if (overrides.isEmpty()) return
-        for ((k, v) in overrides) {
-            nativeSetData(nativeHandle, TgsbSpeakEngine.DATA_SETTINGS, tgsbLang, k, v)
+        // Pack settings overrides (may not exist — that's OK).
+        val json = prefs.getString("pack_overrides_$tgsbLang", null)
+        if (json != null) {
+            val overrides = try {
+                val obj = org.json.JSONObject(json)
+                obj.keys().asSequence().associateWith { obj.getString(it) }
+            } catch (e: Exception) { emptyMap() }
+            for ((k, v) in overrides) {
+                nativeSetData(nativeHandle, TgsbSpeakEngine.DATA_SETTINGS, tgsbLang, k, v)
+            }
         }
-        // Apply dictionary user overlays.
+        // Always apply dictionary overlays and exclusions.
         applyDictOverrides(tgsbLang)
-        // Apply dictionary type exclusions.
         applyDictDisabled(tgsbLang)
     }
 
     /** Apply user dictionary overlays saved by the editor. */
     private fun applyDictOverrides(tgsbLang: String) {
         if (nativeHandle == 0L) return
-        val json = prefs.getString("dict_overrides_$tgsbLang", null) ?: return
+        val json = prefs.getString("dict_overrides_$tgsbLang", null)
+        Log.i(TAG, "applyDictOverrides($tgsbLang): json=${json?.take(200)}")
+        if (json == null) return
         val overrides = try {
             val obj = org.json.JSONObject(json)
             obj.keys().asSequence().associateWith { obj.getString(it) }
-        } catch (e: Exception) { return }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse dict overrides: ${e.message}")
+            return
+        }
+        Log.i(TAG, "Applying ${overrides.size} dict overrides for $tgsbLang")
         for ((k, v) in overrides) {
+            Log.i(TAG, "  setData(DICT, $tgsbLang, $k, $v)")
             nativeSetData(nativeHandle, TgsbSpeakEngine.DATA_DICTIONARY, tgsbLang, k, v)
         }
     }
@@ -581,6 +589,7 @@ class TgsbTtsService : TextToSpeechService() {
     // ---- Synthesis ----
 
     override fun onSynthesizeText(request: SynthesisRequest, callback: SynthesisCallback) {
+        Log.i(TAG, "onSynthesizeText: '${request.charSequenceText?.toString()?.take(50)}' voice=${request.voiceName}")
         stopRequested = false
 
         if (nativeHandle == 0L) {
