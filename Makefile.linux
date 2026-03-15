@@ -36,6 +36,7 @@ SPEECHPLAYER_SRCS = \
 FRONTEND_SRCS = \
 	$(FRONTENDDIR)/data_query.cpp \
 	$(FRONTENDDIR)/frame_emit.cpp \
+	$(FRONTENDDIR)/frontend_data_api.cpp \
 	$(FRONTENDDIR)/ipa_engine.cpp \
 	$(FRONTENDDIR)/ipa_normalize.cpp \
 	$(FRONTENDDIR)/ipa_parser.cpp \
@@ -148,6 +149,9 @@ $(BUILDDIR)/data_query.o: $(FRONTENDDIR)/data_query.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 
 $(BUILDDIR)/frame_emit.o: $(FRONTENDDIR)/frame_emit.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
+
+$(BUILDDIR)/frontend_data_api.o: $(FRONTENDDIR)/frontend_data_api.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 
 $(BUILDDIR)/ipa_engine.o: $(FRONTENDDIR)/ipa_engine.cpp
