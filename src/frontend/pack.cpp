@@ -2006,12 +2006,10 @@ static void loadPronDict(
     e.category = cols.size() > 4 ? cols[4] : "";
     e.source   = source;
 
-    // Lowercase key for case-insensitive lookup.
-    std::string key = e.fromText;
-    for (auto& c : key)
-      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-
-    dict.entries[key] = std::move(e);
+    // Store with original case. dictReplaceInText tries exact case first,
+    // then lowercase fallback — so "Parton" (capitalized) and "parton"
+    // (lowercase) can coexist as separate entries.
+    dict.entries[e.fromText] = std::move(e);
   }
 
   // Rebuild dynamic category list.

@@ -509,10 +509,9 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
     const std::string fromText(keyUtf8);
     const std::string value(valueUtf8);
 
-    // Lowercase key for case-insensitive lookup.
-    std::string lk = fromText;
-    for (auto& c : lk)
-      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    // Use original case for key — dictReplaceInText tries exact case
+    // first, then lowercase fallback.
+    const std::string& lk = fromText;
 
     if (subType == "character") {
       if (value.empty()) {

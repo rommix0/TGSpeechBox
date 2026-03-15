@@ -70,17 +70,25 @@ std::string dictReplaceInText(const std::string& text, const PronDict& dict) {
       continue;
     }
 
-    // Lowercase the core word for case-insensitive lookup.
-    std::string key;
-    key.reserve(hi - lo);
+    // Case-sensitive lookup: try exact case first (e.g., "Parton" as proper
+    // noun), then fallback to lowercase (e.g., "parton" as common word).
+    // This lets users have different pronunciations for capitalized vs
+    // lowercase variants of the same word.
+    std::string exactKey(token, lo, hi - lo);
+    std::string lowerKey;
+    lowerKey.reserve(hi - lo);
     for (size_t k = lo; k < hi; ++k)
-      key.push_back(static_cast<char>(
+      lowerKey.push_back(static_cast<char>(
           std::tolower(static_cast<unsigned char>(token[k]))));
 
-    auto it = dict.entries.find(key);
+    auto it = dict.entries.find(exactKey);
     if (it == dict.entries.end() || it->second.masked) {
-      result += token;
-      continue;
+      // Fallback to lowercase.
+      it = dict.entries.find(lowerKey);
+      if (it == dict.entries.end() || it->second.masked) {
+        result += token;
+        continue;
+      }
     }
 
     // Convert hyphens to spaces in toText — users write them as pronunciation
