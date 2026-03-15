@@ -164,6 +164,22 @@ struct DictionaryEditorView: View {
 
                     Divider()
 
+                    // Remove duplicates
+                    Button(action: {
+                        let mainKeys = Set(entries.filter { $0.source == "main" }.map { $0.fromText.lowercased() })
+                        let duplicates = entries.filter { $0.source == "user" && mainKeys.contains($0.fromText.lowercased()) }
+                        if duplicates.count > 500 {
+                            statusMessage = "Too many duplicates (\(duplicates.count)), remove manually"
+                        } else if duplicates.isEmpty {
+                            statusMessage = "No duplicates found"
+                        } else {
+                            for d in duplicates { engine.deleteDictEntry(fromText: d.fromText) }
+                            statusMessage = "Removed \(duplicates.count) duplicates"
+                        }
+                    }) {
+                        Label("Remove duplicates", systemImage: "doc.on.doc")
+                    }
+
                     // Exclude dictionaries
                     Button(action: { showExcludeSheet = true }) {
                         Label("Exclude dictionaries", systemImage: "eye.slash")

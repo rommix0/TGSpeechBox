@@ -335,6 +335,23 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                             importLauncher.launch(arrayOf("*/*"))
                         }
                     )
+                    // Remove duplicates
+                    DropdownMenuItem(
+                        text = { Text("Remove duplicates") },
+                        onClick = {
+                            showMoreMenu = false
+                            val mainKeys = entries.filter { it.source == "main" }.map { it.fromText.lowercase() }.toSet()
+                            val duplicates = entries.filter { it.source == "user" && it.fromText.lowercase() in mainKeys }
+                            if (duplicates.size > 500) {
+                                Toast.makeText(context, "Too many duplicates (${duplicates.size}), remove manually", Toast.LENGTH_SHORT).show()
+                            } else if (duplicates.isEmpty()) {
+                                Toast.makeText(context, "No duplicates found", Toast.LENGTH_SHORT).show()
+                            } else {
+                                for (d in duplicates) viewModel.deleteDictEntry(d.fromText)
+                                Toast.makeText(context, "Removed ${duplicates.size} duplicates", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
                     // Remove changed entries
                     DropdownMenuItem(
                         text = { Text("Remove changed entries") },
