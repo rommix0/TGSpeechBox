@@ -430,7 +430,7 @@ class TgsbSpeakEngine(private val context: Context) {
     // ── Asset extraction (same logic as TgsbTtsService) ─────────────
 
     private fun extractAssets() {
-        val assetVersion = 12
+        val assetVersion = 13
         val marker = File(context.filesDir, ".assets_v$assetVersion")
         if (marker.exists()) return
 

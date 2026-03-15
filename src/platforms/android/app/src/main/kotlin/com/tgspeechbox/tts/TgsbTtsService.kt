@@ -445,7 +445,7 @@ class TgsbTtsService : TextToSpeechService() {
     // ---- Asset extraction ----
 
     private fun extractAssets() {
-        val assetVersion = 12
+        val assetVersion = 13
         val marker = File(filesDir, ".assets_v$assetVersion")
         if (marker.exists()) return
 
