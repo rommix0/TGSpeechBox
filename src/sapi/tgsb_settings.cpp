@@ -168,6 +168,30 @@ wrapper_settings load_settings(const std::wstring& base_dir)
         out.excluded_lang_tags.insert(normalize_lang_tag(part));
     }
 
+    // Audio section.
+    out.sample_rate = GetPrivateProfileIntW(L"Audio", L"sampleRate", 0, ini_path.c_str());
+
+    // Voicing tone sliders (-1 = not set).
+    auto readSlider = [&](const wchar_t* key) -> int {
+        return GetPrivateProfileIntW(L"VoicingTone", key, -1, ini_path.c_str());
+    };
+    out.voiceTilt       = readSlider(L"voiceTilt");
+    out.noiseGlottalMod = readSlider(L"noiseGlottalMod");
+    out.pitchSyncF1     = readSlider(L"pitchSyncF1");
+    out.pitchSyncB1     = readSlider(L"pitchSyncB1");
+    out.speedQuotient   = readSlider(L"speedQuotient");
+    out.aspirationTilt  = readSlider(L"aspirationTilt");
+    out.cascadeBwScale  = readSlider(L"cascadeBwScale");
+    out.voiceTremor     = readSlider(L"voiceTremor");
+    out.headSize        = readSlider(L"headSize");
+
+    // FrameEx sliders.
+    out.frameExCreakiness  = readSlider(L"frameExCreakiness");
+    out.frameExBreathiness = readSlider(L"frameExBreathiness");
+    out.frameExJitter      = readSlider(L"frameExJitter");
+    out.frameExShimmer     = readSlider(L"frameExShimmer");
+    out.frameExSharpness   = readSlider(L"frameExSharpness");
+
     return out;
 }
 

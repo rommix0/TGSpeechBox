@@ -21,6 +21,28 @@ struct wrapper_settings {
 
     // Normalized (lowercase, '-' separator) language tags that should be hidden.
     std::unordered_set<std::wstring> excluded_lang_tags;
+
+    // Sample rate (Hz). 0 = use default (16000).
+    int sample_rate = 0;
+
+    // Voicing tone sliders (0-100, 50 = neutral for most, 0 = neutral for some).
+    // -1 = not set (use default).
+    int voiceTilt = -1;           // 50 = neutral
+    int noiseGlottalMod = -1;     // 0 = neutral (off)
+    int pitchSyncF1 = -1;         // 50 = neutral
+    int pitchSyncB1 = -1;         // 50 = neutral
+    int speedQuotient = -1;       // 50 = neutral
+    int aspirationTilt = -1;      // 50 = neutral
+    int cascadeBwScale = -1;      // 50 = neutral
+    int voiceTremor = -1;         // 0 = neutral (off)
+    int headSize = -1;            // 50 = neutral
+
+    // FrameEx sliders (0-100).
+    int frameExCreakiness = -1;   // 0 = off
+    int frameExBreathiness = -1;  // 0 = off
+    int frameExJitter = -1;       // 0 = off
+    int frameExShimmer = -1;      // 0 = off
+    int frameExSharpness = -1;    // 50 = neutral
 };
 
 // Normalizes a language tag for comparisons (trim, '_' -> '-', lowercase).

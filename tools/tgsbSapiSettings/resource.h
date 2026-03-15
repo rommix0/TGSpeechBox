@@ -10,3 +10,27 @@ Licensed under the MIT License. See LICENSE for details.
 
 #define IDC_LANG_LIST 1001
 #define IDC_ENABLE_LOGGING 1002
+
+// Audio section
+#define IDC_SAMPLE_RATE 1010
+
+// Voicing Tone sliders (trackbar + static label pairs)
+#define IDC_SL_VOICE_TILT      1100
+#define IDC_SL_NOISE_MOD       1101
+#define IDC_SL_PITCH_F1        1102
+#define IDC_SL_PITCH_B1        1103
+#define IDC_SL_SPEED_QUOT      1104
+#define IDC_SL_ASP_TILT        1105
+#define IDC_SL_CASCADE_BW      1106
+#define IDC_SL_TREMOR          1107
+#define IDC_SL_HEAD_SIZE       1108
+
+// FrameEx sliders
+#define IDC_SL_CREAKINESS      1110
+#define IDC_SL_BREATHINESS     1111
+#define IDC_SL_JITTER          1112
+#define IDC_SL_SHIMMER         1113
+#define IDC_SL_SHARPNESS       1114
+
+// Reset button
+#define IDC_RESET_DEFAULTS     1200

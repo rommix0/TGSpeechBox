@@ -23,7 +23,7 @@ namespace sapi {
 namespace {
 
 constexpr WORD k_audio_channels = 1;
-constexpr DWORD k_audio_sample_rate = 16000;
+constexpr DWORD k_default_audio_sample_rate = 16000;
 constexpr WORD k_audio_bits_per_sample = 16;
 
 constexpr double k_default_inflection = 0.55;
@@ -356,7 +356,15 @@ STDMETHODIMP ISpTTSEngineImpl::GetOutputFormat(const GUID* /*pTargetFmtId*/,
 
     fmt->wFormatTag = WAVE_FORMAT_PCM;
     fmt->nChannels = k_audio_channels;
-    fmt->nSamplesPerSec = k_audio_sample_rate;
+    // Use the runtime's actual sample rate (which reads from settings.ini).
+    // If the runtime hasn't been initialized yet, ensure_initialized reads
+    // the sample rate from settings before creating speechPlayer.
+    if (rt_) {
+        (void)rt_->ensure_initialized();
+        fmt->nSamplesPerSec = static_cast<DWORD>(rt_->sample_rate());
+    } else {
+        fmt->nSamplesPerSec = k_default_audio_sample_rate;
+    }
     fmt->wBitsPerSample = k_audio_bits_per_sample;
     fmt->nBlockAlign = (fmt->nChannels * fmt->wBitsPerSample) / 8;
     fmt->nAvgBytesPerSec = fmt->nSamplesPerSec * fmt->nBlockAlign;
@@ -698,7 +706,7 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
     // stop audio immediately when Speak() returns, before the sound card
     // finishes draining its buffer.  50ms of silence gives enough runway.
     if (!ctx.aborted) {
-        const int padSamples = k_audio_sample_rate / 20;  // 50ms
+        const int padSamples = (rt_ ? rt_->sample_rate() : k_default_audio_sample_rate) / 20;  // 50ms
         std::vector<tgsb::sample_t> silence(static_cast<size_t>(padSamples));
         std::memset(silence.data(), 0, silence.size() * sizeof(tgsb::sample_t));
         const ULONG padBytes = static_cast<ULONG>(padSamples * sizeof(tgsb::sample_t));
