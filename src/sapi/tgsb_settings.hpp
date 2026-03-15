@@ -25,6 +25,9 @@ struct wrapper_settings {
     // Sample rate (Hz). 0 = use default (16000).
     int sample_rate = 0;
 
+    // Pause mode: 0 = off, 1 = short, 2 = long.
+    int pauseMode = 1;
+
     // Voicing tone sliders (0-100, 50 = neutral for most, 0 = neutral for some).
     // -1 = not set (use default).
     int voiceTilt = -1;           // 50 = neutral

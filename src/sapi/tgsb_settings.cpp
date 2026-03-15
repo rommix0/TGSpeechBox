@@ -170,6 +170,7 @@ wrapper_settings load_settings(const std::wstring& base_dir)
 
     // Audio section.
     out.sample_rate = GetPrivateProfileIntW(L"Audio", L"sampleRate", 0, ini_path.c_str());
+    out.pauseMode = GetPrivateProfileIntW(L"Audio", L"pauseMode", 1, ini_path.c_str());
 
     // Voicing tone sliders (-1 = not set).
     auto readSlider = [&](const wchar_t* key) -> int {

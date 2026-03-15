@@ -63,6 +63,7 @@ public:
     void purge();
 
     int sample_rate() const noexcept { return sample_rate_; }
+    const std::wstring& base_dir() const noexcept { return base_dir_; }
     const std::wstring& current_voice_profile() const noexcept { return current_profile_name_; }
 
 private:

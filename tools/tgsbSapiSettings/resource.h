@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE for details.
 
 // Audio section
 #define IDC_SAMPLE_RATE 1010
+#define IDC_PAUSE_MODE  1011
 
 // Voicing Tone sliders (trackbar + static label pairs)
 #define IDC_SL_VOICE_TILT      1100

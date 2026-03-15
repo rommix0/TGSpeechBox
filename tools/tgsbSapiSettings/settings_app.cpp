@@ -153,6 +153,7 @@ struct Settings {
     std::unordered_set<std::wstring> excluded;
 
     int sample_rate = 16000;
+    int pauseMode = 1; // 0=off, 1=short, 2=long
 
     // Voicing tone (0-100, -1 = default).
     int voiceTilt       = 50;
@@ -192,6 +193,7 @@ Settings load_settings(const std::wstring& ini_path)
     s.excluded.erase(L"default");
 
     s.sample_rate = GetPrivateProfileIntW(L"Audio", L"sampleRate", 16000, ini_path.c_str());
+    s.pauseMode = GetPrivateProfileIntW(L"Audio", L"pauseMode", 1, ini_path.c_str());
 
     auto rd = [&](const wchar_t* key, int def) {
         return GetPrivateProfileIntW(L"VoicingTone", key, def, ini_path.c_str());
@@ -232,6 +234,7 @@ bool save_settings(const std::wstring& ini_path, const Settings& s)
         return false;
 
     write_ini_int(ini_path, L"Audio", L"sampleRate", s.sample_rate);
+    write_ini_int(ini_path, L"Audio", L"pauseMode", s.pauseMode);
 
     auto wr = [&](const wchar_t* key, int val) {
         write_ini_int(ini_path, L"VoicingTone", key, val);
@@ -420,9 +423,9 @@ void reset_sliders_to_defaults(HWND hDlg)
     set_slider(hDlg, IDC_SL_SHIMMER,     0);
     set_slider(hDlg, IDC_SL_SHARPNESS,   50);
 
-    // Reset sample rate to 16000.
-    HWND combo = GetDlgItem(hDlg, IDC_SAMPLE_RATE);
-    SendMessageW(combo, CB_SETCURSEL, 1, 0); // index 1 = 16000
+    // Reset sample rate to 16000 and pause mode to Short.
+    SendDlgItemMessageW(hDlg, IDC_SAMPLE_RATE, CB_SETCURSEL, 1, 0);
+    SendDlgItemMessageW(hDlg, IDC_PAUSE_MODE, CB_SETCURSEL, 1, 0);
 }
 
 // -----------------------------
@@ -463,6 +466,17 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
             if (kSampleRates[i] == st->settings.sample_rate) sel = i;
         }
         SendMessageW(combo, CB_SETCURSEL, sel, 0);
+
+        // Pause mode combo.
+        {
+            HWND pm = GetDlgItem(hDlg, IDC_PAUSE_MODE);
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"Off");
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"Short");
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"Long");
+            int pmSel = st->settings.pauseMode;
+            if (pmSel < 0 || pmSel > 2) pmSel = 1;
+            SendMessageW(pm, CB_SETCURSEL, pmSel, 0);
+        }
 
         // Sliders.
         populate_sliders_from_settings(hDlg, st->settings);
@@ -505,6 +519,11 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
             int srSel = (int)SendDlgItemMessageW(hDlg, IDC_SAMPLE_RATE, CB_GETCURSEL, 0, 0);
             if (srSel >= 0 && srSel < 4)
                 st->settings.sample_rate = kSampleRates[srSel];
+
+            // Pause mode.
+            int pmSel = (int)SendDlgItemMessageW(hDlg, IDC_PAUSE_MODE, CB_GETCURSEL, 0, 0);
+            if (pmSel >= 0 && pmSel <= 2)
+                st->settings.pauseMode = pmSel;
 
             // Sliders.
             read_sliders_to_settings(hDlg, st->settings);

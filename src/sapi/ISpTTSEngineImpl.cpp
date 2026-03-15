@@ -16,6 +16,7 @@ Licensed under the MIT License. See LICENSE for details.
 
 #include "utils.hpp"
 #include "debug_log.h"
+#include "tgsb_settings.hpp"
 
 namespace TGSpeech {
 namespace sapi {
@@ -634,6 +635,23 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
             int got;
             while ((got = rt_->synthesize(static_cast<int>(sampleBuf.size()), sampleBuf.data())) > 0)
                 audio_buf.insert(audio_buf.end(), sampleBuf.data(), sampleBuf.data() + got);
+
+            // Pause mode: insert silence after each clause.
+            // Short: 35ms sentence / 25ms comma. Long: 60ms / 50ms.
+            const auto& settings = tgsb::get_settings_cached(rt_->base_dir());
+            int pm = settings.pauseMode;
+            if (pm > 0 && !audio_buf.empty()) {
+                double pauseMs = 0.0;
+                char ct = clause.clause_type;
+                if (ct == '.' || ct == '!' || ct == '?' || ct == ':' || ct == ';')
+                    pauseMs = (pm == 2) ? 60.0 : 35.0;
+                else if (ct == ',')
+                    pauseMs = (pm == 2) ? 50.0 : 25.0;
+                if (pauseMs > 0.0) {
+                    auto padSamples = static_cast<size_t>(pauseMs * rt_->sample_rate() / 1000.0 + 0.5);
+                    audio_buf.insert(audio_buf.end(), padSamples, tgsb::sample_t{0});
+                }
+            }
         }
 
         if (audio_buf.empty()) continue;
