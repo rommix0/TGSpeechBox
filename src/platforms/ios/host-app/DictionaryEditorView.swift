@@ -509,15 +509,6 @@ private struct DictEntryRow: View {
             (entry.category.isEmpty ? "" : ", \(entry.category)")
         )
         .accessibilityAction(named: "Edit") { onEdit() }
-        .accessibilityAction(named: entry.source == "main"
-                             ? (entry.masked ? "Include" : "Exclude")
-                             : "Delete") {
-            if entry.source == "main" {
-                onMask()
-            } else {
-                onDelete()
-            }
-        }
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to edit")
     }

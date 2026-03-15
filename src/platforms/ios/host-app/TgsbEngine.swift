@@ -1145,9 +1145,12 @@ class TgsbEngine: ObservableObject {
 
     func deleteDictEntry(fromText: String) {
         guard let eng = engine else { return }
-        let tag = prefixedLangTag(dictSubType, dictLangTag)
-        tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, fromText, "")
         removeDictOverride(dictLangTag, key: fromText)
+        // Reload the language to restore base dict entries from disk,
+        // then reapply remaining user overrides. This ensures that
+        // removing a modified base entry reverts to the original.
+        tgsb_set_language(eng, dictLangTag, dictLangTag)
+        reapplyDictOverrides(dictLangTag)
         loadDictionary(langTag: dictLangTag, subType: dictSubType)
     }
 
@@ -1226,6 +1229,13 @@ class TgsbEngine: ObservableObject {
         return obj
     }
 
+    private func bumpOverridesVersion() {
+        let d = UserDefaults(suiteName: kAppGroupId)
+        let ver = (d?.integer(forKey: "pack_overrides_version") ?? 0) + 1
+        d?.set(ver, forKey: "pack_overrides_version")
+        d?.synchronize()
+    }
+
     private func saveDictOverride(_ langTag: String, key: String, value: String) {
         var overrides = loadDictOverrides(langTag)
         overrides[key] = value
@@ -1235,6 +1245,7 @@ class TgsbEngine: ObservableObject {
             d?.set(json, forKey: "dict_overrides_\(langTag)")
         }
         d?.synchronize()
+        bumpOverridesVersion()
     }
 
     private func removeDictOverride(_ langTag: String, key: String) {
@@ -1248,6 +1259,7 @@ class TgsbEngine: ObservableObject {
             d?.set(json, forKey: "dict_overrides_\(langTag)")
         }
         d?.synchronize()
+        bumpOverridesVersion()
     }
 
     func speak(_ text: String) {

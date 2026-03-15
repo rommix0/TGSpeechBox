@@ -839,8 +839,12 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteDictEntry(fromText: String) {
         val prefixed = prefixedLangTag(dictSubType, dictLangTag)
-        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, "")
         removeDictOverride(prefixed, fromText)
+        // Reload language to restore base dict entries from disk,
+        // then reapply remaining user overrides. This ensures that
+        // removing a modified base entry reverts to the original.
+        engine.setLanguage(dictLangTag, dictLangTag)
+        reapplyDictOverrides(dictLangTag)
         loadDictionary(dictLangTag, dictSubType)
     }
 
