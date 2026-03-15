@@ -156,11 +156,11 @@ struct DictionaryEditorView: View {
                         ShareLink("Share changed", item: url)
                     }
 
-                    // Import (pronunciation only)
+                    // Import (pronunciation + character)
                     Button(action: { showImportPicker = true }) {
                         Label("Import", systemImage: "square.and.arrow.down")
                     }
-                    .disabled(selectedType != "pronounce")
+                    .disabled(selectedType != "pronounce" && selectedType != "character")
 
                     Divider()
 

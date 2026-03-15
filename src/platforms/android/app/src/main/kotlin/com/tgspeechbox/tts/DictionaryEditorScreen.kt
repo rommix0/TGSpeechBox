@@ -98,7 +98,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
         }
     }
 
-    // Import launcher (pronunciation type only)
+    // Import launcher (pronunciation + character types)
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -326,10 +326,10 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                             shareDictEntries(context, entries, selectedType, langFilter, userOnly = true)
                         }
                     )
-                    // Import (pronunciation only)
+                    // Import (pronunciation + character only)
                     DropdownMenuItem(
                         text = { Text("Import") },
-                        enabled = selectedType == "pronounce",
+                        enabled = selectedType == "pronounce" || selectedType == "character",
                         onClick = {
                             showMoreMenu = false
                             importLauncher.launch(arrayOf("*/*"))
