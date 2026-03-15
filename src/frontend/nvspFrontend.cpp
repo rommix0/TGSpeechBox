@@ -31,6 +31,7 @@ static double parseDouble(const std::string& s) {
 }
 
 #include "data_query.h"
+#include "utf8.h"
 #include "yaml_export.h"
 #include "ipa_engine.h"
 #include "pack.h"
@@ -422,6 +423,15 @@ static int queueIPA_ExImpl(
   }
 
   if (!ipaUtf8) ipaUtf8 = "";
+
+  // Unicode normalization: NFKC + strip invisible characters.
+  // Prevents dictionary mismatches from NFD text (iOS/macOS copy-paste)
+  // and invisible formatting chars from messaging apps (Telegram, WhatsApp).
+  std::string normalizedText;
+  if (textUtf8 && textUtf8[0]) {
+    normalizedText = normalizeText(textUtf8);
+    textUtf8 = normalizedText.c_str();
+  }
 
   // Run text parser if text is available and there's work to do
   // (stress dict for stress correction, OR compound map for IPA merge).
@@ -1003,12 +1013,13 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
   std::lock_guard<std::mutex> lock(h->mu);
   if (!h->packLoaded) return nullptr;
 
-  std::string input(textUtf8);
+  const std::string original(textUtf8);
+  std::string input = normalizeText(original);
   std::string result = prepareTextForEspeak(input, h->pack.compoundMap, h->langTag,
                                              h->pack.lang.yearSplittingEnabled,
                                              h->pack.lang.numberExpansion.ohDigit);
 
-  if (result == input) return nullptr;  // no changes
+  if (result == original) return nullptr;  // no changes
 
   char* out = static_cast<char*>(std::malloc(result.size() + 1));
   if (!out) return nullptr;

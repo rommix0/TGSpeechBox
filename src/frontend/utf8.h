@@ -21,6 +21,18 @@ std::string u32ToUtf8(std::u32string_view s);
 // Lowercase ASCII and convert '_' -> '-' (for language tags).
 std::string normalizeLangTag(std::string_view tag);
 
+// Strip invisible/zero-width Unicode characters (ZWS, ZWNJ, ZWJ, BOM,
+// soft hyphen, bidi controls, etc.).
+std::string stripInvisible(std::string_view s);
+
+// Normalize UTF-8 string to NFKC form.
+// Windows: NormalizeString (Vista+). Apple: CFStringNormalize.
+// Other platforms: identity (normalize at the Java/Python/Swift layer).
+std::string normalizeNFKC(const std::string& s);
+
+// Convenience: stripInvisible + normalizeNFKC in one call.
+std::string normalizeText(const std::string& s);
+
 } // namespace nvsp_frontend
 
 #endif
