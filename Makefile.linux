@@ -43,6 +43,8 @@ FRONTEND_SRCS = \
 	$(FRONTENDDIR)/voice_profile.cpp \
 	$(FRONTENDDIR)/yaml_min.cpp \
 	$(FRONTENDDIR)/text_parser.cpp \
+	$(FRONTENDDIR)/text_prepare.cpp \
+	$(FRONTENDDIR)/dict_lookup.cpp \
 	$(PASSESDIR)/allophones.cpp \
 	$(PASSESDIR)/boundary_smoothing.cpp \
 	$(PASSESDIR)/cluster_blend.cpp \
@@ -165,6 +167,12 @@ $(BUILDDIR)/voice_profile.o: $(FRONTENDDIR)/voice_profile.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 
 $(BUILDDIR)/text_parser.o: $(FRONTENDDIR)/text_parser.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
+
+$(BUILDDIR)/text_prepare.o: $(FRONTENDDIR)/text_prepare.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
+
+$(BUILDDIR)/dict_lookup.o: $(FRONTENDDIR)/dict_lookup.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 
 # Passes sources
