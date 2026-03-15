@@ -857,19 +857,26 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         overrides[key] = value
         val obj = org.json.JSONObject()
         for ((k, v) in overrides) obj.put(k, v)
-        prefs.edit().putString("dict_overrides_$langTag", obj.toString()).apply()
+        val ver = prefs.getInt("pack_overrides_version", 0) + 1
+        prefs.edit()
+            .putString("dict_overrides_$langTag", obj.toString())
+            .putInt("pack_overrides_version", ver)
+            .apply()
     }
 
     private fun removeDictOverride(langTag: String, key: String) {
         val overrides = loadDictOverrides(langTag).toMutableMap()
         overrides.remove(key)
+        val ver = prefs.getInt("pack_overrides_version", 0) + 1
+        val e = prefs.edit()
         if (overrides.isEmpty()) {
-            prefs.edit().remove("dict_overrides_$langTag").apply()
+            e.remove("dict_overrides_$langTag")
         } else {
             val obj = org.json.JSONObject()
             for ((k, v) in overrides) obj.put(k, v)
-            prefs.edit().putString("dict_overrides_$langTag", obj.toString()).apply()
+            e.putString("dict_overrides_$langTag", obj.toString())
         }
+        e.putInt("pack_overrides_version", ver).apply()
     }
 
     fun reapplyDictOverrides(langTag: String) {

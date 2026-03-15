@@ -784,7 +784,6 @@ private fun DictEditDialog(
                     onValueChange = { fromText = it },
                     label = { Text(fromLabel) },
                     singleLine = true,
-                    enabled = false,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
