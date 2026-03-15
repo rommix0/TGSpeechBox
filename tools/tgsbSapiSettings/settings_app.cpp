@@ -155,6 +155,10 @@ struct Settings {
     int sample_rate = 16000;
     int pauseMode = 1; // 0=off, 1=short, 2=long
 
+    // Pitch mode: 0 = language default, 1-5 = specific mode.
+    int pitchMode = 0;
+    int pitchInflectionScale = 50; // 0-100, maps to 0.0-2.0
+
     // Voicing tone (0-100, -1 = default).
     int voiceTilt       = 50;
     int noiseGlottalMod = 0;
@@ -194,6 +198,20 @@ Settings load_settings(const std::wstring& ini_path)
 
     s.sample_rate = GetPrivateProfileIntW(L"Audio", L"sampleRate", 16000, ini_path.c_str());
     s.pauseMode = GetPrivateProfileIntW(L"Audio", L"pauseMode", 1, ini_path.c_str());
+
+    // Pitch mode: read string, map to index.
+    {
+        wchar_t pmBuf[64] = {};
+        GetPrivateProfileStringW(L"Audio", L"pitchMode", L"", pmBuf, 64, ini_path.c_str());
+        std::wstring pm(pmBuf);
+        if (pm == L"espeak_style")    s.pitchMode = 1;
+        else if (pm == L"fujisaki_style") s.pitchMode = 2;
+        else if (pm == L"impulse_style")  s.pitchMode = 3;
+        else if (pm == L"klatt_style")    s.pitchMode = 4;
+        else if (pm == L"legacy")         s.pitchMode = 5;
+        else s.pitchMode = 0;
+    }
+    s.pitchInflectionScale = GetPrivateProfileIntW(L"Audio", L"pitchInflectionScale", 50, ini_path.c_str());
 
     auto rd = [&](const wchar_t* key, int def) {
         return GetPrivateProfileIntW(L"VoicingTone", key, def, ini_path.c_str());
@@ -235,6 +253,21 @@ bool save_settings(const std::wstring& ini_path, const Settings& s)
 
     write_ini_int(ini_path, L"Audio", L"sampleRate", s.sample_rate);
     write_ini_int(ini_path, L"Audio", L"pauseMode", s.pauseMode);
+
+    // Pitch mode: map index to string.
+    {
+        const wchar_t* pmStr = L"";
+        switch (s.pitchMode) {
+            case 1: pmStr = L"espeak_style"; break;
+            case 2: pmStr = L"fujisaki_style"; break;
+            case 3: pmStr = L"impulse_style"; break;
+            case 4: pmStr = L"klatt_style"; break;
+            case 5: pmStr = L"legacy"; break;
+            default: pmStr = L""; break;
+        }
+        WritePrivateProfileStringW(L"Audio", L"pitchMode", pmStr, ini_path.c_str());
+    }
+    write_ini_int(ini_path, L"Audio", L"pitchInflectionScale", s.pitchInflectionScale);
 
     auto wr = [&](const wchar_t* key, int val) {
         write_ini_int(ini_path, L"VoicingTone", key, val);
@@ -423,9 +456,11 @@ void reset_sliders_to_defaults(HWND hDlg)
     set_slider(hDlg, IDC_SL_SHIMMER,     0);
     set_slider(hDlg, IDC_SL_SHARPNESS,   50);
 
-    // Reset sample rate to 16000 and pause mode to Short.
+    // Reset sample rate to 16000, pause mode to Short, pitch to language default.
     SendDlgItemMessageW(hDlg, IDC_SAMPLE_RATE, CB_SETCURSEL, 1, 0);
     SendDlgItemMessageW(hDlg, IDC_PAUSE_MODE, CB_SETCURSEL, 1, 0);
+    SendDlgItemMessageW(hDlg, IDC_PITCH_MODE, CB_SETCURSEL, 0, 0);
+    set_slider(hDlg, IDC_SL_INFLECTION, 50);
 }
 
 // -----------------------------
@@ -478,6 +513,23 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
             SendMessageW(pm, CB_SETCURSEL, pmSel, 0);
         }
 
+        // Pitch mode combo.
+        {
+            HWND pm = GetDlgItem(hDlg, IDC_PITCH_MODE);
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"Use Language Default");
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"eSpeak Style");
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"Fujisaki");
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"Impulse");
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"Klatt");
+            SendMessageW(pm, CB_ADDSTRING, 0, (LPARAM)L"Classic");
+            int pmSel = st->settings.pitchMode;
+            if (pmSel < 0 || pmSel > 5) pmSel = 0;
+            SendMessageW(pm, CB_SETCURSEL, pmSel, 0);
+        }
+
+        // Inflection scale slider.
+        init_slider(hDlg, IDC_SL_INFLECTION, st->settings.pitchInflectionScale);
+
         // Sliders.
         populate_sliders_from_settings(hDlg, st->settings);
 
@@ -524,6 +576,12 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
             int pmSel = (int)SendDlgItemMessageW(hDlg, IDC_PAUSE_MODE, CB_GETCURSEL, 0, 0);
             if (pmSel >= 0 && pmSel <= 2)
                 st->settings.pauseMode = pmSel;
+
+            // Pitch mode.
+            int pitchSel = (int)SendDlgItemMessageW(hDlg, IDC_PITCH_MODE, CB_GETCURSEL, 0, 0);
+            if (pitchSel >= 0 && pitchSel <= 5)
+                st->settings.pitchMode = pitchSel;
+            st->settings.pitchInflectionScale = get_slider(hDlg, IDC_SL_INFLECTION);
 
             // Sliders.
             read_sliders_to_settings(hDlg, st->settings);

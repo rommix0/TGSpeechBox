@@ -701,6 +701,23 @@ void runtime::apply_voicing_tone_if_available()
 
     speechPlayer_setVoicingTone(speech_player_, &dsp_tone);
 
+    // Apply pitch mode override from settings.
+    if (frontend_ && !s.pitchMode.empty()) {
+        std::string yaml = "legacyPitchMode: " + utils::wstring_to_string(s.pitchMode) + "\n";
+        if (s.pitchInflectionScale >= 0) {
+            double scale = s.pitchInflectionScale / 100.0 * 2.0; // 0-100 → 0.0-2.0
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), "legacyPitchInflectionScale: %.4f\n", scale);
+            yaml += buf;
+        }
+        nvspFrontend_applySettingOverrides(frontend_, yaml.c_str());
+    } else if (frontend_ && s.pitchInflectionScale >= 0) {
+        double scale = s.pitchInflectionScale / 100.0 * 2.0;
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "legacyPitchInflectionScale: %.4f\n", scale);
+        nvspFrontend_applySettingOverrides(frontend_, buf);
+    }
+
     // Apply FrameEx defaults from settings.
     if (frontend_) {
         double creakiness  = (s.frameExCreakiness >= 0)  ? s.frameExCreakiness / 100.0  : 0.0;

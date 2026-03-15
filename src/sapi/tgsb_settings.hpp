@@ -28,6 +28,13 @@ struct wrapper_settings {
     // Pause mode: 0 = off, 1 = short, 2 = long.
     int pauseMode = 1;
 
+    // Pitch mode: "" = use language default, or one of:
+    // "espeak_style", "fujisaki_style", "impulse_style", "klatt_style", "legacy"
+    std::wstring pitchMode;
+
+    // Pitch inflection scale: -1 = use language default, 0-100 maps to 0.0-2.0.
+    int pitchInflectionScale = -1;
+
     // Voicing tone sliders (0-100, 50 = neutral for most, 0 = neutral for some).
     // -1 = not set (use default).
     int voiceTilt = -1;           // 50 = neutral

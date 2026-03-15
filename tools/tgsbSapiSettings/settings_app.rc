@@ -8,7 +8,7 @@ Licensed under the MIT License. See LICENSE for details.
 #include <commctrl.h>
 #include "resource.h"
 
-IDD_MAIN_DIALOG DIALOGEX 0, 0, 320, 520
+IDD_MAIN_DIALOG DIALOGEX 0, 0, 320, 554
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "TGSpeechBox SAPI Settings"
 FONT 9, "Segoe UI"
@@ -26,47 +26,52 @@ BEGIN
     LTEXT "Pause mode:", -1, 150, 148, 50, 10
     COMBOBOX IDC_PAUSE_MODE, 205, 146, 60, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    LTEXT "Tone and quality changes apply on the next speech request. Sample rate changes require restarting the host application.", -1, 7, 164, 306, 10, SS_LEFT
+    LTEXT "Pitch mode:", -1, 7, 164, 50, 10
+    COMBOBOX IDC_PITCH_MODE, 60, 162, 100, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Inflection Scale:", -1, 170, 164, 60, 10
+    CONTROL "", IDC_SL_INFLECTION, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 235, 162, 78, 15
+
+    LTEXT "Tone and quality changes apply on the next speech request. Sample rate changes require restarting the host application.", -1, 7, 182, 306, 10, SS_LEFT
 
     // ── Voicing Tone ──
-    GROUPBOX "Voice Tone", -1, 7, 172, 306, 170
+    GROUPBOX "Voice Tone", -1, 7, 194, 306, 170
 
-    LTEXT "Voice Tilt:", -1, 14, 186, 85, 10
-    CONTROL "", IDC_SL_VOICE_TILT, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 184, 200, 15
-    LTEXT "Noise Glottal Modulation:", -1, 14, 204, 85, 10
-    CONTROL "", IDC_SL_NOISE_MOD, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 202, 200, 15
-    LTEXT "Pitch-Sync F1 Delta:", -1, 14, 222, 85, 10
-    CONTROL "", IDC_SL_PITCH_F1, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 220, 200, 15
-    LTEXT "Pitch-Sync B1 Delta:", -1, 14, 240, 85, 10
-    CONTROL "", IDC_SL_PITCH_B1, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 238, 200, 15
-    LTEXT "Glottal Speed Quotient:", -1, 14, 258, 85, 10
-    CONTROL "", IDC_SL_SPEED_QUOT, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 256, 200, 15
-    LTEXT "Aspiration Tilt:", -1, 14, 276, 85, 10
-    CONTROL "", IDC_SL_ASP_TILT, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 274, 200, 15
-    LTEXT "Cascade Bandwidth:", -1, 14, 294, 85, 10
-    CONTROL "", IDC_SL_CASCADE_BW, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 292, 200, 15
-    LTEXT "Voice Tremor:", -1, 14, 312, 85, 10
-    CONTROL "", IDC_SL_TREMOR, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 310, 200, 15
-    LTEXT "Head Size:", -1, 14, 330, 85, 10
-    CONTROL "", IDC_SL_HEAD_SIZE, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 328, 200, 15
+    LTEXT "Voice Tilt:", -1, 14, 208, 85, 10
+    CONTROL "", IDC_SL_VOICE_TILT, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 206, 200, 15
+    LTEXT "Noise Glottal Modulation:", -1, 14, 226, 85, 10
+    CONTROL "", IDC_SL_NOISE_MOD, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 224, 200, 15
+    LTEXT "Pitch-Sync F1 Delta:", -1, 14, 244, 85, 10
+    CONTROL "", IDC_SL_PITCH_F1, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 242, 200, 15
+    LTEXT "Pitch-Sync B1 Delta:", -1, 14, 262, 85, 10
+    CONTROL "", IDC_SL_PITCH_B1, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 260, 200, 15
+    LTEXT "Glottal Speed Quotient:", -1, 14, 280, 85, 10
+    CONTROL "", IDC_SL_SPEED_QUOT, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 278, 200, 15
+    LTEXT "Aspiration Tilt:", -1, 14, 298, 85, 10
+    CONTROL "", IDC_SL_ASP_TILT, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 296, 200, 15
+    LTEXT "Cascade Bandwidth:", -1, 14, 316, 85, 10
+    CONTROL "", IDC_SL_CASCADE_BW, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 314, 200, 15
+    LTEXT "Voice Tremor:", -1, 14, 334, 85, 10
+    CONTROL "", IDC_SL_TREMOR, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 332, 200, 15
+    LTEXT "Head Size:", -1, 14, 352, 85, 10
+    CONTROL "", IDC_SL_HEAD_SIZE, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 350, 200, 15
 
     // ── FrameEx Voice Quality ──
-    GROUPBOX "Voice Quality", -1, 7, 348, 306, 110
+    GROUPBOX "Voice Quality", -1, 7, 370, 306, 110
 
-    LTEXT "Creakiness:", -1, 14, 364, 85, 10
-    CONTROL "", IDC_SL_CREAKINESS, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 362, 200, 15
-    LTEXT "Breathiness:", -1, 14, 382, 85, 10
-    CONTROL "", IDC_SL_BREATHINESS, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 380, 200, 15
-    LTEXT "Pitch Jitter:", -1, 14, 400, 85, 10
-    CONTROL "", IDC_SL_JITTER, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 398, 200, 15
-    LTEXT "Amplitude Shimmer:", -1, 14, 418, 85, 10
-    CONTROL "", IDC_SL_SHIMMER, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 416, 200, 15
-    LTEXT "Glottal Sharpness:", -1, 14, 436, 85, 10
-    CONTROL "", IDC_SL_SHARPNESS, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 434, 200, 15
+    LTEXT "Creakiness:", -1, 14, 386, 85, 10
+    CONTROL "", IDC_SL_CREAKINESS, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 384, 200, 15
+    LTEXT "Breathiness:", -1, 14, 404, 85, 10
+    CONTROL "", IDC_SL_BREATHINESS, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 402, 200, 15
+    LTEXT "Pitch Jitter:", -1, 14, 422, 85, 10
+    CONTROL "", IDC_SL_JITTER, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 420, 200, 15
+    LTEXT "Amplitude Shimmer:", -1, 14, 440, 85, 10
+    CONTROL "", IDC_SL_SHIMMER, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 438, 200, 15
+    LTEXT "Glottal Sharpness:", -1, 14, 458, 85, 10
+    CONTROL "", IDC_SL_SHARPNESS, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 105, 456, 200, 15
 
     // ── Buttons ──
-    DEFPUSHBUTTON "OK", IDOK, 206, 498, 50, 14
-    PUSHBUTTON "Cancel", IDCANCEL, 263, 498, 50, 14
+    DEFPUSHBUTTON "OK", IDOK, 206, 532, 50, 14
+    PUSHBUTTON "Cancel", IDCANCEL, 263, 532, 50, 14
 
-    PUSHBUTTON "Reset &Defaults", IDC_RESET_DEFAULTS, 7, 498, 70, 14
+    PUSHBUTTON "Reset &Defaults", IDC_RESET_DEFAULTS, 7, 532, 70, 14
 END

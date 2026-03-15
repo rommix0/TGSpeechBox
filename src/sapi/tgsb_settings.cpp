@@ -172,6 +172,14 @@ wrapper_settings load_settings(const std::wstring& base_dir)
     out.sample_rate = GetPrivateProfileIntW(L"Audio", L"sampleRate", 0, ini_path.c_str());
     out.pauseMode = GetPrivateProfileIntW(L"Audio", L"pauseMode", 1, ini_path.c_str());
 
+    // Pitch mode ("" = language default).
+    {
+        wchar_t pmBuf[64] = {};
+        GetPrivateProfileStringW(L"Audio", L"pitchMode", L"", pmBuf, 64, ini_path.c_str());
+        out.pitchMode = pmBuf;
+    }
+    out.pitchInflectionScale = GetPrivateProfileIntW(L"Audio", L"pitchInflectionScale", -1, ini_path.c_str());
+
     // Voicing tone sliders (-1 = not set).
     auto readSlider = [&](const wchar_t* key) -> int {
         return GetPrivateProfileIntW(L"VoicingTone", key, -1, ini_path.c_str());
