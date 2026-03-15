@@ -1024,7 +1024,7 @@ class TgsbEngine: ObservableObject {
         let masked: Bool
     }
 
-    struct DictType: Identifiable {
+    struct DictType: Identifiable, Equatable {
         let id: String  // type name
         let type: String
         let count: Int
@@ -1040,6 +1040,13 @@ class TgsbEngine: ObservableObject {
     /// Returns the engine's current language tag (tgsb tag).
     func currentEngineLangTag() -> String {
         return selectedLanguage.tgsbTag
+    }
+
+    /// Temporarily switch the frontend language for dictionary browsing.
+    /// The speaking language is restored when speak() is called.
+    func switchEditorLanguage(_ langTag: String) {
+        guard let eng = engine else { return }
+        tgsb_set_language(eng, langTag, langTag)
     }
 
     func loadDictTypes() {

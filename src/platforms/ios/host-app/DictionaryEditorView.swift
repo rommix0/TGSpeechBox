@@ -17,6 +17,7 @@ private func dictTypeLabel(_ type: String) -> String {
     case "pronounce": return "Pronunciation"
     case "compound":  return "Compound"
     case "stress":    return "Stress"
+    case "character": return "Characters"
     default:          return type.prefix(1).uppercased() + type.dropFirst()
     }
 }
@@ -44,6 +45,11 @@ struct DictionaryEditorView: View {
     @State private var exportAllFileURL: URL?
     @State private var exportChangedFileURL: URL?
 
+    private var typePickerLabel: String {
+        if selectedType.isEmpty { return "Select type" }
+        return "\(dictTypeLabel(selectedType)) (\(engine.dictionaryTotalCount))"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Type dropdown + Language dropdown row
@@ -56,15 +62,7 @@ struct DictionaryEditorView: View {
                         }
                     }
                 } label: {
-                    let label: String = {
-                        if selectedType.isEmpty { return "Select type" }
-                        let info = engine.dictTypes.first(where: { $0.type == selectedType })
-                        if let info = info {
-                            return "\(dictTypeLabel(selectedType)) (\(info.count))"
-                        }
-                        return dictTypeLabel(selectedType)
-                    }()
-                    Text(label)
+                    Text(typePickerLabel)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Color.secondary.opacity(0.15))
@@ -76,9 +74,7 @@ struct DictionaryEditorView: View {
                         desc += "Select type"
                     } else {
                         desc += dictTypeLabel(selectedType)
-                        if let info = engine.dictTypes.first(where: { $0.type == selectedType }) {
-                            desc += ", \(info.count) entries"
-                        }
+                        desc += ", \(engine.dictionaryTotalCount) entries"
                     }
                     return desc
                 }())
@@ -129,8 +125,8 @@ struct DictionaryEditorView: View {
 
                 // More options menu
                 Menu {
-                    // Export all (pronunciation only)
-                    if selectedType == "pronounce" {
+                    // Export all (pronunciation + character)
+                    if selectedType == "pronounce" || selectedType == "character" {
                         Button(action: {
                             exportAllFileURL = exportDictToTempFile(userOnly: false)
                             showExportAllPicker = true
@@ -147,8 +143,8 @@ struct DictionaryEditorView: View {
                         Label("Export changed", systemImage: "square.and.arrow.up")
                     }
 
-                    // Share all (pronunciation only)
-                    if selectedType == "pronounce" {
+                    // Share all (pronunciation + character)
+                    if selectedType == "pronounce" || selectedType == "character" {
                         if let url = exportDictToTempFile(userOnly: false) {
                             ShareLink("Share all", item: url)
                         }
@@ -189,11 +185,21 @@ struct DictionaryEditorView: View {
                 Spacer()
             } else if engine.dictionaryEntries.isEmpty {
                 Spacer()
-                Text(activeSearch.isEmpty
-                     ? "No \(dictTypeLabel(selectedType).lowercased()) entries for \(langFilter)"
-                     : "No matches for \"\(activeSearch)\"")
-                    .foregroundColor(.secondary)
-                    .padding()
+                VStack(spacing: 8) {
+                    if !activeSearch.isEmpty {
+                        Text("No matches for \"\(activeSearch)\"")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("No \(dictTypeLabel(selectedType).lowercased()) entries yet")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        Text("Want to be the first to add one? Tap the + (add) button above.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding()
                 Spacer()
             } else {
                 List {
@@ -243,6 +249,18 @@ struct DictionaryEditorView: View {
             if engineStarted {
                 engine.loadEditorLanguages()
                 engine.loadDictTypes()
+            }
+            // Default language from system locale if not yet set.
+            if langFilter.isEmpty && !engine.editorLanguages.isEmpty {
+                let engineLang = engine.currentEngineLangTag()
+                if engine.editorLanguages.contains(engineLang) {
+                    langFilter = engineLang
+                } else {
+                    // Try system locale (e.g. "es" from "es-ES").
+                    let sysLang = Locale.current.language.languageCode?.identifier ?? ""
+                    let match = engine.editorLanguages.first(where: { $0.hasPrefix(sysLang) })
+                    langFilter = match ?? engine.editorLanguages.first ?? ""
+                }
             }
         }
         .onChange(of: engine.editorLanguages) { langs in
@@ -356,6 +374,9 @@ struct DictionaryEditorView: View {
 
     private func reloadEntries() {
         guard !langFilter.isEmpty, !selectedType.isEmpty else { return }
+        // Switch the frontend language so the data query returns the right pack.
+        engine.switchEditorLanguage(langFilter)
+        engine.loadDictTypes()
         engine.loadDictionary(
             langTag: langFilter,
             subType: selectedType,
@@ -507,6 +528,7 @@ private struct DictEntrySheet: View {
         switch dictType {
         case "stress":    return "Stress pattern"
         case "compound":  return "Split as"
+        case "character": return "Description"
         default:          return "Pronounce as"
         }
     }
@@ -515,22 +537,33 @@ private struct DictEntrySheet: View {
         switch dictType {
         case "stress":    return "Space-separated digits: 1 = primary, 2 = secondary, 0 = none"
         case "compound":  return "Space-separated parts, e.g. \"lock box\""
+        case "character": return "How this character is spoken, e.g. \"a acentuada\""
         default:          return nil
         }
     }
 
+    private var fromLabel: String {
+        dictType == "character" ? "Symbol" : "Word"
+    }
+
     private var showCategory: Bool {
-        return dictType != "stress" && dictType != "compound"
+        return dictType != "stress" && dictType != "compound" && dictType != "character"
     }
 
     var body: some View {
         NavigationView {
             Form {
-                Section("Word") {
-                    TextField("Word", text: $fromText)
+                Section(fromLabel) {
+                    TextField(fromLabel, text: $fromText)
                         .disabled(isEdit)
                         .autocorrectionDisabled()
-                        .accessibilityLabel(isEdit ? "Word, \(fromText)" : "Word")
+                        .accessibilityLabel(isEdit ? "\(fromLabel), \(fromText)" : fromLabel)
+                        .onChange(of: fromText) { newValue in
+                            if dictType == "character" {
+                                let stripped = newValue.replacingOccurrences(of: " ", with: "")
+                                if stripped != newValue { fromText = stripped }
+                            }
+                        }
                 }
                 Section(toLabel) {
                     TextField(toLabel, text: $toText)

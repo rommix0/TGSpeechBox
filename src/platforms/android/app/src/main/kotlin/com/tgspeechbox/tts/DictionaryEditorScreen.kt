@@ -43,6 +43,7 @@ private fun dictTypeLabel(type: String): String = when (type) {
     "compound" -> "Compound"
     "pronounce" -> "Pronunciation"
     "stress" -> "Stress"
+    "character" -> "Characters"
     else -> type.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
 }
 
@@ -137,7 +138,11 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
         if (langFilter.isEmpty() && langs.isNotEmpty()) {
             val engineLang = viewModel.currentEngineLangTag()
             langFilter = if (engineLang in langs) engineLang
-                         else langs.firstOrNull() ?: ""
+                         else {
+                             // Fall back to system locale prefix match.
+                             val sysLang = Locale.getDefault().language
+                             langs.firstOrNull { it.startsWith(sysLang) } ?: langs.firstOrNull() ?: ""
+                         }
         }
     }
 
@@ -188,18 +193,13 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                         contentDescription = buildString {
                             append("Type: ")
                             append(if (selectedType.isEmpty()) "Select type" else dictTypeLabel(selectedType))
-                            val typeInfo = types.find { it.type == selectedType }
-                            if (typeInfo != null) append(", ${typeInfo.count} entries")
+                            if (selectedType.isNotEmpty()) append(", $totalCount entries")
                             append(", dropdown button")
                         }
                     }
                 ) {
                     val label = if (selectedType.isEmpty()) "Select type"
-                    else {
-                        val typeInfo = types.find { it.type == selectedType }
-                        if (typeInfo != null) "${dictTypeLabel(selectedType)} (${typeInfo.count})"
-                        else dictTypeLabel(selectedType)
-                    }
+                    else "${dictTypeLabel(selectedType)} ($totalCount)"
                     Text(label)
                 }
                 DropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
@@ -287,8 +287,8 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                     expanded = showMoreMenu,
                     onDismissRequest = { showMoreMenu = false }
                 ) {
-                    // Export all (file picker — pronunciation only)
-                    if (selectedType == "pronounce") {
+                    // Export all (file picker — pronunciation + character)
+                    if (selectedType == "pronounce" || selectedType == "character") {
                         DropdownMenuItem(
                             text = { Text("Export all") },
                             onClick = {
@@ -307,8 +307,8 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                             exportLauncher.launch("${selectedType}_${langFilter}_changed.tsv")
                         }
                     )
-                    // Share all (share sheet — pronunciation only)
-                    if (selectedType == "pronounce") {
+                    // Share all (share sheet — pronunciation + character)
+                    if (selectedType == "pronounce" || selectedType == "character") {
                         DropdownMenuItem(
                             text = { Text("Share all") },
                             onClick = {
@@ -348,13 +348,25 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
 
         if (entries.isEmpty() && langFilter.isNotEmpty() && selectedType.isNotEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    if (activeSearch.isNotEmpty())
-                        "No matches for \"$activeSearch\""
-                    else
-                        "No ${dictTypeLabel(selectedType).lowercase()} entries for $langFilter",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (activeSearch.isNotEmpty()) {
+                        Text(
+                            "No matches for \"$activeSearch\"",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        Text(
+                            "No ${dictTypeLabel(selectedType).lowercase()} entries yet",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Want to be the first to add one? Tap the + (add) button above.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -621,12 +633,19 @@ private fun DictAddDialog(
             toHelper = "Space-separated parts, e.g. \"lock box\""
             showCategory = false
         }
+        "character" -> {
+            toLabel = "Description"
+            toHelper = "How this character is spoken, e.g. \"a acentuada\""
+            showCategory = false
+        }
         else -> { // "pronounce" or unknown
             toLabel = "Pronounce as"
             toHelper = null
             showCategory = true
         }
     }
+
+    val fromLabel = if (dictType == "character") "Symbol" else "Word"
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -635,8 +654,10 @@ private fun DictAddDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = fromText,
-                    onValueChange = { fromText = it },
-                    label = { Text("Word") },
+                    onValueChange = { v ->
+                        fromText = if (dictType == "character") v.replace(" ", "") else v
+                    },
+                    label = { Text(fromLabel) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -701,11 +722,17 @@ private fun DictEditDialog(
             toLabel = "Split as"
             showCategory = false
         }
+        "character" -> {
+            toLabel = "Description"
+            showCategory = false
+        }
         else -> {
             toLabel = "Pronounce as"
             showCategory = true
         }
     }
+
+    val fromLabel = if (dictType == "character") "Symbol" else "Word"
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -715,7 +742,7 @@ private fun DictEditDialog(
                 OutlinedTextField(
                     value = fromText,
                     onValueChange = { fromText = it },
-                    label = { Text("Word") },
+                    label = { Text(fromLabel) },
                     singleLine = true,
                     enabled = false,
                     modifier = Modifier.fillMaxWidth()
