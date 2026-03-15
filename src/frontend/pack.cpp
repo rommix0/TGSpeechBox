@@ -1949,7 +1949,7 @@ static void loadCompoundMap(
 
 static void loadPronDict(
     const std::string& path,
-    PackSet::PronDict& dict,
+    PronDict& dict,
     const std::string& source)
 {
   std::ifstream f(path);
@@ -1975,7 +1975,7 @@ static void loadPronDict(
     if (cols.empty() || cols[0].empty()) continue;
     if (cols.size() < 2 || cols[1].empty()) continue;
 
-    PackSet::DictEntry e;
+    DictEntry e;
     e.fromText = cols[0];
     e.toText   = cols[1];
     e.fromIpa  = cols.size() > 2 ? cols[2] : "";

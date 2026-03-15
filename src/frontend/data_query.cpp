@@ -681,4 +681,90 @@ std::string serializePhonemesJson(const DataCache& cache, int offset, int limit)
   return out;
 }
 
+// ── Dictionary cache builder ─────────────────────────────────────────
+
+void buildDictionaryCache(DataCache& cache,
+                          const nvsp_frontend::PronDict& dict) {
+  cache.dictionary.clear();
+  cache.dictionary.reserve(dict.entries.size());
+
+  for (const auto& kv : dict.entries) {
+    DictRecord rec;
+    rec.key      = kv.second.fromText;
+    rec.toText   = kv.second.toText;
+    rec.fromIpa  = kv.second.fromIpa;
+    rec.toIpa    = kv.second.toIpa;
+    rec.category = kv.second.category;
+    rec.source   = kv.second.source;
+    rec.masked   = kv.second.masked;
+    cache.dictionary.push_back(std::move(rec));
+  }
+
+  // Sort alphabetically by key for stable ordering.
+  std::sort(cache.dictionary.begin(), cache.dictionary.end(),
+            [](const DictRecord& a, const DictRecord& b) {
+              return a.key < b.key;
+            });
+
+  cache.dictionaryValid = true;
+}
+
+// ── Dictionary JSON serializer ───────────────────────────────────────
+
+std::string serializeDictionaryJson(const DataCache& cache, int offset, int limit) {
+  const auto& vec = cache.dictionary;
+  const int total = static_cast<int>(vec.size());
+
+  if (offset < 0) offset = 0;
+  if (offset >= total) return "[]";
+
+  int endIdx = total;
+  if (limit > 0 && offset + limit < total) {
+    endIdx = offset + limit;
+  }
+
+  std::string out;
+  out.reserve((endIdx - offset) * 200);
+  out += '[';
+
+  bool first = true;
+  for (int i = offset; i < endIdx; ++i) {
+    const auto& rec = vec[i];
+
+    if (!first) out += ',';
+    first = false;
+
+    out += '{';
+
+    out += "\"key\":";
+    jsonEscapeAppend(out, rec.key);
+
+    out += ",\"fromText\":";
+    jsonEscapeAppend(out, rec.key);
+
+    out += ",\"toText\":";
+    jsonEscapeAppend(out, rec.toText);
+
+    out += ",\"fromIpa\":";
+    jsonEscapeAppend(out, rec.fromIpa);
+
+    out += ",\"toIpa\":";
+    jsonEscapeAppend(out, rec.toIpa);
+
+    out += ",\"category\":";
+    jsonEscapeAppend(out, rec.category);
+
+    out += ",\"source\":";
+    jsonEscapeAppend(out, rec.source);
+
+    out += ",\"masked\":";
+    out += rec.masked ? "true" : "false";
+
+    out += '}';
+  }
+
+  out += ']';
+  return out;
+}
+
 } // namespace tgsb_data

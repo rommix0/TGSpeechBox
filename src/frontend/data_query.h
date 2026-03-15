@@ -16,6 +16,7 @@ Provides typed, paginated access to pack settings, phoneme data, and
 // Forward declarations — avoid pulling in pack.h.
 namespace nvsp_frontend {
 struct LanguagePack;
+struct PronDict;
 }
 
 namespace tgsb_data {
@@ -50,6 +51,17 @@ struct PhonemeRecord {
   std::string mappingFrom;  // non-empty only in lang-filtered view
 };
 
+// ── Cached dictionary record ──
+struct DictRecord {
+  std::string key;       // fromText (case-preserved for display)
+  std::string toText;
+  std::string fromIpa;
+  std::string toIpa;
+  std::string category;
+  std::string source;    // "main" or "user"
+  bool masked = false;
+};
+
 // ── Per-domain cache ──
 struct DataCache {
   std::string langTag;
@@ -60,9 +72,13 @@ struct DataCache {
   std::vector<PhonemeRecord> phonemes;
   bool phonemesValid = false;
 
+  std::vector<DictRecord> dictionary;
+  bool dictionaryValid = false;
+
   void invalidate() {
     settingsValid = false;
     phonemesValid = false;
+    dictionaryValid = false;
   }
 };
 
@@ -82,6 +98,10 @@ void buildPhonemesCache(DataCache& cache,
                         const std::string& packDir,
                         const std::string& langTag);
 
+// Build dictionary cache from an in-memory PronDict.
+void buildDictionaryCache(DataCache& cache,
+                          const nvsp_frontend::PronDict& dict);
+
 // ── JSON serializers ──
 
 // Serialize a slice of the settings cache to a JSON array string.
@@ -90,6 +110,9 @@ std::string serializeSettingsJson(const DataCache& cache, int offset, int limit)
 
 // Serialize a slice of the phonemes cache to a JSON array string.
 std::string serializePhonemesJson(const DataCache& cache, int offset, int limit);
+
+// Serialize a slice of the dictionary cache to a JSON array string.
+std::string serializeDictionaryJson(const DataCache& cache, int offset, int limit);
 
 // ── Type detection ──
 

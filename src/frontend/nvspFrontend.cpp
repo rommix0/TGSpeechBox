@@ -1299,6 +1299,14 @@ NVSP_FRONTEND_API int nvspFrontend_getDataCount(
     return static_cast<int>(h->dataCache.phonemes.size());
   }
 
+  if (domain == NVSP_DATA_DICTIONARY) {
+    if (!h->packLoaded) return 0;
+    if (!h->dataCache.dictionaryValid) {
+      tgsb_data::buildDictionaryCache(h->dataCache, h->pack.pronDict);
+    }
+    return static_cast<int>(h->dataCache.dictionary.size());
+  }
+
   // Unsupported domain.
   return -1;
 }
@@ -1339,6 +1347,21 @@ NVSP_FRONTEND_API char* nvspFrontend_queryData(
     }
 
     std::string json = tgsb_data::serializePhonemesJson(h->dataCache, offset, limit);
+    if (json.empty()) return nullptr;
+
+    char* out = static_cast<char*>(std::malloc(json.size() + 1));
+    if (!out) return nullptr;
+    std::memcpy(out, json.c_str(), json.size() + 1);
+    return out;
+  }
+
+  if (domain == NVSP_DATA_DICTIONARY) {
+    if (!h->packLoaded) return nullptr;
+    if (!h->dataCache.dictionaryValid) {
+      tgsb_data::buildDictionaryCache(h->dataCache, h->pack.pronDict);
+    }
+
+    std::string json = tgsb_data::serializeDictionaryJson(h->dataCache, offset, limit);
     if (json.empty()) return nullptr;
 
     char* out = static_cast<char*>(std::malloc(json.size() + 1));
@@ -1483,6 +1506,73 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
     }
 
     h->dataCache.invalidate();
+    return 1;
+  }
+
+  if (domain == NVSP_DATA_DICTIONARY) {
+    const std::string fromText(keyUtf8);
+    const std::string value(valueUtf8);
+
+    // Lowercase key for case-insensitive lookup.
+    std::string lk = fromText;
+    for (auto& c : lk)
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    if (value.empty()) {
+      // Delete entry.
+      h->pack.pronDict.entries.erase(lk);
+    } else {
+      // Parse JSON value: {"toText":"...", "fromIpa":"...", "toIpa":"...",
+      //                     "category":"...", "masked":false}
+      // Simple extraction — find quoted values after known keys.
+      auto extractStr = [&](const char* field) -> std::string {
+        auto pos = value.find(field);
+        if (pos == std::string::npos) return "";
+        pos = value.find('"', pos + std::strlen(field));
+        if (pos == std::string::npos) return "";
+        ++pos;  // skip opening quote
+        auto end = value.find('"', pos);
+        if (end == std::string::npos) return "";
+        return value.substr(pos, end - pos);
+      };
+
+      DictEntry e;
+      e.fromText = fromText;
+      e.toText   = extractStr("\"toText\":");
+      e.fromIpa  = extractStr("\"fromIpa\":");
+      e.toIpa    = extractStr("\"toIpa\":");
+      e.category = extractStr("\"category\":");
+      e.source   = "user";
+      e.masked   = (value.find("\"masked\":true") != std::string::npos);
+
+      // If toText is empty but masked is set, update mask on existing entry.
+      if (e.toText.empty() && e.masked) {
+        auto it = h->pack.pronDict.entries.find(lk);
+        if (it != h->pack.pronDict.entries.end()) {
+          it->second.masked = true;
+          h->dataCache.dictionaryValid = false;
+          return 1;
+        }
+        return 0;
+      }
+      // Unmask: masked=false with empty toText.
+      if (e.toText.empty() && !e.masked &&
+          value.find("\"masked\":false") != std::string::npos) {
+        auto it = h->pack.pronDict.entries.find(lk);
+        if (it != h->pack.pronDict.entries.end()) {
+          it->second.masked = false;
+          h->dataCache.dictionaryValid = false;
+          return 1;
+        }
+        return 0;
+      }
+
+      if (e.toText.empty()) return 0;  // toText is required for new entries
+
+      h->pack.pronDict.entries[lk] = std::move(e);
+    }
+
+    h->dataCache.dictionaryValid = false;
     return 1;
   }
 

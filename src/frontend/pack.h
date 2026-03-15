@@ -1234,6 +1234,23 @@ double liquidDynamicsLabialGlideTransitionPct = 0.60;
   bool toneContoursAbsolute = true;
 };
 
+// Pronunciation dictionary entry.
+struct DictEntry {
+  std::string fromText;   // original word (case-preserved for display)
+  std::string toText;     // replacement text (fed to eSpeak)
+  std::string fromIpa;    // expected IPA for fromText (validation/migration)
+  std::string toIpa;      // expected IPA for toText (validation/migration)
+  std::string category;   // user-defined tag, "" = uncategorized
+  std::string source;     // "main" or "user"
+  bool masked = false;    // if true, entry suppressed
+};
+
+// Pronunciation dictionary: text-to-text replacement, runs pre-eSpeak.
+struct PronDict {
+  std::unordered_map<std::string, DictEntry> entries;  // lowercase key → entry
+  std::vector<std::string> categories;                 // discovered dynamically
+};
+
 struct PackSet {
   std::unordered_map<std::u32string, PhonemeDef> phonemes;
   LanguagePack lang;
@@ -1263,24 +1280,9 @@ struct PackSet {
   // Phase 2: pre-eSpeak splitting for vowel quality.
   std::unordered_map<std::string, std::vector<std::string>> compoundMap;
 
-  // Pronunciation dictionary entry.
-  struct DictEntry {
-    std::string fromText;   // original word (case-preserved for display)
-    std::string toText;     // replacement text (fed to eSpeak)
-    std::string fromIpa;    // expected IPA for fromText (validation/migration)
-    std::string toIpa;      // expected IPA for toText (validation/migration)
-    std::string category;   // user-defined tag, "" = uncategorized
-    std::string source;     // "main" or "user"
-    bool masked = false;    // if true, entry suppressed
-  };
-
   // Pronunciation dictionary: text-to-text replacement, runs pre-eSpeak.
   // Loaded from packs/dict/{langTag}-dict.tsv at pack load time.
   // User entries added via nvspFrontend_setData(DICTIONARY, ...).
-  struct PronDict {
-    std::unordered_map<std::string, DictEntry> entries;  // lowercase key → entry
-    std::vector<std::string> categories;                 // discovered dynamically
-  };
   PronDict pronDict;
 };
 
