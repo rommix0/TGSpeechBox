@@ -164,6 +164,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
     // Reload entries when type, language, or active search changes
     LaunchedEffect(selectedType, langFilter, activeSearch) {
         if (selectedType.isNotEmpty() && langFilter.isNotEmpty()) {
+            viewModel.reapplyDictOverrides(langFilter)
             viewModel.loadDictionary(langFilter, selectedType, offset = 0, limit = 100, search = activeSearch)
             loadedCount = 100
         }

@@ -58,9 +58,8 @@ struct DictionaryEditorView: View {
                 // Type picker
                 Menu {
                     ForEach(engine.dictTypes) { dt in
-                        Button("\(dictTypeLabel(dt.type)) (\(dt.count))") {
-                            selectedType = dt.type
-                        }
+                        let label = dictTypeLabel(dt.type) + " (\(dt.count))"
+                        Button(label) { selectedType = dt.type }
                     }
                 } label: {
                     Text(typePickerLabel)
@@ -166,8 +165,8 @@ struct DictionaryEditorView: View {
 
                     // Remove duplicates
                     Button(action: {
-                        let mainKeys = Set(entries.filter { $0.source == "main" }.map { $0.fromText.lowercased() })
-                        let duplicates = entries.filter { $0.source == "user" && mainKeys.contains($0.fromText.lowercased()) }
+                        let mainKeys = Set(engine.dictionaryEntries.filter { $0.source == "main" }.map { $0.fromText.lowercased() })
+                        let duplicates = engine.dictionaryEntries.filter { $0.source == "user" && mainKeys.contains($0.fromText.lowercased()) }
                         if duplicates.count > 500 {
                             statusMessage = "Too many duplicates (\(duplicates.count)), remove manually"
                         } else if duplicates.isEmpty {
@@ -399,8 +398,8 @@ struct DictionaryEditorView: View {
 
     private func reloadEntries() {
         guard !langFilter.isEmpty, !selectedType.isEmpty else { return }
-        // Cross-language browsing: C++ backend loads dict files from disk
-        // for non-current languages via getDictRefs(), no language switch needed.
+        // Re-apply user overrides so they show up in the query results.
+        engine.reapplyDictOverrides(langFilter)
         engine.loadDictTypes(langTag: langFilter)
         engine.loadDictionary(
             langTag: langFilter,
