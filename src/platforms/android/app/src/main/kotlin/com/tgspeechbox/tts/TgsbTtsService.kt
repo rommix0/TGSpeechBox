@@ -287,6 +287,36 @@ class TgsbTtsService : TextToSpeechService() {
         for ((k, v) in overrides) {
             nativeSetData(nativeHandle, TgsbSpeakEngine.DATA_SETTINGS, tgsbLang, k, v)
         }
+        // Apply dictionary user overlays.
+        applyDictOverrides(tgsbLang)
+        // Apply dictionary type exclusions.
+        applyDictDisabled(tgsbLang)
+    }
+
+    /** Apply user dictionary overlays saved by the editor. */
+    private fun applyDictOverrides(tgsbLang: String) {
+        if (nativeHandle == 0L) return
+        val json = prefs.getString("dict_overrides_$tgsbLang", null) ?: return
+        val overrides = try {
+            val obj = org.json.JSONObject(json)
+            obj.keys().asSequence().associateWith { obj.getString(it) }
+        } catch (e: Exception) { return }
+        for ((k, v) in overrides) {
+            nativeSetData(nativeHandle, TgsbSpeakEngine.DATA_DICTIONARY, tgsbLang, k, v)
+        }
+    }
+
+    /** Apply dictionary type exclusions saved by the editor. */
+    private fun applyDictDisabled(tgsbLang: String) {
+        if (nativeHandle == 0L) return
+        val json = prefs.getString("dict_disabled_$tgsbLang", null) ?: return
+        val disabled = try {
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { arr.getString(it) }
+        } catch (e: Exception) { return }
+        for (type in disabled) {
+            nativeSetData(nativeHandle, TgsbSpeakEngine.DATA_DICTIONARY, "config:$tgsbLang", type, "false")
+        }
     }
 
     /**
