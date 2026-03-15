@@ -39,6 +39,7 @@ std::string runTextParser(
 // Pre-eSpeak text normalization.
 //
 // Applies text-level transforms before eSpeak phonemization:
+//   0. Pronunciation dictionary — "monster" → "mahnster" (highest priority)
 //   1. Compound splitting — "dogfood" → "dog\x1Ffood" (if in compoundMap)
 //   2. Date ordinals — "June 6" → "June 6th" (English only)
 //   3. Year splitting — "1995" → "19 95" (if yearSplitting enabled)
@@ -48,6 +49,7 @@ std::string runTextParser(
 std::string prepareTextForEspeak(
     const std::string& text,
     const std::unordered_map<std::string, std::vector<std::string>>& compoundMap,
+    const PackSet::PronDict& pronDict,
     const std::string& langTag,
     bool yearSplitting,
     const std::string& ohDigit = "");

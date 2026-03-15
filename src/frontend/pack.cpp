@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE for details.
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
 
 namespace fs = std::filesystem;
 
@@ -1946,6 +1947,59 @@ static void loadCompoundMap(
   }
 }
 
+static void loadPronDict(
+    const std::string& path,
+    PackSet::PronDict& dict,
+    const std::string& source)
+{
+  std::ifstream f(path);
+  if (!f.is_open()) return;
+
+  std::string line;
+  while (std::getline(f, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+
+    // Parse up to 5 tab-separated columns.
+    std::vector<std::string> cols;
+    size_t pos = 0;
+    for (int i = 0; i < 5; ++i) {
+      size_t tab = line.find('\t', pos);
+      if (tab == std::string::npos) {
+        cols.push_back(line.substr(pos));
+        break;
+      }
+      cols.push_back(line.substr(pos, tab - pos));
+      pos = tab + 1;
+    }
+    if (cols.empty() || cols[0].empty()) continue;
+    if (cols.size() < 2 || cols[1].empty()) continue;
+
+    PackSet::DictEntry e;
+    e.fromText = cols[0];
+    e.toText   = cols[1];
+    e.fromIpa  = cols.size() > 2 ? cols[2] : "";
+    e.toIpa    = cols.size() > 3 ? cols[3] : "";
+    e.category = cols.size() > 4 ? cols[4] : "";
+    e.source   = source;
+
+    // Lowercase key for case-insensitive lookup.
+    std::string key = e.fromText;
+    for (auto& c : key)
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    dict.entries[key] = std::move(e);
+  }
+
+  // Rebuild dynamic category list.
+  std::unordered_set<std::string> catSet;
+  for (const auto& kv : dict.entries) {
+    if (!kv.second.category.empty())
+      catSet.insert(kv.second.category);
+  }
+  dict.categories.assign(catSet.begin(), catSet.end());
+}
+
 bool loadPackSet(
   const std::string& packDir,
   const std::string& langTag,
@@ -2069,6 +2123,32 @@ bool loadPackSet(
         if (dash != std::string::npos) {
           const fs::path basePath = packsRoot / "dict" / (tag.substr(0, dash) + "-compounds.tsv");
           loadCompoundMap(basePath.string(), out.compoundMap);
+        }
+      }
+    }
+  }
+
+  // Load pronunciation dictionary (if one exists for this language).
+  // Check override dir first, then fall back to bundle.
+  {
+    const auto& tag = out.lang.langTag;
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path ovDict = fs::path(overrideDir) / "packs" / "dict" / (tag + "-dict.tsv");
+      if (fs::exists(ovDict)) {
+        loadPronDict(ovDict.string(), out.pronDict, "main");
+        loaded = true;
+      }
+    }
+    if (!loaded) {
+      const fs::path dictPath = packsRoot / "dict" / (tag + "-dict.tsv");
+      loadPronDict(dictPath.string(), out.pronDict, "main");
+      // Fallback to base language (e.g., "en" for "en-us").
+      if (out.pronDict.entries.empty()) {
+        const auto dash = tag.find('-');
+        if (dash != std::string::npos) {
+          const fs::path basePath = packsRoot / "dict" / (tag.substr(0, dash) + "-dict.tsv");
+          loadPronDict(basePath.string(), out.pronDict, "main");
         }
       }
     }

@@ -1508,11 +1508,81 @@ static std::string splitYears(const std::string& text, const std::string& ohDigi
   return result;
 }
 
+// ── Pronunciation dictionary replacement ──
+
+static std::string dictReplaceInText(
+    const std::string& text,
+    const PackSet::PronDict& dict)
+{
+  if (text.empty() || dict.entries.empty()) return text;
+
+  std::string result;
+  result.reserve(text.size() + 32);
+
+  size_t i = 0;
+  while (i < text.size()) {
+    // Skip whitespace.
+    if (text[i] == ' ' || text[i] == '\t' ||
+        text[i] == '\n' || text[i] == '\r') {
+      result.push_back(text[i]);
+      ++i;
+      continue;
+    }
+
+    // Extract word token.
+    size_t wordStart = i;
+    while (i < text.size() && text[i] != ' ' && text[i] != '\t' &&
+           text[i] != '\n' && text[i] != '\r') {
+      ++i;
+    }
+    std::string token = text.substr(wordStart, i - wordStart);
+
+    // Strip leading/trailing punctuation for lookup.
+    size_t lo = 0;
+    while (lo < token.size() &&
+           std::ispunct(static_cast<unsigned char>(token[lo])))
+      ++lo;
+    size_t hi = token.size();
+    while (hi > lo &&
+           std::ispunct(static_cast<unsigned char>(token[hi - 1])))
+      --hi;
+
+    if (lo >= hi) {
+      result += token;
+      continue;
+    }
+
+    // Lowercase the core word for case-insensitive lookup.
+    std::string key;
+    key.reserve(hi - lo);
+    for (size_t k = lo; k < hi; ++k)
+      key.push_back(static_cast<char>(
+          std::tolower(static_cast<unsigned char>(token[k]))));
+
+    auto it = dict.entries.find(key);
+    if (it == dict.entries.end() || it->second.masked) {
+      result += token;
+      continue;
+    }
+
+    TPLOG("  dictReplace: \"%s\" → \"%s\"\n",
+          it->second.fromText.c_str(), it->second.toText.c_str());
+
+    // Replace core with toText, preserving surrounding punctuation.
+    result += token.substr(0, lo);
+    result += it->second.toText;
+    result += token.substr(hi);
+  }
+
+  return result;
+}
+
 // ── Public API ──
 
 std::string prepareTextForEspeak(
     const std::string& text,
     const std::unordered_map<std::string, std::vector<std::string>>& compoundMap,
+    const PackSet::PronDict& pronDict,
     const std::string& langTag,
     bool yearSplitting,
     const std::string& ohDigit)
@@ -1523,6 +1593,11 @@ std::string prepareTextForEspeak(
         text.c_str(), langTag.c_str(), yearSplitting ? 1 : 0);
 
   std::string result = text;
+
+  // 0. Pronunciation dictionary replacement (highest priority).
+  if (!pronDict.entries.empty()) {
+    result = dictReplaceInText(result, pronDict);
+  }
 
   // 1. Compound splitting.
   if (!compoundMap.empty()) {

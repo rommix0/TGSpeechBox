@@ -1015,7 +1015,8 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
 
   const std::string original(textUtf8);
   std::string input = normalizeText(original);
-  std::string result = prepareTextForEspeak(input, h->pack.compoundMap, h->langTag,
+  std::string result = prepareTextForEspeak(input, h->pack.compoundMap,
+                                             h->pack.pronDict, h->langTag,
                                              h->pack.lang.yearSplittingEnabled,
                                              h->pack.lang.numberExpansion.ohDigit);
 
