@@ -709,27 +709,98 @@ void buildDictionaryCache(DataCache& cache,
   cache.dictionaryValid = true;
 }
 
-// ── Dictionary JSON serializer ───────────────────────────────────────
+// ── Stress dictionary cache builder ──────────────────────────────────
 
-std::string serializeDictionaryJson(const DataCache& cache, int offset, int limit) {
-  const auto& vec = cache.dictionary;
-  const int total = static_cast<int>(vec.size());
+void buildStressDictCache(DataCache& cache,
+                          const std::unordered_map<std::string, std::vector<int>>& stressDict) {
+  cache.dictionary.clear();
+  cache.dictionary.reserve(stressDict.size());
 
-  if (offset < 0) offset = 0;
-  if (offset >= total) return "[]";
-
-  int endIdx = total;
-  if (limit > 0 && offset + limit < total) {
-    endIdx = offset + limit;
+  for (const auto& kv : stressDict) {
+    DictRecord rec;
+    rec.key = kv.first;
+    // Join stress digits with spaces: {1, 0, 2} → "1 0 2"
+    std::string joined;
+    for (size_t i = 0; i < kv.second.size(); ++i) {
+      if (i > 0) joined += ' ';
+      joined += std::to_string(kv.second[i]);
+    }
+    rec.toText = std::move(joined);
+    rec.source = "main";
+    cache.dictionary.push_back(std::move(rec));
   }
 
+  std::sort(cache.dictionary.begin(), cache.dictionary.end(),
+            [](const DictRecord& a, const DictRecord& b) {
+              return a.key < b.key;
+            });
+
+  cache.dictionaryValid = true;
+}
+
+// ── Compound map cache builder ───────────────────────────────────────
+
+void buildCompoundDictCache(DataCache& cache,
+                            const std::unordered_map<std::string, std::vector<std::string>>& compoundMap) {
+  cache.dictionary.clear();
+  cache.dictionary.reserve(compoundMap.size());
+
+  for (const auto& kv : compoundMap) {
+    DictRecord rec;
+    rec.key = kv.first;
+    // Join parts with spaces: {"lock", "box"} → "lock box"
+    std::string joined;
+    for (size_t i = 0; i < kv.second.size(); ++i) {
+      if (i > 0) joined += ' ';
+      joined += kv.second[i];
+    }
+    rec.toText = std::move(joined);
+    rec.source = "main";
+    cache.dictionary.push_back(std::move(rec));
+  }
+
+  std::sort(cache.dictionary.begin(), cache.dictionary.end(),
+            [](const DictRecord& a, const DictRecord& b) {
+              return a.key < b.key;
+            });
+
+  cache.dictionaryValid = true;
+}
+
+// ── Dictionary JSON serializer ───────────────────────────────────────
+
+// Case-insensitive prefix match helper.
+static bool keyMatchesSearch(const std::string& key, const std::string& search) {
+  if (search.empty()) return true;
+  if (key.size() < search.size()) return false;
+  for (size_t i = 0; i < search.size(); ++i) {
+    char a = static_cast<char>(std::tolower(static_cast<unsigned char>(key[i])));
+    if (a != search[i]) return false;  // search is already lowered
+  }
+  return true;
+}
+
+std::string serializeDictionaryJson(const DataCache& cache, int offset, int limit,
+                                    const std::string& search) {
+  const auto& vec = cache.dictionary;
+
+  if (offset < 0) offset = 0;
+
   std::string out;
-  out.reserve((endIdx - offset) * 200);
+  out.reserve(std::min(static_cast<int>(vec.size()), limit > 0 ? limit : 200) * 200);
   out += '[';
 
   bool first = true;
-  for (int i = offset; i < endIdx; ++i) {
-    const auto& rec = vec[i];
+  int matched = 0;
+  int emitted = 0;
+
+  for (const auto& rec : vec) {
+    if (!keyMatchesSearch(rec.key, search)) continue;
+
+    if (matched < offset) { ++matched; continue; }
+    ++matched;
+
+    if (limit > 0 && emitted >= limit) break;
 
     if (!first) out += ',';
     first = false;
@@ -761,10 +832,20 @@ std::string serializeDictionaryJson(const DataCache& cache, int offset, int limi
     out += rec.masked ? "true" : "false";
 
     out += '}';
+    ++emitted;
   }
 
   out += ']';
   return out;
+}
+
+int countDictionaryMatches(const DataCache& cache, const std::string& search) {
+  if (search.empty()) return static_cast<int>(cache.dictionary.size());
+  int count = 0;
+  for (const auto& rec : cache.dictionary) {
+    if (keyMatchesSearch(rec.key, search)) ++count;
+  }
+  return count;
 }
 
 } // namespace tgsb_data

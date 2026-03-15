@@ -11,6 +11,7 @@ Provides typed, paginated access to pack settings, phoneme data, and
 #define TGSB_DATA_QUERY_H
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 // Forward declarations — avoid pulling in pack.h.
@@ -74,11 +75,13 @@ struct DataCache {
 
   std::vector<DictRecord> dictionary;
   bool dictionaryValid = false;
+  std::string dictionarySubType;  // "", "stress", or "compound"
 
   void invalidate() {
     settingsValid = false;
     phonemesValid = false;
     dictionaryValid = false;
+    dictionarySubType.clear();
   }
 };
 
@@ -102,6 +105,14 @@ void buildPhonemesCache(DataCache& cache,
 void buildDictionaryCache(DataCache& cache,
                           const nvsp_frontend::PronDict& dict);
 
+// Build dictionary cache from an in-memory stress dictionary.
+void buildStressDictCache(DataCache& cache,
+                          const std::unordered_map<std::string, std::vector<int>>& stressDict);
+
+// Build dictionary cache from an in-memory compound map.
+void buildCompoundDictCache(DataCache& cache,
+                            const std::unordered_map<std::string, std::vector<std::string>>& compoundMap);
+
 // ── JSON serializers ──
 
 // Serialize a slice of the settings cache to a JSON array string.
@@ -112,7 +123,14 @@ std::string serializeSettingsJson(const DataCache& cache, int offset, int limit)
 std::string serializePhonemesJson(const DataCache& cache, int offset, int limit);
 
 // Serialize a slice of the dictionary cache to a JSON array string.
-std::string serializeDictionaryJson(const DataCache& cache, int offset, int limit);
+// If search is non-empty, only entries whose key starts with search are included
+// (case-insensitive prefix match). Pagination applies after filtering.
+std::string serializeDictionaryJson(const DataCache& cache, int offset, int limit,
+                                    const std::string& search = "");
+
+// Count dictionary entries matching a search prefix (case-insensitive).
+// If search is empty, returns total cache size.
+int countDictionaryMatches(const DataCache& cache, const std::string& search);
 
 // ── Type detection ──
 
