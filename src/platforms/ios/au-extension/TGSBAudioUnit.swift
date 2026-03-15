@@ -337,6 +337,7 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         }
         applyStoredOverrides(tgsbLang)
         applyDictOverrides(tgsbLang)
+        applyDictDisabled(tgsbLang)
 
         tgsb_queue_text(eng, plainText, speed, pitch)
 
@@ -536,6 +537,19 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         else { return }
         for (k, v) in obj {
             tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tgsbLang, k, v)
+        }
+    }
+
+    private func applyDictDisabled(_ tgsbLang: String) {
+        guard let eng = engine else { return }
+        let d = UserDefaults(suiteName: "group.com.tgspeechbox.app")
+        guard let json = d?.string(forKey: "dict_disabled_\(tgsbLang)"),
+              let data = json.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [String],
+              !arr.isEmpty
+        else { return }
+        for type in arr {
+            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, "config:\(tgsbLang)", type, "false")
         }
     }
 

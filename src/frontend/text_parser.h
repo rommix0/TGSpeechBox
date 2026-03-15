@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE for details.
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace nvsp_frontend {
@@ -50,6 +51,7 @@ std::string prepareTextForEspeak(
     const std::string& text,
     const std::unordered_map<std::string, std::vector<std::string>>& compoundMap,
     const PronDict& pronDict,
+    const std::unordered_set<std::string>& disabledDictTypes,
     const std::string& langTag,
     bool yearSplitting,
     const std::string& ohDigit = "");

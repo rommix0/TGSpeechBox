@@ -1165,6 +1165,62 @@ class TgsbEngine: ObservableObject {
         for (k, v) in overrides {
             tgsb_set_data(eng, TGSB_DATA_DICTIONARY, langTag, k, v)
         }
+        // Re-apply dict type disabled state
+        let disabled = loadDictDisabled(langTag)
+        for type in disabled {
+            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, "config:\(langTag)", type, "false")
+        }
+    }
+
+    // ── Dict type exclusion ────────────────────────────────────────
+
+    func loadDictConfig(langTag: String) -> [(type: String, enabled: Bool)] {
+        guard let eng = engine else { return [] }
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_DICTIONARY, "config:\(langTag)", 0, 0) else { return [] }
+        let jsonStr = String(cString: ptr)
+        tgsb_free_string(ptr)
+        guard let data = jsonStr.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return [] }
+        return arr.compactMap { obj in
+            guard let type = obj["type"] as? String,
+                  let enabled = obj["enabled"] as? Bool else { return nil }
+            return (type: type, enabled: enabled)
+        }
+    }
+
+    func setDictTypeEnabled(langTag: String, type: String, enabled: Bool) {
+        guard let eng = engine else { return }
+        tgsb_set_data(eng, TGSB_DATA_DICTIONARY, "config:\(langTag)", type, enabled ? "true" : "false")
+        saveDictDisabled(langTag, type: type, disabled: !enabled)
+    }
+
+    private func loadDictDisabled(_ langTag: String) -> Set<String> {
+        let d = UserDefaults(suiteName: kAppGroupId)
+        guard let json = d?.string(forKey: "dict_disabled_\(langTag)"),
+              let data = json.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [String]
+        else { return [] }
+        return Set(arr)
+    }
+
+    private func saveDictDisabled(_ langTag: String, type: String, disabled: Bool) {
+        var current = loadDictDisabled(langTag)
+        if disabled {
+            current.insert(type)
+        } else {
+            current.remove(type)
+        }
+        let d = UserDefaults(suiteName: kAppGroupId)
+        if current.isEmpty {
+            d?.removeObject(forKey: "dict_disabled_\(langTag)")
+        } else {
+            if let data = try? JSONSerialization.data(withJSONObject: Array(current)),
+               let json = String(data: data, encoding: .utf8) {
+                d?.set(json, forKey: "dict_disabled_\(langTag)")
+            }
+        }
+        d?.synchronize()
     }
 
     private func loadDictOverrides(_ langTag: String) -> [String: String] {

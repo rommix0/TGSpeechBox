@@ -881,6 +881,49 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         for ((k, v) in overrides) {
             engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, langTag, k, v)
         }
+        // Re-apply dict type disabled state
+        val disabled = loadDictDisabled(langTag)
+        for (type in disabled) {
+            engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, "config:$langTag", type, "false")
+        }
+    }
+
+    // ── Dict type exclusion ───────────────────────────────────────────
+
+    fun loadDictConfig(langTag: String): Map<String, Boolean> {
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_DICTIONARY, "config:$langTag") ?: return emptyMap()
+        return try {
+            val arr = org.json.JSONArray(jsonStr)
+            val result = mutableMapOf<String, Boolean>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                result[obj.getString("type")] = obj.getBoolean("enabled")
+            }
+            result
+        } catch (e: Exception) { emptyMap() }
+    }
+
+    fun setDictTypeEnabled(langTag: String, type: String, enabled: Boolean) {
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, "config:$langTag", type, if (enabled) "true" else "false")
+        saveDictDisabled(langTag, type, !enabled)
+    }
+
+    private fun loadDictDisabled(langTag: String): Set<String> {
+        val json = prefs.getString("dict_disabled_$langTag", null) ?: return emptySet()
+        return try {
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { arr.getString(it) }.toSet()
+        } catch (e: Exception) { emptySet() }
+    }
+
+    private fun saveDictDisabled(langTag: String, type: String, disabled: Boolean) {
+        val current = loadDictDisabled(langTag).toMutableSet()
+        if (disabled) current.add(type) else current.remove(type)
+        if (current.isEmpty()) {
+            prefs.edit().remove("dict_disabled_$langTag").apply()
+        } else {
+            prefs.edit().putString("dict_disabled_$langTag", org.json.JSONArray(current.toList()).toString()).apply()
+        }
     }
 
     // ── Phoneme editor ────────────────────────────────────────────────

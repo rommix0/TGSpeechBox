@@ -71,6 +71,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
     // More options menu state
     var showMoreMenu by remember { mutableStateOf(false) }
     var showRemoveConfirm by remember { mutableStateOf(false) }
+    var showExcludeDialog by remember { mutableStateOf(false) }
     var pendingExportUserOnly by remember { mutableStateOf(true) }
 
     // Export launcher (file picker → save TSV)
@@ -342,6 +343,14 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                             showRemoveConfirm = true
                         }
                     )
+                    // Exclude dictionaries
+                    DropdownMenuItem(
+                        text = { Text("Exclude dictionaries") },
+                        onClick = {
+                            showMoreMenu = false
+                            showExcludeDialog = true
+                        }
+                    )
                 }
             }
         }
@@ -536,6 +545,15 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                 viewModel.addDictEntry(from, to, cat)
                 editingEntry = null
             }
+        )
+    }
+
+    // Exclude dictionaries dialog
+    if (showExcludeDialog) {
+        ExcludeDictionariesDialog(
+            langTag = langFilter,
+            viewModel = viewModel,
+            onDismiss = { showExcludeDialog = false }
         )
     }
 
@@ -773,6 +791,63 @@ private fun DictEditDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun ExcludeDictionariesDialog(
+    langTag: String,
+    viewModel: TgsbViewModel,
+    onDismiss: () -> Unit
+) {
+    // Load current config on show
+    val config = remember(langTag) { mutableStateMapOf<String, Boolean>() }
+    LaunchedEffect(langTag) {
+        config.clear()
+        config.putAll(viewModel.loadDictConfig(langTag))
+    }
+
+    // Stable order: character, compound, pronounce, stress
+    val sortedTypes = config.keys.sorted()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Exclude dictionaries") },
+        text = {
+            Column {
+                Text(
+                    "Uncheck a dictionary type to exclude it for $langTag.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                for (type in sortedTypes) {
+                    val enabled = config[type] ?: true
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp)
+                    ) {
+                        Checkbox(
+                            checked = enabled,
+                            onCheckedChange = { checked ->
+                                config[type] = checked
+                                viewModel.setDictTypeEnabled(langTag, type, checked)
+                            }
+                        )
+                        Text(
+                            text = dictTypeLabel(type),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
         }
     )
 }

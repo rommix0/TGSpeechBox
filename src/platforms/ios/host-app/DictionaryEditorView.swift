@@ -36,6 +36,7 @@ struct DictionaryEditorView: View {
     @State private var showAddSheet = false
     @State private var editingEntry: TgsbEngine.DictEntry? = nil
     @State private var showRemoveConfirm = false
+    @State private var showExcludeSheet = false
     @State private var statusMessage: String?
 
     // Export state
@@ -162,6 +163,11 @@ struct DictionaryEditorView: View {
                     .disabled(selectedType != "pronounce")
 
                     Divider()
+
+                    // Exclude dictionaries
+                    Button(action: { showExcludeSheet = true }) {
+                        Label("Exclude dictionaries", systemImage: "eye.slash")
+                    }
 
                     // Remove changed entries
                     Button(role: .destructive, action: { showRemoveConfirm = true }) {
@@ -328,6 +334,9 @@ struct DictionaryEditorView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will remove all user overrides for \(dictTypeLabel(selectedType)) in \(langFilter). This cannot be undone.")
+        }
+        .sheet(isPresented: $showExcludeSheet) {
+            ExcludeDictionariesSheet(engine: engine, langTag: langFilter)
         }
         .fileExporter(
             isPresented: $showExportAllPicker,
@@ -604,6 +613,58 @@ private struct DictEntrySheet: View {
                     )
                 }
             }
+        }
+#if os(iOS)
+        .presentationDetents([.medium])
+#endif
+    }
+}
+
+// MARK: - Exclude Dictionaries Sheet
+
+private struct ExcludeDictionariesSheet: View {
+    @ObservedObject var engine: TgsbEngine
+    let langTag: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var config: [(type: String, enabled: Bool)] = []
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    Text("Uncheck a dictionary type to exclude it for \(langTag).")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Section {
+                    ForEach(config.indices, id: \.self) { idx in
+                        Toggle(dictTypeLabel(config[idx].type), isOn: Binding(
+                            get: { config[idx].enabled },
+                            set: { newVal in
+                                config[idx].enabled = newVal
+                                engine.setDictTypeEnabled(
+                                    langTag: langTag,
+                                    type: config[idx].type,
+                                    enabled: newVal
+                                )
+                            }
+                        ))
+                    }
+                }
+            }
+            .navigationTitle("Exclude dictionaries")
+#if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+#endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .onAppear {
+            config = engine.loadDictConfig(langTag: langTag)
+                .sorted(by: { $0.type < $1.type })
         }
 #if os(iOS)
         .presentationDetents([.medium])

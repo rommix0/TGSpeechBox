@@ -54,6 +54,10 @@ struct Handle {
   std::string langTag;
   std::string lastError;
   std::mutex mu;
+
+  // Per-language disabled dictionary types (e.g., {"en-us": {"stress", "compound"}}).
+  // Set via setData(DICTIONARY, "config:langTag", type, "false"/"true").
+  std::unordered_map<std::string, std::unordered_set<std::string>> disabledDictTypes;
   
   // Per-handle trajectory limiting state for formant smoothing.
   // This is NOT static - each handle has its own state to avoid data races
@@ -435,15 +439,24 @@ static int queueIPA_ExImpl(
 
   // Run text parser if text is available and there's work to do
   // (stress dict for stress correction, OR compound map for IPA merge).
+  // Respect per-language dict type disabling.
   std::string parsedIpa;
   const char* finalIpa = ipaUtf8;
-  if (textUtf8 && textUtf8[0] &&
-      (!h->pack.stressDict.empty() || !h->pack.compoundMap.empty())) {
-    parsedIpa = runTextParser(textUtf8, ipaUtf8, h->pack.stressDict,
-                               h->pack.compoundMap,
-                               h->pack.lang.legalOnsets,
-                               h->pack.lang.numberExpansion);
-    finalIpa = parsedIpa.c_str();
+  {
+    const auto& dis = h->disabledDictTypes.count(h->langTag)
+        ? h->disabledDictTypes.at(h->langTag) : std::unordered_set<std::string>{};
+    const bool stressOk = !h->pack.stressDict.empty() && dis.count("stress") == 0;
+    const bool compoundOk = !h->pack.compoundMap.empty() && dis.count("compound") == 0;
+    static const std::unordered_map<std::string, std::vector<int>> emptyStress;
+    static const std::unordered_map<std::string, std::vector<std::string>> emptyCompound;
+    if (textUtf8 && textUtf8[0] && (stressOk || compoundOk)) {
+      parsedIpa = runTextParser(textUtf8, ipaUtf8,
+                                 stressOk ? h->pack.stressDict : emptyStress,
+                                 compoundOk ? h->pack.compoundMap : emptyCompound,
+                                 h->pack.lang.legalOnsets,
+                                 h->pack.lang.numberExpansion);
+      finalIpa = parsedIpa.c_str();
+    }
   }
 
   char clauseType = '.';
@@ -1015,8 +1028,12 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
 
   const std::string original(textUtf8);
   std::string input = normalizeText(original);
+  // Get disabled dict types for current language (empty set if none disabled).
+  const auto& disabled = h->disabledDictTypes.count(h->langTag)
+      ? h->disabledDictTypes.at(h->langTag) : std::unordered_set<std::string>{};
   std::string result = prepareTextForEspeak(input, h->pack.compoundMap,
-                                             h->pack.pronDict, h->langTag,
+                                             h->pack.pronDict, disabled,
+                                             h->langTag,
                                              h->pack.lang.yearSplittingEnabled,
                                              h->pack.lang.numberExpansion.ohDigit);
 
@@ -1341,6 +1358,10 @@ NVSP_FRONTEND_API int nvspFrontend_getDataCount(
     std::string subType, lang, search;
     parseDictLangTag(langTagUtf8, subType, lang, search);
 
+    if (subType == "config") {
+      return 4;  // four dict types
+    }
+
     if (subType == "types") {
       // All four types always available (users can add overrides).
       return 4;
@@ -1434,6 +1455,27 @@ NVSP_FRONTEND_API char* nvspFrontend_queryData(
 
     std::string subType, lang, search;
     parseDictLangTag(langTagUtf8, subType, lang, search);
+
+    if (subType == "config") {
+      // Return enabled/disabled state for each dict type for this language.
+      const auto& dis = h->disabledDictTypes.count(lang)
+          ? h->disabledDictTypes.at(lang) : std::unordered_set<std::string>{};
+      const char* types[] = {"character", "compound", "pronounce", "stress"};
+      std::string json = "[";
+      for (int i = 0; i < 4; ++i) {
+        if (i > 0) json += ',';
+        json += "{\"type\":\"";
+        json += types[i];
+        json += "\",\"enabled\":";
+        json += dis.count(types[i]) == 0 ? "true" : "false";
+        json += '}';
+      }
+      json += ']';
+      char* out = static_cast<char*>(std::malloc(json.size() + 1));
+      if (!out) return nullptr;
+      std::memcpy(out, json.c_str(), json.size() + 1);
+      return out;
+    }
 
     if (subType == "types") {
       // Return JSON array of available dict types with counts.
@@ -1628,6 +1670,24 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
   if (domain == NVSP_DATA_DICTIONARY) {
     std::string subType, lang, search;
     parseDictLangTag(langTagUtf8, subType, lang, search);
+
+    // "config" sub-type: enable/disable dict types per language.
+    // key = dict type ("stress", "compound", "pronounce", "character")
+    // value = "true" (enable) or "false" (disable)
+    if (subType == "config") {
+      const std::string dictType(keyUtf8);
+      const std::string val(valueUtf8);
+      if (val == "false") {
+        h->disabledDictTypes[lang].insert(dictType);
+      } else {
+        auto it = h->disabledDictTypes.find(lang);
+        if (it != h->disabledDictTypes.end()) {
+          it->second.erase(dictType);
+          if (it->second.empty()) h->disabledDictTypes.erase(it);
+        }
+      }
+      return 1;
+    }
 
     const std::string fromText(keyUtf8);
     const std::string value(valueUtf8);

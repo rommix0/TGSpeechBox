@@ -970,6 +970,7 @@ std::string prepareTextForEspeak(
     const std::string& text,
     const std::unordered_map<std::string, std::vector<std::string>>& compoundMap,
     const PronDict& pronDict,
+    const std::unordered_set<std::string>& disabledDictTypes,
     const std::string& langTag,
     bool yearSplitting,
     const std::string& ohDigit)
@@ -982,12 +983,12 @@ std::string prepareTextForEspeak(
   std::string result = text;
 
   // 0. Pronunciation dictionary replacement (highest priority).
-  if (!pronDict.entries.empty()) {
+  if (!pronDict.entries.empty() && disabledDictTypes.count("pronounce") == 0) {
     result = dictReplaceInText(result, pronDict);
   }
 
   // 1. Compound splitting.
-  if (!compoundMap.empty()) {
+  if (!compoundMap.empty() && disabledDictTypes.count("compound") == 0) {
     result = splitCompoundsInText(result, compoundMap);
   }
 
