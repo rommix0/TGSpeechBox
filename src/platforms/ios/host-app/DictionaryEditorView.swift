@@ -399,8 +399,8 @@ struct DictionaryEditorView: View {
 
     private func reloadEntries() {
         guard !langFilter.isEmpty, !selectedType.isEmpty else { return }
-        // Switch the frontend language so the data query returns the right pack.
-        engine.switchEditorLanguage(langFilter)
+        // Cross-language browsing: C++ backend loads dict files from disk
+        // for non-current languages via getDictRefs(), no language switch needed.
         engine.loadDictTypes()
         engine.loadDictionary(
             langTag: langFilter,

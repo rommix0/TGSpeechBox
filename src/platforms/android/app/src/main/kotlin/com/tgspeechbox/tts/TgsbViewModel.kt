@@ -746,11 +746,6 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         return languages[idx].langDef.tgsbLang
     }
 
-    /** Temporarily switch the frontend language for dictionary browsing. */
-    fun switchEditorLanguage(langTag: String) {
-        engine.setLanguage(langTag, langTag)
-    }
-
     fun loadDictTypes() {
         val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_DICTIONARY, "types", 0, 0) ?: run {
             dictTypes.value = emptyList()
@@ -783,8 +778,8 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadDictionary(langTag: String, subType: String = "", offset: Int = 0, limit: Int = 100, append: Boolean = false, search: String = "") {
-        // Switch frontend language so the data query returns the correct pack.
-        if (langTag.isNotEmpty()) switchEditorLanguage(langTag)
+        // Cross-language browsing: the C++ backend loads dict files from disk
+        // for non-current languages via getDictRefs(), no setLanguage needed.
         dictLangTag = langTag
         dictSubType = subType
         val prefixed = prefixedLangTag(subType, langTag) +

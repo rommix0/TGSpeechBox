@@ -1042,13 +1042,6 @@ class TgsbEngine: ObservableObject {
         return selectedLanguage.tgsbTag
     }
 
-    /// Temporarily switch the frontend language for dictionary browsing.
-    /// The speaking language is restored when speak() is called.
-    func switchEditorLanguage(_ langTag: String) {
-        guard let eng = engine else { return }
-        tgsb_set_language(eng, langTag, langTag)
-    }
-
     func loadDictTypes() {
         guard let eng = engine else { return }
         guard let ptr = tgsb_query_data(eng, TGSB_DATA_DICTIONARY, "types", 0, 0) else {
