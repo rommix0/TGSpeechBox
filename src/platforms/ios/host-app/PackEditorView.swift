@@ -27,6 +27,7 @@ struct PackEditorView: View {
                 Picker("", selection: $selectedTab) {
                     Text("Packs").tag(0)
                     Text("Phonemes").tag(1)
+                    Text("Words").tag(2)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
@@ -35,6 +36,11 @@ struct PackEditorView: View {
                 switch selectedTab {
                 case 0:
                     LanguageListView(
+                        engine: engine,
+                        engineStarted: $engineStarted
+                    )
+                case 2:
+                    DictionaryEditorView(
                         engine: engine,
                         engineStarted: $engineStarted
                     )

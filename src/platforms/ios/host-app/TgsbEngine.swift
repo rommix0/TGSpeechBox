@@ -593,6 +593,7 @@ class TgsbEngine: ObservableObject {
         guard let eng = engine else { return }
         tgsb_set_language(eng, selectedLanguage.espeakTag, selectedLanguage.tgsbTag)
         applyStoredOverrides(selectedLanguage.tgsbTag)
+        reapplyDictOverrides(selectedLanguage.tgsbTag)
     }
 
     private func getBaseValues(_ langTag: String) -> [String: String] {
@@ -1010,6 +1011,136 @@ class TgsbEngine: ObservableObject {
         d?.synchronize()
     }
 
+    // MARK: - Dictionary editor
+
+    struct DictEntry: Identifiable, Hashable {
+        let id: String  // fromText
+        let fromText: String
+        let toText: String
+        let fromIpa: String
+        let toIpa: String
+        let category: String
+        let source: String  // "main" or "user"
+        let masked: Bool
+    }
+
+    @Published var dictionaryEntries: [DictEntry] = []
+    @Published var dictionaryTotalCount: Int = 0
+    @Published var dictionaryCategories: [String] = []
+    private var dictLangTag: String = ""
+
+    func loadDictionary(langTag: String, offset: Int = 0, limit: Int = 100) {
+        guard let eng = engine else { return }
+        dictLangTag = langTag
+
+        dictionaryTotalCount = Int(tgsb_get_data_count(eng, TGSB_DATA_DICTIONARY, langTag))
+
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_DICTIONARY, langTag,
+                                         Int32(offset), Int32(limit)) else {
+            dictionaryEntries = []
+            return
+        }
+        let jsonStr = String(cString: ptr)
+        tgsb_free_string(ptr)
+
+        guard let data = jsonStr.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return }
+
+        var entries: [DictEntry] = []
+        var cats = Set<String>()
+        for obj in arr {
+            let fromText = obj["fromText"] as? String ?? obj["key"] as? String ?? ""
+            let entry = DictEntry(
+                id: fromText,
+                fromText: fromText,
+                toText: obj["toText"] as? String ?? "",
+                fromIpa: obj["fromIpa"] as? String ?? "",
+                toIpa: obj["toIpa"] as? String ?? "",
+                category: obj["category"] as? String ?? "",
+                source: obj["source"] as? String ?? "main",
+                masked: obj["masked"] as? Bool ?? false
+            )
+            entries.append(entry)
+            if !entry.category.isEmpty { cats.insert(entry.category) }
+        }
+        dictionaryEntries = entries
+        dictionaryCategories = cats.sorted()
+    }
+
+    func addDictEntry(fromText: String, toText: String, category: String = "") {
+        guard let eng = engine, !fromText.isEmpty, !toText.isEmpty else { return }
+        var dict: [String: Any] = ["toText": toText]
+        if !category.isEmpty { dict["category"] = category }
+        if let data = try? JSONSerialization.data(withJSONObject: dict),
+           let str = String(data: data, encoding: .utf8) {
+            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, dictLangTag, fromText, str)
+            saveDictOverride(dictLangTag, key: fromText, value: str)
+        }
+        loadDictionary(langTag: dictLangTag)
+    }
+
+    func maskDictEntry(fromText: String, masked: Bool) {
+        guard let eng = engine else { return }
+        let dict: [String: Any] = ["masked": masked]
+        if let data = try? JSONSerialization.data(withJSONObject: dict),
+           let str = String(data: data, encoding: .utf8) {
+            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, dictLangTag, fromText, str)
+            saveDictOverride(dictLangTag, key: fromText, value: str)
+        }
+        loadDictionary(langTag: dictLangTag)
+    }
+
+    func deleteDictEntry(fromText: String) {
+        guard let eng = engine else { return }
+        tgsb_set_data(eng, TGSB_DATA_DICTIONARY, dictLangTag, fromText, "")
+        removeDictOverride(dictLangTag, key: fromText)
+        loadDictionary(langTag: dictLangTag)
+    }
+
+    // ── Dictionary override persistence ────────────────────────────
+
+    func reapplyDictOverrides(_ langTag: String) {
+        guard let eng = engine else { return }
+        let overrides = loadDictOverrides(langTag)
+        for (k, v) in overrides {
+            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, langTag, k, v)
+        }
+    }
+
+    private func loadDictOverrides(_ langTag: String) -> [String: String] {
+        let d = UserDefaults(suiteName: kAppGroupId)
+        guard let json = d?.string(forKey: "dict_overrides_\(langTag)"),
+              let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        else { return [:] }
+        return obj
+    }
+
+    private func saveDictOverride(_ langTag: String, key: String, value: String) {
+        var overrides = loadDictOverrides(langTag)
+        overrides[key] = value
+        let d = UserDefaults(suiteName: kAppGroupId)
+        if let data = try? JSONSerialization.data(withJSONObject: overrides),
+           let json = String(data: data, encoding: .utf8) {
+            d?.set(json, forKey: "dict_overrides_\(langTag)")
+        }
+        d?.synchronize()
+    }
+
+    private func removeDictOverride(_ langTag: String, key: String) {
+        var overrides = loadDictOverrides(langTag)
+        overrides.removeValue(forKey: key)
+        let d = UserDefaults(suiteName: kAppGroupId)
+        if overrides.isEmpty {
+            d?.removeObject(forKey: "dict_overrides_\(langTag)")
+        } else if let data = try? JSONSerialization.data(withJSONObject: overrides),
+                  let json = String(data: data, encoding: .utf8) {
+            d?.set(json, forKey: "dict_overrides_\(langTag)")
+        }
+        d?.synchronize()
+    }
+
     func speak(_ text: String) {
         guard let eng = engine else { return }
         stopSpeaking()
@@ -1019,6 +1150,7 @@ class TgsbEngine: ObservableObject {
                           selectedLanguage.espeakTag,
                           selectedLanguage.tgsbTag)
         applyStoredOverrides(selectedLanguage.tgsbTag)
+        reapplyDictOverrides(selectedLanguage.tgsbTag)
         applySelectedVoice(eng)
         applyEngineSettings()
         tgsb_set_inflection(eng, inflectionValue / 100.0)

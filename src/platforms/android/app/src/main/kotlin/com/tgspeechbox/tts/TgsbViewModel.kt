@@ -133,6 +133,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
             val ld = languages[selectedLanguageIndex.value].langDef
             engine.setLanguage(ld.espeakLang, ld.tgsbLang)
             applyStoredOverrides(ld.tgsbLang)
+            reapplyDictOverrides(ld.tgsbLang)
             engine.setVoice(voices[selectedVoiceIndex.value].id)
             applyVoicingTone()
             applyFrameExDefaults()
@@ -167,6 +168,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         val ld = languages[selectedLanguageIndex.value].langDef
         engine.setLanguage(ld.espeakLang, ld.tgsbLang)
         applyStoredOverrides(ld.tgsbLang)
+        reapplyDictOverrides(ld.tgsbLang)
         engine.setVoice(voices[selectedVoiceIndex.value].id)
         applyVoicingTone()
         applyFrameExDefaults()
@@ -189,6 +191,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         val ld = languages[index].langDef
         engine.setLanguage(ld.espeakLang, ld.tgsbLang)
         applyStoredOverrides(ld.tgsbLang)
+        reapplyDictOverrides(ld.tgsbLang)
         Log.i(TAG, "Language selected: ${ld.espeakLang}")
     }
 
@@ -661,6 +664,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         val curLang = languages.getOrNull(selectedLanguageIndex.value) ?: return
         engine.setLanguage(curLang.langDef.espeakLang, curLang.langDef.tgsbLang)
         applyStoredOverrides(curLang.langDef.tgsbLang)
+        reapplyDictOverrides(curLang.langDef.tgsbLang)
     }
 
     /** Apply stored overrides after setLanguage via per-key setData. */
@@ -710,6 +714,112 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
             }
             sb.append(c)
         }.toString().replaceFirstChar { it.uppercase() }
+    }
+
+    // ── Dictionary editor ─────────────────────────────────────────────
+
+    data class DictEntry(
+        val fromText: String,
+        val toText: String,
+        val fromIpa: String = "",
+        val toIpa: String = "",
+        val category: String = "",
+        val source: String = "main",  // "main" or "user"
+        val masked: Boolean = false
+    )
+
+    val dictionaryEntries = MutableStateFlow<List<DictEntry>>(emptyList())
+    val dictionaryTotalCount = MutableStateFlow(0)
+    val dictionaryCategories = MutableStateFlow<List<String>>(emptyList())
+    private var dictLangTag: String = ""
+
+    fun loadDictionary(langTag: String, offset: Int = 0, limit: Int = 100) {
+        dictLangTag = langTag
+        dictionaryTotalCount.value = engine.getDataCount(TgsbSpeakEngine.DATA_DICTIONARY, langTag)
+        val jsonStr = engine.queryData(TgsbSpeakEngine.DATA_DICTIONARY, langTag, offset, limit) ?: run {
+            dictionaryEntries.value = emptyList()
+            return
+        }
+        val arr = org.json.JSONArray(jsonStr)
+        val entries = mutableListOf<DictEntry>()
+        val cats = mutableSetOf<String>()
+        for (i in 0 until arr.length()) {
+            val obj = arr.getJSONObject(i)
+            val entry = DictEntry(
+                fromText = obj.optString("fromText", obj.optString("key", "")),
+                toText = obj.optString("toText", ""),
+                fromIpa = obj.optString("fromIpa", ""),
+                toIpa = obj.optString("toIpa", ""),
+                category = obj.optString("category", ""),
+                source = obj.optString("source", "main"),
+                masked = obj.optBoolean("masked", false)
+            )
+            entries.add(entry)
+            if (entry.category.isNotEmpty()) cats.add(entry.category)
+        }
+        dictionaryEntries.value = entries
+        dictionaryCategories.value = cats.sorted()
+    }
+
+    fun addDictEntry(fromText: String, toText: String, category: String = "") {
+        if (fromText.isBlank() || toText.isBlank()) return
+        val json = org.json.JSONObject().apply {
+            put("toText", toText)
+            put("category", category)
+        }
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, dictLangTag, fromText, json.toString())
+        saveDictOverride(dictLangTag, fromText, json.toString())
+        loadDictionary(dictLangTag)
+    }
+
+    fun maskDictEntry(fromText: String, masked: Boolean) {
+        val json = org.json.JSONObject().apply {
+            put("masked", masked)
+        }
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, dictLangTag, fromText, json.toString())
+        saveDictOverride(dictLangTag, fromText, json.toString())
+        loadDictionary(dictLangTag)
+    }
+
+    fun deleteDictEntry(fromText: String) {
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, dictLangTag, fromText, "")
+        removeDictOverride(dictLangTag, fromText)
+        loadDictionary(dictLangTag)
+    }
+
+    private fun loadDictOverrides(langTag: String): Map<String, String> {
+        val json = prefs.getString("dict_overrides_$langTag", null) ?: return emptyMap()
+        return try {
+            val obj = org.json.JSONObject(json)
+            obj.keys().asSequence().associateWith { obj.getString(it) }
+        } catch (e: Exception) { emptyMap() }
+    }
+
+    private fun saveDictOverride(langTag: String, key: String, value: String) {
+        val overrides = loadDictOverrides(langTag).toMutableMap()
+        overrides[key] = value
+        val obj = org.json.JSONObject()
+        for ((k, v) in overrides) obj.put(k, v)
+        prefs.edit().putString("dict_overrides_$langTag", obj.toString()).apply()
+    }
+
+    private fun removeDictOverride(langTag: String, key: String) {
+        val overrides = loadDictOverrides(langTag).toMutableMap()
+        overrides.remove(key)
+        if (overrides.isEmpty()) {
+            prefs.edit().remove("dict_overrides_$langTag").apply()
+        } else {
+            val obj = org.json.JSONObject()
+            for ((k, v) in overrides) obj.put(k, v)
+            prefs.edit().putString("dict_overrides_$langTag", obj.toString()).apply()
+        }
+    }
+
+    fun reapplyDictOverrides(langTag: String) {
+        val overrides = loadDictOverrides(langTag)
+        for ((k, v) in overrides) {
+            engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, langTag, k, v)
+        }
     }
 
     // ── Phoneme editor ────────────────────────────────────────────────

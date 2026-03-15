@@ -41,7 +41,7 @@ import androidx.navigation.NavController
 @Composable
 fun EditorScreen(viewModel: TgsbViewModel, navController: NavController) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val tabTitles = listOf("Packs", "Phonemes")
+    val tabTitles = listOf("Packs", "Phonemes", "Words")
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTab) {
@@ -57,8 +57,14 @@ fun EditorScreen(viewModel: TgsbViewModel, navController: NavController) {
         when (selectedTab) {
             0 -> PacksTab(viewModel, navController)
             1 -> PhonemesTab(viewModel, navController)
+            2 -> WordsTab(viewModel)
         }
     }
+}
+
+@Composable
+private fun WordsTab(viewModel: TgsbViewModel) {
+    DictionaryListScreen(viewModel = viewModel)
 }
 
 @Composable
