@@ -767,6 +767,29 @@ void buildCompoundDictCache(DataCache& cache,
   cache.dictionaryValid = true;
 }
 
+// ── Character/letter dictionary cache builder ────────────────────────
+
+void buildCharacterDictCache(DataCache& cache,
+                             const std::unordered_map<std::string, std::string>& letterDict) {
+  cache.dictionary.clear();
+  cache.dictionary.reserve(letterDict.size());
+
+  for (const auto& kv : letterDict) {
+    DictRecord rec;
+    rec.key = kv.first;
+    rec.toText = kv.second;
+    rec.source = "main";
+    cache.dictionary.push_back(std::move(rec));
+  }
+
+  std::sort(cache.dictionary.begin(), cache.dictionary.end(),
+            [](const DictRecord& a, const DictRecord& b) {
+              return a.key < b.key;
+            });
+
+  cache.dictionaryValid = true;
+}
+
 // ── Dictionary JSON serializer ───────────────────────────────────────
 
 // Case-insensitive prefix match helper.

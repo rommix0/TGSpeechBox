@@ -113,6 +113,10 @@ void buildStressDictCache(DataCache& cache,
 void buildCompoundDictCache(DataCache& cache,
                             const std::unordered_map<std::string, std::vector<std::string>>& compoundMap);
 
+// Build dictionary cache from an in-memory character/letter dict.
+void buildCharacterDictCache(DataCache& cache,
+                             const std::unordered_map<std::string, std::string>& letterDict);
+
 // ── JSON serializers ──
 
 // Serialize a slice of the settings cache to a JSON array string.

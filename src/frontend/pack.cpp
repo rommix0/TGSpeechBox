@@ -1947,6 +1947,29 @@ static void loadCompoundMap(
   }
 }
 
+static void loadLetterDict(
+    const std::string& path,
+    std::unordered_map<std::string, std::string>& dict)
+{
+  std::ifstream f(path);
+  if (!f.is_open()) return;
+
+  std::string line;
+  while (std::getline(f, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    if (line.back() == '\r') line.pop_back();
+
+    const auto tab = line.find('\t');
+    if (tab == std::string::npos) continue;
+
+    std::string key = line.substr(0, tab);
+    std::string desc = line.substr(tab + 1);
+    if (key.empty()) continue;
+
+    dict.emplace(std::move(key), std::move(desc));
+  }
+}
+
 static void loadPronDict(
     const std::string& path,
     PronDict& dict,
@@ -2149,6 +2172,31 @@ bool loadPackSet(
         if (dash != std::string::npos) {
           const fs::path basePath = packsRoot / "dict" / (tag.substr(0, dash) + "-dict.tsv");
           loadPronDict(basePath.string(), out.pronDict, "main");
+        }
+      }
+    }
+  }
+
+  // Load character/letter dictionary (if one exists for this language).
+  // Check override dir first, then fall back to bundle.
+  {
+    const auto& tag = out.lang.langTag;
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path ovLetters = fs::path(overrideDir) / "packs" / "dict" / (tag + "-letters.tsv");
+      if (fs::exists(ovLetters)) {
+        loadLetterDict(ovLetters.string(), out.letterDict);
+        loaded = true;
+      }
+    }
+    if (!loaded) {
+      const fs::path lettersPath = packsRoot / "dict" / (tag + "-letters.tsv");
+      loadLetterDict(lettersPath.string(), out.letterDict);
+      if (out.letterDict.empty()) {
+        const auto dash = tag.find('-');
+        if (dash != std::string::npos) {
+          const fs::path basePath = packsRoot / "dict" / (tag.substr(0, dash) + "-letters.tsv");
+          loadLetterDict(basePath.string(), out.letterDict);
         }
       }
     }

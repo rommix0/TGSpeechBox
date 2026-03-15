@@ -1284,6 +1284,11 @@ struct PackSet {
   // Loaded from packs/dict/{langTag}-dict.tsv at pack load time.
   // User entries added via nvspFrontend_setData(DICTIONARY, ...).
   PronDict pronDict;
+
+  // Character/letter dictionary: character → spoken description.
+  // Loaded from packs/dict/{langTag}-letters.tsv at pack load time.
+  // Empty if no file exists for this language.
+  std::unordered_map<std::string, std::string> letterDict;
 };
 
 // Load phonemes.yaml + merged language packs.

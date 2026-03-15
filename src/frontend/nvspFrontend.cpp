@@ -1342,13 +1342,18 @@ NVSP_FRONTEND_API int nvspFrontend_getDataCount(
     parseDictLangTag(langTagUtf8, subType, lang, search);
 
     if (subType == "types") {
-      // Count of available dict sub-types.
-      int count = 1;  // "pronounce" always exists (even if empty)
-      if (!h->pack.stressDict.empty()) ++count;
-      if (!h->pack.compoundMap.empty()) ++count;
-      return count;
+      // All four types always available (users can add overrides).
+      return 4;
     }
 
+    if (subType == "character") {
+      if (search.empty()) return static_cast<int>(h->pack.letterDict.size());
+      if (!h->dataCache.dictionaryValid || h->dataCache.dictionarySubType != "character") {
+        tgsb_data::buildCharacterDictCache(h->dataCache, h->pack.letterDict);
+        h->dataCache.dictionarySubType = "character";
+      }
+      return tgsb_data::countDictionaryMatches(h->dataCache, search);
+    }
     if (subType == "stress") {
       if (search.empty()) return static_cast<int>(h->pack.stressDict.size());
       // Build cache for search counting.
@@ -1434,22 +1439,21 @@ NVSP_FRONTEND_API char* nvspFrontend_queryData(
       // Return JSON array of available dict types with counts.
       std::string json = "[";
       bool first = true;
-      if (!h->pack.compoundMap.empty()) {
-        json += "{\"type\":\"compound\",\"count\":";
-        json += std::to_string(h->pack.compoundMap.size());
-        json += '}';
-        first = false;
-      }
-      // Always include pronounce (the user pronDict).
-      if (!first) json += ',';
-      json += "{\"type\":\"pronounce\",\"count\":";
+      // Always include character (users can add overrides even if no base file).
+      json += "{\"type\":\"character\",\"count\":";
+      json += std::to_string(h->pack.letterDict.size());
+      json += '}';
+      first = false;
+      // Always include all types so users can add overrides for any language.
+      json += ",{\"type\":\"compound\",\"count\":";
+      json += std::to_string(h->pack.compoundMap.size());
+      json += '}';
+      json += ",{\"type\":\"pronounce\",\"count\":";
       json += std::to_string(h->pack.pronDict.entries.size());
       json += '}';
-      if (!h->pack.stressDict.empty()) {
-        json += ",{\"type\":\"stress\",\"count\":";
-        json += std::to_string(h->pack.stressDict.size());
-        json += '}';
-      }
+      json += ",{\"type\":\"stress\",\"count\":";
+      json += std::to_string(h->pack.stressDict.size());
+      json += '}';
       json += ']';
 
       char* out = static_cast<char*>(std::malloc(json.size() + 1));
@@ -1465,6 +1469,8 @@ NVSP_FRONTEND_API char* nvspFrontend_queryData(
         tgsb_data::buildStressDictCache(h->dataCache, h->pack.stressDict);
       } else if (subType == "compound") {
         tgsb_data::buildCompoundDictCache(h->dataCache, h->pack.compoundMap);
+      } else if (subType == "character") {
+        tgsb_data::buildCharacterDictCache(h->dataCache, h->pack.letterDict);
       } else {
         tgsb_data::buildDictionaryCache(h->dataCache, h->pack.pronDict);
       }
@@ -1631,6 +1637,27 @@ NVSP_FRONTEND_API int nvspFrontend_setData(
     for (auto& c : lk)
       c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
+    if (subType == "character") {
+      if (value.empty()) {
+        h->pack.letterDict.erase(lk);
+      } else {
+        // Value is description string or JSON {"toText":"..."}.
+        std::string desc = value;
+        auto pos = value.find("\"toText\":");
+        if (pos != std::string::npos) {
+          auto sq = value.find('"', pos + 9);
+          if (sq != std::string::npos) {
+            auto eq = value.find('"', sq + 1);
+            if (eq != std::string::npos) {
+              desc = value.substr(sq + 1, eq - sq - 1);
+            }
+          }
+        }
+        h->pack.letterDict[lk] = std::move(desc);
+      }
+      h->dataCache.dictionaryValid = false;
+      return 1;
+    }
     if (subType == "stress") {
       if (value.empty()) {
         h->pack.stressDict.erase(lk);
