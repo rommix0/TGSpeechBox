@@ -37,6 +37,8 @@ FRONTEND_SRCS = \
 	$(FRONTENDDIR)/data_query.cpp \
 	$(FRONTENDDIR)/frame_emit.cpp \
 	$(FRONTENDDIR)/ipa_engine.cpp \
+	$(FRONTENDDIR)/ipa_normalize.cpp \
+	$(FRONTENDDIR)/ipa_parser.cpp \
 	$(FRONTENDDIR)/nvspFrontend.cpp \
 	$(FRONTENDDIR)/pack.cpp \
 	$(FRONTENDDIR)/utf8.cpp \
@@ -149,6 +151,12 @@ $(BUILDDIR)/frame_emit.o: $(FRONTENDDIR)/frame_emit.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 
 $(BUILDDIR)/ipa_engine.o: $(FRONTENDDIR)/ipa_engine.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
+
+$(BUILDDIR)/ipa_normalize.o: $(FRONTENDDIR)/ipa_normalize.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
+
+$(BUILDDIR)/ipa_parser.o: $(FRONTENDDIR)/ipa_parser.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 
 $(BUILDDIR)/nvspFrontend.o: $(FRONTENDDIR)/nvspFrontend.cpp
