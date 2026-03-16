@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE for details.
 
 #include "AccessibilityUtils.h"
 #include "Dialogs.h"
+#include "DictionaryEditor.h"
 #include "VoiceProfileEditor.h"
 #include "RulesEditor.h"
 #include "WinUtils.h"
@@ -2298,7 +2299,40 @@ LRESULT AppController::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
         return 0;
       }
 
-      if (id == IDM_SETTINGS_EDIT_VOICES) {
+      if (id == IDM_EDITOR_DICT) {
+        if (app.packsDir.empty()) {
+          msgBox(hWnd, L"Open a pack root first.", L"Dictionary Editor", MB_ICONINFORMATION);
+          return 0;
+        }
+        tgsb_editor::DictionaryEditorState dst;
+        dst.packDir = app.packsDir;
+        // Discover available languages from YAML files.
+        {
+          fs::path langDirPath = fs::path(app.packsDir) / "lang";
+          if (fs::exists(langDirPath)) {
+            std::vector<std::string> langs;
+            for (auto& e : fs::directory_iterator(langDirPath)) {
+              if (!e.is_regular_file()) continue;
+              auto p = e.path();
+              if (p.extension() == ".yaml" || p.extension() == ".yml") {
+                if (p.stem().u8string() != "default")
+                  langs.push_back(p.stem().u8string());
+              }
+            }
+            std::sort(langs.begin(), langs.end());
+            dst.availableLangs = std::move(langs);
+          }
+        }
+        dst.initialLang = selectedLangTagUtf8(app);
+        // Wire up IPA conversion callback.
+        dst.convertToIpa = [&app](const std::wstring& text, std::string& ipa, std::string& err) -> bool {
+          return convertTextToIpaViaPhonemizer(app, text, ipa, err);
+        };
+        tgsb_editor::ShowDictionaryEditorDialog(app.hInst, hWnd, dst);
+        return 0;
+      }
+
+      if (id == IDM_EDITOR_VOICES) {
         if (app.packsDir.empty()) {
           msgBox(hWnd, L"Open a pack root first.", L"Voice Profiles", MB_ICONINFORMATION);
           return 0;
@@ -2330,7 +2364,7 @@ LRESULT AppController::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
         return 0;
       }
 
-      if (id == IDM_SETTINGS_EDIT_ALLOPHONES) {
+      if (id == IDM_EDITOR_ALLOPHONES) {
         if (!app.language.isLoaded()) {
           msgBox(hWnd, L"Load a language first.", L"Allophone Rules", MB_ICONINFORMATION);
           return 0;
@@ -2345,7 +2379,7 @@ LRESULT AppController::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
         return 0;
       }
 
-      if (id == IDM_SETTINGS_EDIT_SPECIAL_COARTIC) {
+      if (id == IDM_EDITOR_SPECIAL_COARTIC) {
         if (!app.language.isLoaded()) {
           msgBox(hWnd, L"Load a language first.", L"Special Coarticulation", MB_ICONINFORMATION);
           return 0;

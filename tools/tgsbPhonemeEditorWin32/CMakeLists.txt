@@ -19,6 +19,8 @@ add_executable(tgsbPhonemeEditor WIN32
   VoiceProfileEditor.h
   RulesEditor.cpp
   RulesEditor.h
+  DictionaryEditor.cpp
+  DictionaryEditor.h
   WinUtils.cpp
   WinUtils.h
   AccessibilityUtils.cpp
@@ -59,6 +61,7 @@ endif()
 if(WIN32)
   target_link_libraries(tgsbPhonemeEditor PRIVATE
     comctl32
+    comdlg32
     oleacc
     ole32
     shell32

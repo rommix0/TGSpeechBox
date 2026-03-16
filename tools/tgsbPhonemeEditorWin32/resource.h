@@ -311,3 +311,43 @@ Licensed under the MIT License. See LICENSE for details.
 #define IDC_SC_CUMULATIVE    3516
 #define IDC_SC_UNSTRESSED    3517
 #define IDC_SC_PHRASEFINAL   3518
+
+// -----------------
+// Menu commands: Editor menu
+// -----------------
+#define IDM_EDITOR_DICT              40301
+#define IDM_EDITOR_VOICES            40302
+#define IDM_EDITOR_ALLOPHONES        40303
+#define IDM_EDITOR_SPECIAL_COARTIC   40304
+
+// -----------------
+// Dialog: Dictionary editor
+// -----------------
+#define IDD_DICT_EDITOR              220
+#define IDC_DICT_LANG                3601
+#define IDC_DICT_TYPE                3602
+#define IDC_DICT_SEARCH              3603
+#define IDC_DICT_LIST                3604
+#define IDC_DICT_ADD                 3605
+#define IDC_DICT_EDIT                3606
+#define IDC_DICT_DELETE              3607
+#define IDC_DICT_IMPORT              3608
+#define IDC_DICT_EXPORT              3609
+#define IDC_DICT_SAVE                3610
+
+// -----------------
+// Dialog: Dictionary entry add/edit
+// -----------------
+#define IDD_DICT_ENTRY               221
+#define IDC_DENTRY_FROM              3701
+#define IDC_DENTRY_TO                3702
+#define IDC_DENTRY_FROM_IPA_BTN      3703
+#define IDC_DENTRY_FROM_IPA          3704
+#define IDC_DENTRY_TO_IPA_BTN        3705
+#define IDC_DENTRY_TO_IPA            3706
+#define IDC_DENTRY_CATEGORY          3707
+#define IDC_DENTRY_LBL_FROM          3708
+#define IDC_DENTRY_LBL_TO            3709
+#define IDC_DENTRY_LBL_CATEGORY      3710
+#define IDC_DENTRY_LBL_FROM_IPA      3711
+#define IDC_DENTRY_LBL_TO_IPA        3712
