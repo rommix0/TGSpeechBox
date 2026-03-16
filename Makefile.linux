@@ -44,6 +44,7 @@ FRONTEND_SRCS = \
 	$(FRONTENDDIR)/pack.cpp \
 	$(FRONTENDDIR)/utf8.cpp \
 	$(FRONTENDDIR)/voice_profile.cpp \
+	$(FRONTENDDIR)/yaml_export.cpp \
 	$(FRONTENDDIR)/yaml_min.cpp \
 	$(FRONTENDDIR)/text_parser.cpp \
 	$(FRONTENDDIR)/text_prepare.cpp \
@@ -170,6 +171,9 @@ $(BUILDDIR)/pack.o: $(FRONTENDDIR)/pack.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 
 $(BUILDDIR)/utf8.o: $(FRONTENDDIR)/utf8.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
+
+$(BUILDDIR)/yaml_export.o: $(FRONTENDDIR)/yaml_export.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -DNVSP_FRONTEND_EXPORTS=1 -c $< -o $@
 
 $(BUILDDIR)/yaml_min.o: $(FRONTENDDIR)/yaml_min.cpp
