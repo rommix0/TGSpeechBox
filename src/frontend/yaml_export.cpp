@@ -17,6 +17,7 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
+#include <cstdint>
 
 namespace nvsp_frontend::yaml_export {
 
