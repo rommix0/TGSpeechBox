@@ -191,6 +191,11 @@ struct DictionaryEditorView: View {
                         .font(.body)
                 }
                 .accessibilityLabel("More options")
+#if os(iOS)
+                .accessibilityElement()
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Double tap to show actions")
+#endif
             }
             .padding(.horizontal)
             .padding(.vertical, 4)
