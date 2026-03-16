@@ -133,7 +133,6 @@ settings:
   microprosodyIntrinsicF0LowDropHz: 2.0
 
   # Pre-voiceless shortening: "bat" vowel shorter than "bad" vowel.
-  # MacinTalk: 55% before voiceless stops, 80% before fricatives.
   # Klatt (1976): vowels 60-70% as long before voiceless vs voiced.
   # 0.80 is a moderate compromise (was 0.92, barely perceptible).
   microprosodyPreVoicelessShortenEnabled: true
@@ -163,7 +162,6 @@ settings:
     wordFinalReduction: 0.05
 
     # Duration: prominent syllables hold steady, unstressed ones can shrink.
-    # MacinTalk: word-medial unstressed at 55%, others at 70%.
     # 0.85 is conservative but gives more rhythmic contrast than 0.92.
     durationProminentFloorMs: 55
     durationPrimaryFloorMs: 95
