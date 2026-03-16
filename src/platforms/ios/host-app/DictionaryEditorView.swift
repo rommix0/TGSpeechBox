@@ -39,12 +39,10 @@ struct DictionaryEditorView: View {
     @State private var showExcludeSheet = false
     @State private var statusMessage: String?
 
-    // Export state
-    @State private var showExportAllPicker = false
-    @State private var showExportChangedPicker = false
+    // Export state — single fileExporter to avoid SwiftUI dual-modifier conflict
+    @State private var showExportPicker = false
+    @State private var exportUserOnly = false
     @State private var showImportPicker = false
-    @State private var exportAllFileURL: URL?
-    @State private var exportChangedFileURL: URL?
 
     private var typePickerLabel: String {
         if selectedType.isEmpty { return "Select type" }
@@ -128,8 +126,8 @@ struct DictionaryEditorView: View {
                     // Export all (pronunciation + character)
                     if selectedType == "pronounce" || selectedType == "character" {
                         Button(action: {
-                            exportAllFileURL = exportDictToTempFile(userOnly: false)
-                            showExportAllPicker = true
+                            exportUserOnly = false
+                            showExportPicker = true
                         }) {
                             Label("Export all", systemImage: "square.and.arrow.up")
                         }
@@ -137,8 +135,8 @@ struct DictionaryEditorView: View {
 
                     // Export changed (all types)
                     Button(action: {
-                        exportChangedFileURL = exportDictToTempFile(userOnly: true)
-                        showExportChangedPicker = true
+                        exportUserOnly = true
+                        showExportPicker = true
                     }) {
                         Label("Export changed", systemImage: "square.and.arrow.up")
                     }
@@ -354,25 +352,15 @@ struct DictionaryEditorView: View {
             ExcludeDictionariesSheet(engine: engine, langTag: langFilter)
         }
         .fileExporter(
-            isPresented: $showExportAllPicker,
-            document: DictTsvDocument(entries: engine.dictionaryEntries, userOnly: false),
+            isPresented: $showExportPicker,
+            document: DictTsvDocument(entries: engine.dictionaryEntries, userOnly: exportUserOnly),
             contentType: .tabSeparatedText,
-            defaultFilename: "\(selectedType)_\(langFilter).tsv"
+            defaultFilename: exportUserOnly
+                ? "\(selectedType)_\(langFilter)_changed.tsv"
+                : "\(selectedType)_\(langFilter).tsv"
         ) { result in
             if case .success = result {
-                statusMessage = "Exported all entries"
-            } else if case .failure(let error) = result {
-                statusMessage = "Export failed: \(error.localizedDescription)"
-            }
-        }
-        .fileExporter(
-            isPresented: $showExportChangedPicker,
-            document: DictTsvDocument(entries: engine.dictionaryEntries, userOnly: true),
-            contentType: .tabSeparatedText,
-            defaultFilename: "\(selectedType)_\(langFilter)_changed.tsv"
-        ) { result in
-            if case .success = result {
-                statusMessage = "Exported changed entries"
+                statusMessage = exportUserOnly ? "Exported changed entries" : "Exported all entries"
             } else if case .failure(let error) = result {
                 statusMessage = "Export failed: \(error.localizedDescription)"
             }

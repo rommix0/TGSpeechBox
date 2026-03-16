@@ -335,6 +335,7 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
             applyEngineSettings(eng, voice: voiceName)
             cachedSettingsVersion = curVersion
         }
+        applyPhonemeOverrides()
         applyStoredOverrides(tgsbLang)
         applyDictOverrides(tgsbLang)
         applyDictDisabled(tgsbLang)
@@ -550,6 +551,19 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         else { return }
         for type in arr {
             tgsb_set_data(eng, TGSB_DATA_DICTIONARY, "config:\(tgsbLang)", type, "false")
+        }
+    }
+
+    private func applyPhonemeOverrides() {
+        guard let eng = engine else { return }
+        let d = UserDefaults(suiteName: "group.com.tgspeechbox.app")
+        guard let json = d?.string(forKey: "phoneme_overrides"),
+              let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+              !obj.isEmpty
+        else { return }
+        for (k, v) in obj {
+            tgsb_set_data(eng, TGSB_DATA_PHONEMES, "", k, v)
         }
     }
 

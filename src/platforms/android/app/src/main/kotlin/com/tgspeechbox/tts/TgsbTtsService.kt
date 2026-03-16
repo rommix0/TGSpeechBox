@@ -278,6 +278,8 @@ class TgsbTtsService : TextToSpeechService() {
     /** Apply pack setting overrides saved by the editor via per-key setData. */
     private fun applyStoredOverrides(tgsbLang: String) {
         if (nativeHandle == 0L) return
+        // Phoneme overrides (global, not per-language).
+        applyPhonemeOverrides()
         // Pack settings overrides (may not exist — that's OK).
         val json = prefs.getString("pack_overrides_$tgsbLang", null)
         if (json != null) {
@@ -292,6 +294,19 @@ class TgsbTtsService : TextToSpeechService() {
         // Always apply dictionary overlays and exclusions.
         applyDictOverrides(tgsbLang)
         applyDictDisabled(tgsbLang)
+    }
+
+    /** Apply user phoneme overrides saved by the phoneme editor. */
+    private fun applyPhonemeOverrides() {
+        if (nativeHandle == 0L) return
+        val json = prefs.getString("phoneme_overrides", null) ?: return
+        val overrides = try {
+            val obj = org.json.JSONObject(json)
+            obj.keys().asSequence().associateWith { obj.getString(it) }
+        } catch (e: Exception) { return }
+        for ((k, v) in overrides) {
+            nativeSetData(nativeHandle, TgsbSpeakEngine.DATA_PHONEMES, "", k, v)
+        }
     }
 
     /** Apply user dictionary overlays saved by the editor. */
