@@ -28,6 +28,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -250,6 +252,10 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             onValueChange = { searchQuery = it },
             label = { Text("Search") },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                autoCorrect = false
+            ),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp)
@@ -707,6 +713,10 @@ private fun DictAddDialog(
                     },
                     label = { Text(fromLabel) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrect = false
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -714,6 +724,10 @@ private fun DictAddDialog(
                     onValueChange = { toText = it },
                     label = { Text(toLabel) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrect = false
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (toHelper != null) {
@@ -729,6 +743,10 @@ private fun DictAddDialog(
                         onValueChange = { category = it },
                         label = { Text("Category (optional)") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrect = false
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -805,6 +823,10 @@ private fun DictEditDialog(
                     onValueChange = { fromText = it },
                     label = { Text(fromLabel) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrect = false
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -812,6 +834,10 @@ private fun DictEditDialog(
                     onValueChange = { toText = it },
                     label = { Text(toLabel) },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrect = false
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (showCategory) {
@@ -820,6 +846,10 @@ private fun DictEditDialog(
                         onValueChange = { category = it },
                         label = { Text("Category (optional)") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrect = false
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
