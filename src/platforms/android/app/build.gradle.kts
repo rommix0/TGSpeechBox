@@ -29,7 +29,7 @@ android {
         applicationId = "com.tgspeechbox.tts"
         minSdk = 26
         targetSdk = 35
-        versionCode = 326
+        versionCode = 327
         versionName = "3.0-beta27"
 
         externalNativeBuild {
