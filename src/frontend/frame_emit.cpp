@@ -1119,10 +1119,20 @@ static void generateAcousticEvents(
       // Phase 3: recovery — formants blend AWAY from tap back toward
       // neutral.  Uses 50/50 blend; the DSP crossfade to the next token
       // completes the trajectory to the following vowel.
+      //
+      // Exception: utterance-final taps (e.g. Spanish "amor") skip the
+      // vowel blend — there's no following vowel to transition toward.
+      // Instead, keep tap formants and decay amplitude so the frication
+      // burst carries the release cue.  Without this, singleWordFinalHold
+      // sustains the vowel-blended recovery for ~35ms, sounding lateral.
       {
+        const bool isLastToken = (&t == &tokens.back());
         double seg[kFrameFieldCount];
         std::memcpy(seg, base, sizeof(seg));
-        if (trajectoryState->hasPrevBase) {
+        if (isLastToken) {
+          // Utterance-final: decay voicing, keep tap formants + frication.
+          seg[vaIdx] = notchAmp * 0.3;
+        } else if (trajectoryState->hasPrevBase) {
           // Blend back toward vowel space — abrupt exit from tap.
           const double prevW = 0.65;
           const double tapW  = 0.35;

@@ -7188,12 +7188,20 @@ phonemes:
     pf6: 4900
     voiceAmplitude: 1.0
   "ɾ_wf":
-    # Word-final tap for Spanish. At utterance end the base ɾ is held
-    # by singleWordFinalHold and sounds nasal (voiced alveolar closure
-    # with no release ≈ /n/). This allophone adds fricationAmplitude
-    # for a tongue-flick release and raises cf2 to push away from /n/.
-    # cf1 raised 220→340: 220 was in nasal F1 territory (issue #53).
-    # fricationAmplitude 0.03→0.05: slightly more audible tongue-flick.
+    # Word-final tap for Spanish (issue #53). Before silence the tap
+    # needs a clear alveolar release burst — without it the held closure
+    # sounds nasal (/n/) or lateral (/l/).
+    # Tuning based on Quilis (1993), Blecua (2001): word-final tap
+    # F1 ~400-450 Hz, F2 at alveolar locus ~1400-1600 Hz.
+    # cf1 420: above lateral (310) and nasal (250) territory.
+    # cf2 1550: alveolar locus, avoids palatal/glide quality (was 1720).
+    # fricationAmplitude 0.18: audible release burst before silence
+    # (base tap is 0.25; previous 0.05 was nearly inaudible).
+    # pa rebalanced to mid-frequency alveolar profile (was pa6-only).
+    # voiceAmplitude 0.55: low voicing so frication burst dominates the
+    # release — high voicing (0.95) caused the tap recovery phase to
+    # sound lateral when held by singleWordFinalHold before silence.
+    # May need DSP/frontend-level fix long-term (issue #53).
     _isLiquid: false
     _isNasal: false
     _isSemivowel: false
@@ -7203,43 +7211,43 @@ phonemes:
     _isVowel: false
     aspirationAmplitude: 0
     caNP: 0
-    cb1: 60
-    cb2: 80
-    cb3: 130
+    cb1: 80
+    cb2: 100
+    cb3: 150
     cb4: 320
     cb5: 400
     cb6: 1400
     cbN0: 100
     cbNP: 100
-    cf1: 340
-    cf2: 1720
-    cf3: 2600
+    cf1: 420
+    cf2: 1550
+    cf3: 2500
     cf4: 3300
     cf5: 3750
     cf6: 4900
     cfN0: 250
     cfNP: 200
-    fricationAmplitude: 0.05
-    pa1: 0
-    pa2: 0.22
-    pa3: 0.22
-    pa4: 0
-    pa5: 0
-    pa6: 0.50
+    fricationAmplitude: 0.18
+    pa1: 0.15
+    pa2: 0.35
+    pa3: 0.40
+    pa4: 0.35
+    pa5: 0.20
+    pa6: 0.10
     parallelBypass: 0
-    pb1: 55
-    pb2: 100
-    pb3: 160
+    pb1: 70
+    pb2: 110
+    pb3: 170
     pb4: 320
     pb5: 400
     pb6: 1400
-    pf1: 220
-    pf2: 1720
-    pf3: 2600
+    pf1: 420
+    pf2: 1550
+    pf3: 2500
     pf4: 3300
     pf5: 3750
     pf6: 4900
-    voiceAmplitude: 0.95
+    voiceAmplitude: 0.55
   "ʁ":
     # Voiced uvular fricative — used by German, French, Dutch, etc.
     # FIXED: F3 was 1600 Hz, identical to English ɹ/ɻ (1550-1600).
