@@ -1009,6 +1009,7 @@ class TgsbEngine: ObservableObject {
             d?.set(json, forKey: "phoneme_overrides")
         }
         d?.synchronize()
+        bumpOverridesVersion()
     }
 
     // MARK: - Dictionary editor

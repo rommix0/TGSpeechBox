@@ -566,7 +566,9 @@ private struct DictEntrySheet: View {
                 Section(fromLabel) {
                     TextField(fromLabel, text: $fromText)
                         .autocorrectionDisabled()
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
+                        #endif
                         .accessibilityLabel(fromLabel)
                         .onChange(of: fromText) { newValue in
                             if dictType == "character" {
@@ -578,7 +580,9 @@ private struct DictEntrySheet: View {
                 Section(toLabel) {
                     TextField(toLabel, text: $toText)
                         .autocorrectionDisabled()
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
+                        #endif
                     if let helper = toHelperText {
                         Text(helper)
                             .font(.caption)
@@ -589,7 +593,9 @@ private struct DictEntrySheet: View {
                     Section("Category (optional)") {
                         TextField("Category", text: $category)
                             .autocorrectionDisabled()
+                            #if os(iOS)
                             .textInputAutocapitalization(.never)
+                            #endif
                     }
                 }
                 if dictType == "pronounce" {
