@@ -347,9 +347,8 @@ normalization:
       to: ""
 
     # === GEMINATE CONSONANTS ===
-    # eSpeak Hungarian uses Cː (length mark) for geminate stops and some
-    # fricatives. Our phoneme table has no Cː entries — map to doubled
-    # consonants so the tokenizer produces two tokens (longer closure).
+    # Stops: double so the tokenizer produces two tokens with a closure
+    # gap between them (correct for geminate stop perception).
     - from: "tː"
       to: "tt"
     - from: "dː"
@@ -366,28 +365,33 @@ normalization:
       to: "cc"
     - from: "ɟː"
       to: "ɟɟ"
-    - from: "fː"
-      to: "ff"
-    - from: "vː"
-      to: "vv"
-    - from: "sː"
-      to: "ss"
-    - from: "ʃː"
-      to: "ʃʃ"
-    - from: "zː"
-      to: "zz"
-    - from: "ʒː"
-      to: "ʒʒ"
-    - from: "nː"
-      to: "nn"
-    - from: "mː"
-      to: "mm"
-    - from: "lː"
-      to: "ll"
-    - from: "rː"
-      to: "rr"
-    - from: "ɲː"
-      to: "ɲɲ"
+    # Continuants (fricatives, nasals, liquids): merge to single ː token.
+    # Two identical fricative tokens create a crossfade amplitude dip that
+    # sounds like a stop closure — e.g. /ʃʃ/ in "kisebb" sounded like
+    # /tʃ/. A single lengthened token avoids the dip. eSpeak may output
+    # either Cː or CC form, so we handle both directions.
+    - from: "ff"
+      to: "fː"
+    - from: "vv"
+      to: "vː"
+    - from: "ss"
+      to: "sː"
+    - from: "ʃʃ"
+      to: "ʃː"
+    - from: "zz"
+      to: "zː"
+    - from: "ʒʒ"
+      to: "ʒː"
+    - from: "nn"
+      to: "nː"
+    - from: "mm"
+      to: "mː"
+    - from: "ll"
+      to: "lː"
+    - from: "rr"
+      to: "rː"
+    - from: "ɲɲ"
+      to: "ɲː"
 
     # === GY (ɟ) STRESS HANDLING ===
     # Move stress marker after word-initial gy/dzs so the stop closure
