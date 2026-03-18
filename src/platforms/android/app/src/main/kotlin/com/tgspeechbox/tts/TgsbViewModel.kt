@@ -76,6 +76,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
     val overrideSystemRate = MutableStateFlow(loadGlobalBool("overrideSystemRate", false))
     val globalRate = MutableStateFlow(loadGlobalFloat("globalRate", 1.0f))
+    val rateBoostEnabled = MutableStateFlow(loadGlobalBool("rateBoostEnabled", false))
 
     // ── Output (global, NOT per-voice) ───────────────────────────────
 
@@ -188,8 +189,9 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         engine.setPauseMode(pauseMode.value)
 
         errorMessage.value = null
-        engine.speak(text, speedRate.value.toDouble(), pitchHz.value.toDouble())
-        Log.i(TAG, "speak: lang=${ld.espeakLang} speed=${speedRate.value} pitch=${pitchHz.value}")
+        val effectiveSpeed = speedRate.value.toDouble() * (if (rateBoostEnabled.value) 2.0 else 1.0)
+        engine.speak(text, effectiveSpeed, pitchHz.value.toDouble())
+        Log.i(TAG, "speak: lang=${ld.espeakLang} speed=$effectiveSpeed pitch=${pitchHz.value}")
     }
 
     /** Speak arbitrary text using current Speak-tab settings. */
@@ -204,7 +206,8 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         applyFrameExDefaults()
         applyPitchSettings()
         engine.setPauseMode(pauseMode.value)
-        engine.speak(text, speedRate.value.toDouble(), pitchHz.value.toDouble())
+        val effectiveSpeed = speedRate.value.toDouble() * (if (rateBoostEnabled.value) 2.0 else 1.0)
+        engine.speak(text, effectiveSpeed, pitchHz.value.toDouble())
     }
 
     /** Preview a dictionary entry: speaks "fromText. toText." */
@@ -299,6 +302,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     fun onInflectionChanged(v: Float)          { inflection.value = v;         saveSlider("inflection", v);         applyPitchSettings() }
     fun onOverrideSystemRateChanged(v: Boolean){ overrideSystemRate.value = v;  saveGlobalBool("overrideSystemRate", v) }
     fun onGlobalRateChanged(v: Float)          { globalRate.value = v;          saveGlobalFloat("globalRate", v) }
+    fun onRateBoostEnabledChanged(v: Boolean)  { rateBoostEnabled.value = v;    saveGlobalBool("rateBoostEnabled", v) }
     fun onSystemVolumeChanged(v: Float)        { systemVolume.value = v;        saveGlobalFloat("systemVolume", v);  engine.setVolume(v) }
     fun onSampleRateChanged(index: Float) {
         sampleRateIndex.value = index
@@ -371,6 +375,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
         // Global: System rate
         onOverrideSystemRateChanged(false)
+        onRateBoostEnabledChanged(false)
         globalRate.value = 1.0f;     onGlobalRateChanged(1.0f)
 
         // Global: Output

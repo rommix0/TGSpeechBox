@@ -130,6 +130,7 @@ struct ContentView: View {
                         .accessibilityLabel("Inflection")
                         .accessibilityValue("\(Int(engine.inflectionValue))")
                 }
+                Toggle("Rate boost", isOn: $engine.rateBoost)
             }
 
             // Speak / Stop buttons

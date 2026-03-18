@@ -309,6 +309,24 @@ fun AdvancedScreen(
             )
         }
 
+        // Rate Boost checkbox
+        val rateBoost by viewModel.rateBoostEnabled.collectAsState()
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Checkbox(
+                checked = rateBoost,
+                onCheckedChange = { viewModel.onRateBoostEnabledChanged(it) }
+            )
+            Text(
+                text = "Rate boost",
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { viewModel.onRateBoostEnabledChanged(!rateBoost) }
+            )
+        }
+
         Spacer(Modifier.height(20.dp))
 
         // ── Output section ──────────────────────────────────────────

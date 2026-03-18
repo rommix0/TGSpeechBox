@@ -667,6 +667,9 @@ class TgsbTtsService : TextToSpeechService() {
             val rate = prefs.getFloat("adv_globalRate", 1.0f)
             effectiveRate = (rate * 100f).toInt()
         }
+        if (prefs.getBoolean("adv_rateBoostEnabled", false)) {
+            effectiveRate = (effectiveRate * 2).coerceAtMost(600)
+        }
         try {
             nativeQueueText(nativeHandle, text, effectiveRate, request.pitch)
         } catch (e: Exception) {

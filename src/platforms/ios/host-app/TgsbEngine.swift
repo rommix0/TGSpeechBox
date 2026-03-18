@@ -68,6 +68,12 @@ class TgsbEngine: ObservableObject {
     }
     @Published var selectedVoice: TgsbVoice
     @Published var speed: Double = 1.0
+    @Published var rateBoost: Bool = UserDefaults(suiteName: kAppGroupId)?
+        .bool(forKey: "rateBoost") ?? false {
+        didSet {
+            UserDefaults(suiteName: kAppGroupId)?.set(rateBoost, forKey: "rateBoost")
+        }
+    }
     @Published var pitch: Double = 110.0
     @Published var inflectionValue: Double = 50.0  // 0–100 slider
 
@@ -1296,7 +1302,7 @@ class TgsbEngine: ObservableObject {
 
         isSpeaking = true
 
-        let speed = self.speed
+        let speed = self.speed * (self.rateBoost ? 2.0 : 1.0)
         let pitch = self.pitch
         let sr = self.sampleRate
 
