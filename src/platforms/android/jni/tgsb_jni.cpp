@@ -518,7 +518,15 @@ Java_com_tgspeechbox_tts_TgsbTtsService_nativeQueueText(
     /* Map Android rate/pitch to TGSpeechBox params */
     double speed = (double)speechRate / 100.0;
     if (speed < 0.1) speed = 0.1;
-    if (speed > 5.0) speed = 5.0;
+
+    /* Automatic speed split: cap synthesis at 2.0x, frame-advance the rest */
+    const double kSynthCap = 2.0;
+    double timeStretch = 1.0;
+    if (speed > kSynthCap) {
+        timeStretch = speed / kSynthCap;
+        speed = kSynthCap;
+    }
+    speechPlayer_setTimeStretch(engine->player, timeStretch);
 
     double basePitch = 110.0 * ((double)pitch / 100.0);
     if (basePitch < 40.0) basePitch = 40.0;
@@ -851,7 +859,17 @@ Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeQueueText(
 
     double sp = speed;
     if (sp < 0.1) sp = 0.1;
-    if (sp > 5.0) sp = 5.0;
+
+    // Automatic speed split: cap synthesis at 2.0x and put the excess
+    // into DSP time-stretch (frame-advance).  Prevents formant mush
+    // at extreme rates while maintaining clean output.
+    const double kSynthCap = 2.0;
+    double timeStretch = 1.0;
+    if (sp > kSynthCap) {
+        timeStretch = sp / kSynthCap;
+        sp = kSynthCap;
+    }
+    speechPlayer_setTimeStretch(engine->player, timeStretch);
 
     double bp = pitchHz;
     if (bp < 40.0) bp = 40.0;
@@ -863,8 +881,8 @@ Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeQueueText(
 
     synthesizeClauses(engine, textChars, sp, bp, onFrame, &ctx);
     env->ReleaseStringUTFChars(text, textChars);
-    LOGI("SpeakEngine: queued %d frames (speed=%.2f pitch=%.0f)",
-         ctx.frameCount, sp, bp);
+    LOGI("SpeakEngine: queued %d frames (speed=%.2f ts=%.2f pitch=%.0f)",
+         ctx.frameCount, sp, timeStretch, bp);
 }
 
 /*
