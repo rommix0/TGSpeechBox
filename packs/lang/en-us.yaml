@@ -725,9 +725,9 @@ settings:
     # plural /s/, past tense /d/, possessive /z/. Extra protection.
     wordFinalBonusMs: 5
 
-    # 0.0 = rigid floors at all speeds (recommended to start).
-    # Increase toward 1.0 if floors make 4x+ speech feel too slow.
-    floorSpeedScale: 0.0
+    # Let floors shrink at extreme speeds so rate boost can push past
+    # the normal ceiling.  0.5 = floors halve at max speed.
+    floorSpeedScale: 0.5
 
     # When a floor bumps one consonant in a cluster, its neighbors
     # can end up disproportionately short — creating a "bulge".

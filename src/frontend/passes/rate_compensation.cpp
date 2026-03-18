@@ -130,7 +130,7 @@ static double getClassFloor(const Token& t, const LanguagePack& lang) {
 // Apply optional speed scaling to a floor value.
 static double scaleFloor(double floor, double speedScale, double speed) {
   if (speedScale <= 0.0) return floor;
-  double factor = 1.0 - speedScale * std::min(1.0, (speed - 1.0) / 8.0);
+  double factor = 1.0 - speedScale * std::min(1.0, (speed - 1.0) / 4.0);
   return floor * factor;
 }
 

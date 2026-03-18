@@ -1142,8 +1142,9 @@ double liquidDynamicsLabialGlideTransitionPct = 0.60;
   // Word-final segments get extra floor padding (added to class floor).
   double rateCompWordFinalBonusMs = 5.0;
 
-  // Optional: let floors shrink slightly at extreme speeds (0.0 = rigid).
-  double rateCompFloorSpeedScale = 0.0;
+  // Let floors shrink at extreme speeds so rate boost can push beyond
+  // the normal ceiling.  0.5 = floors halve at max speed.
+  double rateCompFloorSpeedScale = 0.5;
 
   // Cluster proportion guard: prevent single-segment bulge after floor
   // enforcement. If one consonant in a cluster hits its floor, nudge
