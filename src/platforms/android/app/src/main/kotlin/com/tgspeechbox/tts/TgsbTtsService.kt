@@ -668,7 +668,7 @@ class TgsbTtsService : TextToSpeechService() {
             effectiveRate = (rate * 100f).toInt()
         }
         if (prefs.getBoolean("adv_rateBoostEnabled", false)) {
-            effectiveRate = (effectiveRate * 2).coerceAtMost(600)
+            effectiveRate = effectiveRate * 2
         }
         try {
             nativeQueueText(nativeHandle, text, effectiveRate, request.pitch)

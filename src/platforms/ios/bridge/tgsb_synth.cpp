@@ -245,7 +245,16 @@ void tgsb_synth_queue_ipa(TgsbSynth *synth,
     speechPlayer_queueFrame(synth->player, NULL, 0, 0, -1, true);
 
     if (speed < 0.1) speed = 0.1;
-    if (speed > 5.0) speed = 5.0;
+
+    /* Automatic speed split: cap synthesis at 2.0x, frame-advance the rest */
+    const double kSynthCap = 2.0;
+    double timeStretch = 1.0;
+    if (speed > kSynthCap) {
+        timeStretch = speed / kSynthCap;
+        speed = kSynthCap;
+    }
+    speechPlayer_setTimeStretch(synth->player, timeStretch);
+
     if (pitch < 40.0) pitch = 40.0;
     if (pitch > 500.0) pitch = 500.0;
 
