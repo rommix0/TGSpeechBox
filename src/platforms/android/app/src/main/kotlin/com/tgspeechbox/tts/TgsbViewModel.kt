@@ -210,9 +210,16 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         engine.speak(text, effectiveSpeed, pitchHz.value.toDouble())
     }
 
-    /** Preview a dictionary entry: speaks the replacement text. */
+    /** Preview a dictionary entry: temporarily masks the entry so the
+     *  original word is spoken uncorrected, then speaks the replacement. */
     fun previewDictEntry(fromText: String, toText: String) {
-        speakText(toText)
+        val prefixed = prefixedLangTag(dictSubType, dictLangTag)
+        // Temporarily mask so fromText isn't auto-corrected
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, """{"masked":true}""")
+        // Queue frames for both: original (uncorrected) + replacement
+        speakText("$fromText. $toText.")
+        // Unmask — frames are already generated, audio plays from queue
+        engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, """{"masked":false}""")
     }
 
     fun stop() {

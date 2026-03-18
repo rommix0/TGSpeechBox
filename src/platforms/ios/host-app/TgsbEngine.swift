@@ -1281,9 +1281,17 @@ class TgsbEngine: ObservableObject {
         bumpOverridesVersion()
     }
 
-    /// Preview a dictionary entry: speaks the replacement text.
+    /// Preview a dictionary entry: temporarily masks the entry so the
+    /// original word is spoken uncorrected, then speaks the replacement.
     func previewDictEntry(from: String, to: String) {
-        speak(to)
+        guard let eng = engine else { return }
+        let tag = prefixedLangTag(dictSubType, dictLangTag)
+        // Temporarily mask so 'from' isn't auto-corrected
+        tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, from, "{\"masked\":true}")
+        // Queue frames for both: original (uncorrected) + replacement
+        speak("\(from). \(to).")
+        // Unmask — frames already generated, audio plays from queue
+        tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, from, "{\"masked\":false}")
     }
 
     func speak(_ text: String) {
