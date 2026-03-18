@@ -14,7 +14,6 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -313,18 +312,23 @@ fun AdvancedScreen(
         // Rate Boost checkbox
         val rateBoost by viewModel.rateBoostEnabled.collectAsState()
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = rateBoost,
+                    onValueChange = { viewModel.onRateBoostEnabledChanged(it) },
+                    role = androidx.compose.ui.semantics.Role.Checkbox
+                )
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = rateBoost,
-                onCheckedChange = { viewModel.onRateBoostEnabledChanged(it) }
+                onCheckedChange = null
             )
             Text(
                 text = "Rate boost",
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { viewModel.onRateBoostEnabledChanged(!rateBoost) }
+                modifier = Modifier.padding(start = 12.dp)
             )
         }
 
