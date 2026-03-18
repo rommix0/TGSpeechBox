@@ -1281,9 +1281,9 @@ class TgsbEngine: ObservableObject {
         bumpOverridesVersion()
     }
 
-    /// Preview a dictionary entry: speaks "fromText. toText."
+    /// Preview a dictionary entry: speaks the replacement text.
     func previewDictEntry(from: String, to: String) {
-        speak("\(from). \(to).")
+        speak(to)
     }
 
     func speak(_ text: String) {

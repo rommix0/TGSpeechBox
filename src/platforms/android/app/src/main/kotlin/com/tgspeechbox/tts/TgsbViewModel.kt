@@ -210,9 +210,9 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         engine.speak(text, effectiveSpeed, pitchHz.value.toDouble())
     }
 
-    /** Preview a dictionary entry: speaks "fromText. toText." */
+    /** Preview a dictionary entry: speaks the replacement text. */
     fun previewDictEntry(fromText: String, toText: String) {
-        speakText("$fromText. $toText.")
+        speakText(toText)
     }
 
     fun stop() {
