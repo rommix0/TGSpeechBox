@@ -425,6 +425,11 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                                         if (entry.category.isNotEmpty()) append(", ${entry.category}")
                                     }
                                     customActions = buildList {
+                                        if (selectedType == "pronounce" || selectedType == "character") {
+                                            add(CustomAccessibilityAction("Preview") {
+                                                viewModel.previewDictEntry(entry.fromText, entry.toText); true
+                                            })
+                                        }
                                         add(CustomAccessibilityAction("Edit") {
                                             editingEntry = entry; true
                                         })

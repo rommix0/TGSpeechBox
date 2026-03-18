@@ -520,6 +520,7 @@ private struct DictEntryRow: View {
             (entry.category.isEmpty ? "" : ", \(entry.category)")
         )
         .accessibilityAction(named: "Edit") { onEdit() }
+        .accessibilityAction(named: "Preview") { onPreview?() }
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to edit")
     }
