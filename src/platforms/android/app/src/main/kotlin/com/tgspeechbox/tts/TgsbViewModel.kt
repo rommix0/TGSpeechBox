@@ -34,6 +34,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "TgsbUI"
         private const val PREF_PREFIX = "adv_"
+        private const val PREF_SPEAK_LANG = "tgsb_speak_lang"
         val SAMPLE_RATES = listOf(11025, 16000, 22050, 44100)
     }
 
@@ -113,17 +114,28 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         val idx = voices.indexOfFirst { it.id == savedPreset }
         if (idx >= 0) selectedVoiceIndex.value = idx
 
-        val deviceLocale = Locale.getDefault()
-        val langMatch = languages.indexOfFirst { item ->
-            val ld = item.langDef.displayLocale
-            ld.language == deviceLocale.language && ld.country == deviceLocale.country
-        }
-        val langFallback = if (langMatch < 0) {
-            languages.indexOfFirst { it.langDef.displayLocale.language == deviceLocale.language }
-        } else langMatch
-        if (langFallback >= 0) {
-            selectedLanguageIndex.value = langFallback
-            Log.i(TAG, "Default language: ${languages[langFallback].displayName}")
+        // Restore saved Speak-tab language, fall back to device locale.
+        val savedSpeakLang = prefs.getString(PREF_SPEAK_LANG, null)
+        val savedLangIdx = if (savedSpeakLang != null) {
+            languages.indexOfFirst { it.langDef.tgsbLang == savedSpeakLang }
+        } else -1
+
+        if (savedLangIdx >= 0) {
+            selectedLanguageIndex.value = savedLangIdx
+            Log.i(TAG, "Restored speak language: $savedSpeakLang")
+        } else {
+            val deviceLocale = Locale.getDefault()
+            val langMatch = languages.indexOfFirst { item ->
+                val ld = item.langDef.displayLocale
+                ld.language == deviceLocale.language && ld.country == deviceLocale.country
+            }
+            val langFallback = if (langMatch < 0) {
+                languages.indexOfFirst { it.langDef.displayLocale.language == deviceLocale.language }
+            } else langMatch
+            if (langFallback >= 0) {
+                selectedLanguageIndex.value = langFallback
+                Log.i(TAG, "Default language: ${languages[langFallback].displayName}")
+            }
         }
 
         if (engine.start()) {
@@ -192,6 +204,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         engine.setLanguage(ld.espeakLang, ld.tgsbLang)
         applyStoredOverrides(ld.tgsbLang)
         reapplyDictOverrides(ld.tgsbLang)
+        prefs.edit().putString(PREF_SPEAK_LANG, ld.tgsbLang).apply()
         Log.i(TAG, "Language selected: ${ld.espeakLang}")
     }
 
