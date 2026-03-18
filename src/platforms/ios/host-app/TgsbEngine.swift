@@ -1285,13 +1285,51 @@ class TgsbEngine: ObservableObject {
     /// original word is spoken uncorrected, then speaks the replacement.
     func previewDictEntry(from: String, to: String) {
         guard let eng = engine else { return }
+        stopSpeaking()
+
+        // Apply all settings + dict overrides first
+        tgsb_set_language(eng, selectedLanguage.espeakTag, selectedLanguage.tgsbTag)
+        applyStoredOverrides(selectedLanguage.tgsbTag)
+        reapplyDictOverrides(selectedLanguage.tgsbTag)
+        applySelectedVoice(eng)
+        applyEngineSettings()
+        tgsb_set_inflection(eng, inflectionValue / 100.0)
+
+        // Mask AFTER dict overrides — prevents auto-correction of 'from'
         let tag = prefixedLangTag(dictSubType, dictLangTag)
-        // Temporarily mask so 'from' isn't auto-corrected
         tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, from, "{\"masked\":true}")
-        // Queue frames for both: original (uncorrected) + replacement
-        speak("\(from). \(to).")
-        // Unmask — frames already generated, audio plays from queue
-        tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, from, "{\"masked\":false}")
+
+        isSpeaking = true
+        let text = "\(from). \(to)."
+        let speed = self.speed * (self.rateBoost ? 2.0 : 1.0)
+        let pitch = self.pitch
+        let sr = self.sampleRate
+
+        synthQueue.async { [weak self] in
+            tgsb_queue_text(eng, text, speed, pitch)
+
+            // Unmask on synth thread — frames already queued
+            tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, from, "{\"masked\":false}")
+
+            // Pull PCM and play (same as speak())
+            var pcmData = Data()
+            let chunkSize = 4096
+            var buf = [Int16](repeating: 0, count: chunkSize)
+            while true {
+                let got = buf.withUnsafeMutableBufferPointer { ptr in
+                    tgsb_pull_audio(eng, ptr.baseAddress, Int32(chunkSize))
+                }
+                if got <= 0 { break }
+                buf.withUnsafeBufferPointer { ptr in
+                    pcmData.append(UnsafeBufferPointer(start: ptr.baseAddress, count: Int(got)))
+                }
+            }
+            guard !pcmData.isEmpty else {
+                DispatchQueue.main.async { self?.isSpeaking = false }
+                return
+            }
+            self?.playPCMData(pcmData, sampleRate: sr)
+        }
     }
 
     func speak(_ text: String) {

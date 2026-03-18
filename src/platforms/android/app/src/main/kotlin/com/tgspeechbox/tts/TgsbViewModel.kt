@@ -213,12 +213,23 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     /** Preview a dictionary entry: temporarily masks the entry so the
      *  original word is spoken uncorrected, then speaks the replacement. */
     fun previewDictEntry(fromText: String, toText: String) {
+        val text = "$fromText. $toText."
+        if (text.isBlank()) return
+        val ld = languages[selectedLanguageIndex.value].langDef
+        engine.setLanguage(ld.espeakLang, ld.tgsbLang)
+        applyStoredOverrides(ld.tgsbLang)
+        reapplyDictOverrides(ld.tgsbLang)
+        engine.setVoice(voices[selectedVoiceIndex.value].id)
+        applyVoicingTone()
+        applyFrameExDefaults()
+        applyPitchSettings()
+        engine.setPauseMode(pauseMode.value)
+        // Mask AFTER dict overrides are applied — prevents auto-correction of fromText
         val prefixed = prefixedLangTag(dictSubType, dictLangTag)
-        // Temporarily mask so fromText isn't auto-corrected
         engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, """{"masked":true}""")
-        // Queue frames for both: original (uncorrected) + replacement
-        speakText("$fromText. $toText.")
-        // Unmask — frames are already generated, audio plays from queue
+        val effectiveSpeed = speedRate.value.toDouble() * (if (rateBoostEnabled.value) 2.0 else 1.0)
+        engine.speak(text, effectiveSpeed, pitchHz.value.toDouble())
+        // Unmask — frames already queued, audio plays from buffer
         engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, """{"masked":false}""")
     }
 
