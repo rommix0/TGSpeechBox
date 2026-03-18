@@ -297,8 +297,8 @@ fun AdvancedScreen(
             Slider(
                 value = globalRateVal,
                 onValueChange = { viewModel.onGlobalRateChanged(it) },
-                valueRange = 0.3f..3.0f,
-                steps = 26,
+                valueRange = 0.3f..4.0f,
+                steps = 36,
                 enabled = overrideRate,
                 modifier = Modifier
                     .fillMaxWidth()

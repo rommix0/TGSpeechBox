@@ -110,7 +110,7 @@ struct ContentView: View {
                     Text("Speed: \(engine.speed, specifier: "%.1f")x")
                         .frame(width: 100, alignment: .leading)
                         .accessibilityHidden(true)
-                    Slider(value: $engine.speed, in: 0.3...3.0, step: 0.1)
+                    Slider(value: $engine.speed, in: 0.3...4.0, step: 0.1)
                         .accessibilityLabel("Speed")
                         .accessibilityValue("\(engine.speed, specifier: "%.1f") times")
                 }
