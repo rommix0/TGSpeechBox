@@ -489,6 +489,15 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                             expanded = contextMenuEntry == entry.fromText,
                             onDismissRequest = { contextMenuEntry = null }
                         ) {
+                            if (selectedType == "pronounce" || selectedType == "character") {
+                                DropdownMenuItem(
+                                    text = { Text("Preview") },
+                                    onClick = {
+                                        viewModel.previewDictEntry(entry.fromText, entry.toText)
+                                        contextMenuEntry = null
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Edit") },
                                 onClick = {
@@ -558,7 +567,10 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             onConfirm = { from, to, cat ->
                 viewModel.addDictEntry(from, to, cat)
                 showAddDialog = false
-            }
+            },
+            onPreview = if (selectedType == "pronounce" || selectedType == "character") {
+                { from, to -> viewModel.previewDictEntry(from, to) }
+            } else null
         )
     }
 
@@ -573,7 +585,10 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                 if (from != entry.fromText) viewModel.deleteDictEntry(entry.fromText)
                 viewModel.addDictEntry(from, to, cat)
                 editingEntry = null
-            }
+            },
+            onPreview = if (selectedType == "pronounce" || selectedType == "character") {
+                { from, to -> viewModel.previewDictEntry(from, to) }
+            } else null
         )
     }
 
@@ -658,7 +673,8 @@ private fun shareDictEntries(
 private fun DictAddDialog(
     dictType: String,
     onDismiss: () -> Unit,
-    onConfirm: (from: String, to: String, category: String) -> Unit
+    onConfirm: (from: String, to: String, category: String) -> Unit,
+    onPreview: ((from: String, to: String) -> Unit)? = null
 ) {
     var fromText by rememberSaveable { mutableStateOf("") }
     var toText by rememberSaveable { mutableStateOf("") }
@@ -759,6 +775,12 @@ private fun DictAddDialog(
                         Switch(checked = caseSensitive, onCheckedChange = { caseSensitive = it })
                     }
                 }
+                if (onPreview != null) {
+                    TextButton(
+                        onClick = { onPreview(finalFromText(), toText.trim()) },
+                        enabled = fromText.isNotBlank() && toText.isNotBlank()
+                    ) { Text("Preview") }
+                }
             }
         },
         confirmButton = {
@@ -778,7 +800,8 @@ private fun DictEditDialog(
     dictType: String,
     entry: TgsbViewModel.DictEntry,
     onDismiss: () -> Unit,
-    onConfirm: (from: String, to: String, category: String) -> Unit
+    onConfirm: (from: String, to: String, category: String) -> Unit,
+    onPreview: ((from: String, to: String) -> Unit)? = null
 ) {
     var fromText by rememberSaveable { mutableStateOf(entry.fromText) }
     var toText by rememberSaveable { mutableStateOf(entry.toText) }
@@ -861,6 +884,12 @@ private fun DictEditDialog(
                         Text("Match capitalization", modifier = Modifier.weight(1f))
                         Switch(checked = caseSensitive, onCheckedChange = { caseSensitive = it })
                     }
+                }
+                if (onPreview != null) {
+                    TextButton(
+                        onClick = { onPreview(fromText.trim(), toText.trim()) },
+                        enabled = fromText.isNotBlank() && toText.isNotBlank()
+                    ) { Text("Preview") }
                 }
             }
         },

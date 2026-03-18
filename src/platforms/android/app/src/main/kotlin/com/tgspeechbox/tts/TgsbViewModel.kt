@@ -192,6 +192,26 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         Log.i(TAG, "speak: lang=${ld.espeakLang} speed=${speedRate.value} pitch=${pitchHz.value}")
     }
 
+    /** Speak arbitrary text using current Speak-tab settings. */
+    fun speakText(text: String) {
+        if (text.isBlank()) return
+        val ld = languages[selectedLanguageIndex.value].langDef
+        engine.setLanguage(ld.espeakLang, ld.tgsbLang)
+        applyStoredOverrides(ld.tgsbLang)
+        reapplyDictOverrides(ld.tgsbLang)
+        engine.setVoice(voices[selectedVoiceIndex.value].id)
+        applyVoicingTone()
+        applyFrameExDefaults()
+        applyPitchSettings()
+        engine.setPauseMode(pauseMode.value)
+        engine.speak(text, speedRate.value.toDouble(), pitchHz.value.toDouble())
+    }
+
+    /** Preview a dictionary entry: speaks "fromText. toText." */
+    fun previewDictEntry(fromText: String, toText: String) {
+        speakText("$fromText. $toText.")
+    }
+
     fun stop() {
         engine.stop()
     }

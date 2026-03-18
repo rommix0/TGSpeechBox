@@ -1275,6 +1275,11 @@ class TgsbEngine: ObservableObject {
         bumpOverridesVersion()
     }
 
+    /// Preview a dictionary entry: speaks "fromText. toText."
+    func previewDictEntry(from: String, to: String) {
+        speak("\(from). \(to).")
+    }
+
     func speak(_ text: String) {
         guard let eng = engine else { return }
         stopSpeaking()

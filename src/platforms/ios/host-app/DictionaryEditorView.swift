@@ -237,7 +237,10 @@ struct DictionaryEditorView: View {
                             },
                             onDelete: {
                                 engine.deleteDictEntry(fromText: entry.fromText)
-                            }
+                            },
+                            onPreview: (selectedType == "pronounce" || selectedType == "character") ? {
+                                engine.previewDictEntry(from: entry.fromText, to: entry.toText)
+                            } : nil
                         )
                     }
 
@@ -317,10 +320,14 @@ struct DictionaryEditorView: View {
         .sheet(isPresented: $showAddSheet) {
             DictEntrySheet(
                 title: "Add Entry",
-                dictType: selectedType
-            ) { from, to, cat in
-                engine.addDictEntry(fromText: from, toText: to, category: cat)
-            }
+                dictType: selectedType,
+                onSave: { from, to, cat in
+                    engine.addDictEntry(fromText: from, toText: to, category: cat)
+                },
+                onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to in
+                    engine.previewDictEntry(from: from, to: to)
+                } : nil
+            )
         }
         .sheet(item: $editingEntry) { entry in
             DictEntrySheet(
@@ -329,13 +336,17 @@ struct DictionaryEditorView: View {
                 initialFrom: entry.fromText,
                 initialTo: entry.toText,
                 initialCategory: entry.category,
-                isEdit: true
-            ) { from, to, cat in
-                if from != entry.fromText {
-                    engine.deleteDictEntry(fromText: entry.fromText)
-                }
-                engine.addDictEntry(fromText: from, toText: to, category: cat)
-            }
+                isEdit: true,
+                onSave: { from, to, cat in
+                    if from != entry.fromText {
+                        engine.deleteDictEntry(fromText: entry.fromText)
+                    }
+                    engine.addDictEntry(fromText: from, toText: to, category: cat)
+                },
+                onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to in
+                    engine.previewDictEntry(from: from, to: to)
+                } : nil
+            )
         }
         .alert("Remove changed entries", isPresented: $showRemoveConfirm) {
             Button("Remove", role: .destructive) {
@@ -461,6 +472,7 @@ private struct DictEntryRow: View {
     let onEdit: () -> Void
     let onMask: () -> Void
     let onDelete: () -> Void
+    var onPreview: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -494,6 +506,12 @@ private struct DictEntryRow: View {
                     .tint(entry.masked ? .green : .orange)
             }
         }
+        .swipeActions(edge: .leading) {
+            if let onPreview = onPreview {
+                Button("Preview") { onPreview() }
+                    .tint(.blue)
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(entry.fromText) maps to \(entry.toText), " +
@@ -518,12 +536,14 @@ private struct DictEntrySheet: View {
     @State var caseSensitive: Bool = false
     var isEdit: Bool = false
     let onSave: (String, String, String) -> Void
+    var onPreview: ((String, String) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     init(title: String, dictType: String, initialFrom: String = "",
          initialTo: String = "", initialCategory: String = "",
          isEdit: Bool = false,
-         onSave: @escaping (String, String, String) -> Void) {
+         onSave: @escaping (String, String, String) -> Void,
+         onPreview: ((String, String) -> Void)? = nil) {
         self.title = title
         self.dictType = dictType
         self._fromText = State(initialValue: initialFrom)
@@ -532,6 +552,7 @@ private struct DictEntrySheet: View {
         self._caseSensitive = State(initialValue: initialFrom != initialFrom.lowercased())
         self.isEdit = isEdit
         self.onSave = onSave
+        self.onPreview = onPreview
     }
 
     private var toLabel: String {
@@ -611,6 +632,21 @@ private struct DictEntrySheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+                if let onPreview = onPreview {
+                    ToolbarItem(placement: .bottomBar) {
+                        Button("Preview") {
+                            let word = fromText.trimmingCharacters(in: .whitespaces)
+                            let replacement = toText.trimmingCharacters(in: .whitespaces)
+                            if !word.isEmpty && !replacement.isEmpty {
+                                onPreview(word, replacement)
+                            }
+                        }
+                        .disabled(
+                            fromText.trimmingCharacters(in: .whitespaces).isEmpty ||
+                            toText.trimmingCharacters(in: .whitespaces).isEmpty
+                        )
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
