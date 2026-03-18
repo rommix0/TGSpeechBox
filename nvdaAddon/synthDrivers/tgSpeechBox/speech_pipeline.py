@@ -438,7 +438,7 @@ class SpeechPipelineMixin:
                         ok = self._frontend.queueIPA_ExWithText(
                             ipaText,
                             originalText=chunk,
-                            speed=self._curRate,
+                            speed=self._curRate * (2.0 if self._rateBoost else 1.0),
                             basePitch=basePitch,
                             inflection=self._curInflection,
                             clauseType=clauseType,

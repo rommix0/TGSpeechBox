@@ -65,6 +65,7 @@ class SynthDriver(
         _SynthDriverBase.VoiceSetting(),
         _SynthDriverBase.LanguageSetting(),
         _SynthDriverBase.RateSetting(),
+        _SynthDriverBase.RateBoostSetting(),
         _SynthDriverBase.PitchSetting(),
         DriverSetting("legacyPitchMode", _("Pitch mode"), availableInSettingsRing=True),
         _SynthDriverBase.InflectionSetting(),
@@ -123,6 +124,7 @@ class SynthDriver(
         self._curInflection = 0.5
         self._curVolume = 1.0
         self._curRate = 1.0
+        self._rateBoost = False
         self._curVoiceTilt = 50
         self._curNoiseGlottalMod = 0
         self._curPitchSyncF1 = 50
@@ -849,6 +851,12 @@ class SynthDriver(
             self._curRate = 0.25 * (2 ** (float(val) / 25.0))
         except Exception:
             pass
+
+    def _get_rateBoost(self):
+        return self._rateBoost
+
+    def _set_rateBoost(self, val):
+        self._rateBoost = val
 
     def _get_pitch(self):
         return int(getattr(self, "_curPitch", 50))
