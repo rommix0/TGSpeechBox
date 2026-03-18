@@ -1302,7 +1302,13 @@ class TgsbEngine: ObservableObject {
 
         isSpeaking = true
 
-        let speed = self.speed * (self.rateBoost ? 2.0 : 1.0)
+        // Use override rate if enabled, otherwise Speak tab slider
+        let d = UserDefaults(suiteName: kAppGroupId)
+        var speed = self.speed
+        if d?.bool(forKey: "adv_overrideRate") == true {
+            speed = d?.double(forKey: "adv_globalRate") ?? 1.0
+        }
+        if self.rateBoost { speed *= 2.0 }
         let pitch = self.pitch
         let sr = self.sampleRate
 

@@ -74,6 +74,11 @@ struct EngineSettingsView: View {
     // Volume
     @State private var systemVolume: Double
 
+    // Rate override + boost (global)
+    @State private var overrideRate: Bool
+    @State private var globalRate: Double
+    @State private var rateBoostEnabled: Bool
+
     private var defaults: UserDefaults? { UserDefaults(suiteName: kAppGroupId) }
 
     @State private var showResetAlert = false
@@ -125,6 +130,12 @@ struct EngineSettingsView: View {
         let vol = d?.object(forKey: "systemVolume") != nil
             ? d!.double(forKey: "systemVolume") : 0.8
         _systemVolume = State(initialValue: vol > 0.0 ? vol : 0.8)
+
+        _overrideRate = State(initialValue: d?.bool(forKey: "adv_overrideRate") ?? false)
+        let savedGlobalRate = d?.object(forKey: "adv_globalRate") != nil
+            ? d!.double(forKey: "adv_globalRate") : 1.0
+        _globalRate = State(initialValue: savedGlobalRate > 0.0 ? savedGlobalRate : 1.0)
+        _rateBoostEnabled = State(initialValue: d?.bool(forKey: "rateBoost") ?? false)
     }
 
     var body: some View {
@@ -251,6 +262,35 @@ struct EngineSettingsView: View {
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
 
+                Toggle("Override speech rate", isOn: $overrideRate)
+                    .onChange(of: overrideRate) { val in
+                        defaults?.set(val, forKey: "adv_overrideRate")
+                        bumpVersion()
+                    }
+
+                if overrideRate {
+                    HStack {
+                        Text("Rate: \(globalRate, specifier: "%.1f")x")
+                            .frame(width: 120, alignment: .leading)
+                            .accessibilityHidden(true)
+                        Slider(value: $globalRate, in: 0.3...4.0, step: 0.1)
+                            .onChange(of: globalRate) { val in
+                                defaults?.set(val, forKey: "adv_globalRate")
+                                bumpVersion()
+                            }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Override rate")
+                    .accessibilityValue("\(globalRate, specifier: "%.1f") times")
+                }
+
+                Toggle("Rate boost", isOn: $rateBoostEnabled)
+                    .onChange(of: rateBoostEnabled) { val in
+                        defaults?.set(val, forKey: "rateBoost")
+                        engine.rateBoost = val
+                        bumpVersion()
+                    }
+
                 HStack {
                     Text("Sample Rate: \(kSampleRates[Int(sampleRateIndex)].label)")
                         .frame(width: 220, alignment: .leading)
@@ -346,6 +386,9 @@ struct EngineSettingsView: View {
         pauseMode = 1         // short
         sampleRateIndex = 2   // 22050 Hz
         systemVolume = 0.8
+        overrideRate = false
+        globalRate = 1.0
+        rateBoostEnabled = false
 
         // Persist per-voice defaults
         let d = defaults
@@ -377,6 +420,9 @@ struct EngineSettingsView: View {
         d?.set(pauseMode,       forKey: "adv_pauseMode")
         d?.set(22050,           forKey: "adv_sampleRate")
         d?.set(systemVolume,    forKey: "systemVolume")
+        d?.set(false,           forKey: "adv_overrideRate")
+        d?.set(1.0,             forKey: "adv_globalRate")
+        d?.set(false,           forKey: "rateBoost")
 
         // Apply to engine
         engine.setPitchMode(pitchMode)
