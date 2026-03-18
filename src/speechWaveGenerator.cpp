@@ -154,6 +154,14 @@ private:
     // Default 1.0 (NVDA). Android=3.0, iOS=1.7.
     double outputGain;
 
+    // Time-stretch: accelerated frame consumption for rate boost.
+    // Instead of skipping output cycles (which creates discontinuities),
+    // consume frames faster — advance the speech timeline by calling
+    // getCurrentFrameWithEx() multiple times per output sample.
+    // Every output sample is cleanly generated, no artifacts.
+    double timeStretchFactor;  // 1.0 = off, 2.0 = 2x speedup
+    double timeStretchAccum;   // fractional accumulator for sub-sample stepping
+
     void initHighShelf(double fc, double gainDb, double Q) {
         // Clamp inputs to prevent NaNs and weird filter behavior from bad UI values
         double nyq = 0.5 * (double)sampleRate;
@@ -191,7 +199,7 @@ private:
     }
 
 public:
-    SpeechWaveGeneratorImpl(int sr): sampleRate(sr), voiceGenerator(sr), fricGenerator(), cascade(sr), parallel(sr), frameManager(NULL), lastInput(0.0), lastOutput(0.0), wasSilence(true), smoothPreGain(0.0), preGainAttackAlpha(0.0), preGainReleaseAlpha(0.0), smoothFricAmp(0.0), fricAttackAlpha(0.0), fricReleaseAlpha(0.0), hsIn1(0), hsIn2(0), hsOut1(0), hsOut2(0), fricBurstLp1(sr), fricBurstLp2(sr), fricSustainLp1(sr), fricSustainLp2(sr), lastTargetFricAmp(0.0), lastTargetAspAmp(0.0), fricBurstFc(0.0), fricSustainFc(0.0), burstEnv(0.0), burstEnvDecayMul(1.0), aspLp1(sr), aspLp2(sr), aspBurstFc(0.0), shelfMix(1.0), shelfMixAlpha(0.0), lastBrightOut(0.0), stopFadeRemaining(0), stopFadeTotal(0), startFadeRemaining(0), startFadeTotal(0), limiterGain(1.0), limiterAttackAlpha(0.0), limiterReleaseAlpha(0.0), limiterThreshold(0.0), smoothCascadeDuck(1.0), cascadeDuckAlpha(0.0), stcTiltState(0.0), stcSmoothPole(0.0), stcSmoothBwOff(0.0), stcAlpha(0.0), sgPole(sr), sgZero(sr, true), sgCouplingSmooth(0.0), sgCouplingAlpha(0.0), outputGain(1.0) {
+    SpeechWaveGeneratorImpl(int sr): sampleRate(sr), voiceGenerator(sr), fricGenerator(), cascade(sr), parallel(sr), frameManager(NULL), lastInput(0.0), lastOutput(0.0), wasSilence(true), smoothPreGain(0.0), preGainAttackAlpha(0.0), preGainReleaseAlpha(0.0), smoothFricAmp(0.0), fricAttackAlpha(0.0), fricReleaseAlpha(0.0), hsIn1(0), hsIn2(0), hsOut1(0), hsOut2(0), fricBurstLp1(sr), fricBurstLp2(sr), fricSustainLp1(sr), fricSustainLp2(sr), lastTargetFricAmp(0.0), lastTargetAspAmp(0.0), fricBurstFc(0.0), fricSustainFc(0.0), burstEnv(0.0), burstEnvDecayMul(1.0), aspLp1(sr), aspLp2(sr), aspBurstFc(0.0), shelfMix(1.0), shelfMixAlpha(0.0), lastBrightOut(0.0), stopFadeRemaining(0), stopFadeTotal(0), startFadeRemaining(0), startFadeTotal(0), limiterGain(1.0), limiterAttackAlpha(0.0), limiterReleaseAlpha(0.0), limiterThreshold(0.0), smoothCascadeDuck(1.0), cascadeDuckAlpha(0.0), stcTiltState(0.0), stcSmoothPole(0.0), stcSmoothBwOff(0.0), stcAlpha(0.0), sgPole(sr), sgZero(sr, true), sgCouplingSmooth(0.0), sgCouplingAlpha(0.0), outputGain(1.0), timeStretchFactor(1.0), timeStretchAccum(0.0) {
         const double attackMs = 1.0;
         const double releaseMs = 0.5;
         preGainAttackAlpha = 1.0 - exp(-1.0 / (sampleRate * (attackMs * 0.001)));
@@ -689,6 +697,20 @@ public:
                 const double limit = 32767.0;
                 if(scaled > limit) scaled = limit;
                 if(scaled < -limit) scaled = -limit;
+
+                // Time-stretch: accelerated frame consumption.
+                // Advance the frame manager extra ticks so the speech
+                // timeline moves faster. Every output sample is cleanly
+                // generated — no cycle skipping, no discontinuities.
+                if (timeStretchFactor > 1.01) {
+                    timeStretchAccum += (timeStretchFactor - 1.0);
+                    while (timeStretchAccum >= 1.0) {
+                        // Consume an extra frame tick (advances speech timeline)
+                        frameManager->getCurrentFrameWithEx(NULL);
+                        timeStretchAccum -= 1.0;
+                    }
+                }
+
                 sampleBuf[i].value = (int)scaled;
             } else {
                 // No frame available - handle stop/interrupt with fade-out to avoid click
@@ -869,6 +891,13 @@ public:
         if (gain < 0.0) gain = 0.0;
         if (gain > 10.0) gain = 10.0;
         outputGain = gain;
+    }
+
+    void setTimeStretch(double factor) {
+        if (factor < 1.0) factor = 1.0;
+        if (factor > 8.0) factor = 8.0;
+        timeStretchFactor = factor;
+        timeStretchAccum = 0.0;
     }
 };
 

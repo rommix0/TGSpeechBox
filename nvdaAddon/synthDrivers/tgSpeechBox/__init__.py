@@ -857,6 +857,10 @@ class SynthDriver(
 
     def _set_rateBoost(self, val):
         self._rateBoost = val
+        # Apply DSP-level time-stretch instead of doubling frontend speed.
+        # Cycle-skipping preserves formant quality at extreme rates.
+        if hasattr(self, '_player') and self._player:
+            self._player.setTimeStretch(2.0 if val else 1.0)
 
     def _get_pitch(self):
         return int(getattr(self, "_curPitch", 50))

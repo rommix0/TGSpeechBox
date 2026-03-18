@@ -80,3 +80,10 @@ void speechPlayer_setOutputGain(speechPlayer_handle_t playerHandle, double gain)
 unsigned int speechPlayer_getDspVersion(void) {
 	return SPEECHPLAYER_DSP_VERSION;
 }
+
+void speechPlayer_setTimeStretch(speechPlayer_handle_t playerHandle, double factor) {
+	speechPlayer_handleInfo_t* playerHandleInfo=(speechPlayer_handleInfo_t*)playerHandle;
+	if (playerHandleInfo && playerHandleInfo->waveGenerator) {
+		playerHandleInfo->waveGenerator->setTimeStretch(factor);
+	}
+}

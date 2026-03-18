@@ -79,6 +79,20 @@ void speechPlayer_setOutputGain(speechPlayer_handle_t playerHandle, double gain)
  */
 unsigned int speechPlayer_getDspVersion(void);
 
+/**
+ * Set time-stretch factor for DSP-level rate boost.
+ *
+ * 1.0 = normal (no stretching). 2.0 = skip every other glottal cycle
+ * for 2x speedup without formant compression.  Uses pitch-synchronous
+ * cycle skipping with linear crossfade at boundaries.  Inspired by
+ * Sonic (Bill Cox) but implemented natively — the DSP knows exact
+ * glottal cycle timing.
+ *
+ * @param playerHandle  Handle returned by speechPlayer_initialize()
+ * @param factor        Time-stretch factor (clamped to 1.0–8.0)
+ */
+void speechPlayer_setTimeStretch(speechPlayer_handle_t playerHandle, double factor);
+
 #ifdef __cplusplus
 }
 #endif

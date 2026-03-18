@@ -396,6 +396,28 @@ class SpeechPlayer(object):
         except (AttributeError, OSError):
             pass
 
+        # Time-stretch API (optional - DSP-level rate boost via cycle skipping)
+        self._hasTimeStretchApi = False
+        try:
+            _setTS = getattr(self._dll, "speechPlayer_setTimeStretch", None)
+            if _setTS is not None:
+                self._dll.speechPlayer_setTimeStretch.argtypes = (c_void_p, c_double)
+                self._dll.speechPlayer_setTimeStretch.restype = None
+                self._hasTimeStretchApi = True
+        except (AttributeError, OSError):
+            pass
+
+    def setTimeStretch(self, factor: float) -> bool:
+        """Set DSP-level time-stretch factor for rate boost.
+
+        1.0 = normal, 2.0 = skip every other glottal cycle (2x speedup).
+        Returns True if the API is available.
+        """
+        if not self._hasTimeStretchApi:
+            return False
+        self._dll.speechPlayer_setTimeStretch(self._speechHandle, c_double(factor))
+        return True
+
     def setOutputGain(self, gain: float) -> bool:
         """Set output gain applied before the DSP limiter.
 

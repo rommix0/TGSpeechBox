@@ -9,3 +9,5 @@ EXPORTS
 	speechPlayer_setVoicingTone
 	speechPlayer_getVoicingTone
 	speechPlayer_getDspVersion
+	speechPlayer_setOutputGain
+	speechPlayer_setTimeStretch

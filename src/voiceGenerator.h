@@ -264,6 +264,7 @@ return clampDouble(a, 0.0, 0.9999);
 
 public:
     bool glottisOpen;
+    bool cycleJustWrapped;  // true for one sample at the start of each new glottal cycle
 
     // Frication tilt: same algorithm, separate state, shares smoothed tilt value
     double applyFricationTilt(double x) {
@@ -617,6 +618,7 @@ public:
 
         // Detect start of a new glottal cycle.
         const bool cycleWrapped = (pitchHz > 0.0) && (cyclePos < lastCyclePos);
+        cycleJustWrapped = cycleWrapped;
         lastCyclePos = cyclePos;
 
         if (cycleWrapped) {

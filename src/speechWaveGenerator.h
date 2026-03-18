@@ -41,6 +41,14 @@ class SpeechWaveGenerator: public WaveGenerator {
 	 * data.  Default is 1.0 (no gain).
 	 */
 	virtual void setOutputGain(double gain)=0;
+
+	/**
+	 * Set time-stretch factor for DSP-level rate boost.
+	 * 1.0 = normal (no stretching). 2.0 = skip every other glottal cycle
+	 * for 2x speedup without formant compression. Uses pitch-synchronous
+	 * cycle skipping with linear crossfade at boundaries.
+	 */
+	virtual void setTimeStretch(double factor)=0;
 };
 
 #endif

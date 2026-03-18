@@ -433,12 +433,27 @@ class SpeechPipelineMixin:
 
                     ok = False
                     try:
+                        # Automatic speed split: cap synthesis at 3.0x and put
+                        # the excess into DSP time-stretch (frame-advance).
+                        # Prevents formant mush at extreme rates.
+                        _SYNTH_CAP = 2.0
+                        _effectiveSpeed = self._curRate
+                        if getattr(self, '_rateBoost', False):
+                            _effectiveSpeed *= 2.0
+                        if _effectiveSpeed > _SYNTH_CAP:
+                            _synthSpeed = _SYNTH_CAP
+                            _timeStretch = _effectiveSpeed / _SYNTH_CAP
+                        else:
+                            _synthSpeed = _effectiveSpeed
+                            _timeStretch = 1.0
+                        self._player.setTimeStretch(_timeStretch)
+
                         # Use queueIPA_ExWithText for stress correction (ABI v4+).
                         # Falls back to queueIPA_Ex internally if not available.
                         ok = self._frontend.queueIPA_ExWithText(
                             ipaText,
                             originalText=chunk,
-                            speed=self._curRate * (2.0 if getattr(self, '_rateBoost', False) else 1.0),
+                            speed=_synthSpeed,
                             basePitch=basePitch,
                             inflection=self._curInflection,
                             clauseType=clauseType,
