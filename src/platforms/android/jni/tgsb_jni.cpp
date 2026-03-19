@@ -26,6 +26,57 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 /* ------------------------------------------------------------------ */
+/* Emoji spacing — pad emoji codepoints with spaces so eSpeak treats  */
+/* them as separate words for $textmode dictionary lookup.             */
+/* ------------------------------------------------------------------ */
+
+static bool isEmojiLeadByte(unsigned char b) {
+    // 4-byte UTF-8 sequences starting with F0 9F cover U+1F000..U+1FFFF
+    // which includes all major emoji blocks.
+    // We also handle U+2600..U+27BF (Misc Symbols + Dingbats) as 3-byte.
+    return (b == 0xF0);
+}
+
+static std::string padEmojiWithSpaces(const char *text) {
+    std::string out;
+    out.reserve(strlen(text) * 2);
+    const unsigned char *p = (const unsigned char *)text;
+    while (*p) {
+        // 4-byte UTF-8: emoji in U+1F000..U+1FFFF (F0 9F xx xx)
+        if (p[0] == 0xF0 && p[1] >= 0x9F && p[1] <= 0x9F &&
+            (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+            if (!out.empty() && out.back() != ' ') out += ' ';
+            out += (char)p[0]; out += (char)p[1];
+            out += (char)p[2]; out += (char)p[3];
+            p += 4;
+            // Skip variation selectors (FE0E/FE0F) — 3-byte: EF B8 8E/8F
+            while (p[0] == 0xEF && p[1] == 0xB8 && (p[2] == 0x8E || p[2] == 0x8F)) {
+                out += (char)p[0]; out += (char)p[1]; out += (char)p[2];
+                p += 3;
+            }
+            if (*p && *p != ' ') out += ' ';
+            continue;
+        }
+        // 3-byte UTF-8: U+2600..U+27BF (E2 98 80..E2 9E BF)
+        if (p[0] == 0xE2 && p[1] >= 0x98 && p[1] <= 0x9E &&
+            (p[2] & 0xC0) == 0x80) {
+            if (!out.empty() && out.back() != ' ') out += ' ';
+            out += (char)p[0]; out += (char)p[1]; out += (char)p[2];
+            p += 3;
+            // Skip variation selectors
+            while (p[0] == 0xEF && p[1] == 0xB8 && (p[2] == 0x8E || p[2] == 0x8F)) {
+                out += (char)p[0]; out += (char)p[1]; out += (char)p[2];
+                p += 3;
+            }
+            if (*p && *p != ' ') out += ' ';
+            continue;
+        }
+        out += (char)*p++;
+    }
+    return out;
+}
+
+/* ------------------------------------------------------------------ */
 /* Voice presets                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -284,6 +335,13 @@ static void synthesizeClauses(TgsbEngine *engine,
         if (splitClause) {
             free(clause);
             clause = splitClause;
+        }
+
+        /* Pad emoji with spaces so eSpeak treats them as separate words */
+        std::string padded = padEmojiWithSpaces(clause);
+        if (padded.size() != strlen(clause)) {
+            free(clause);
+            clause = strdup(padded.c_str());
         }
 
         /* eSpeak → IPA for this clause.
