@@ -268,11 +268,22 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
             return
         }
 
-        let langEntry = Self.languageMap.first {
-            $0.bcp47.lowercased() == bcp47.lowercased()
+        // Lock language: if enabled, use the Speak tab's saved language
+        // instead of the VoiceOver request's BCP-47 tag.
+        let lockLang = ud?.bool(forKey: "adv_lockLanguage") == true
+        let espeakLang: String
+        let tgsbLang: String
+        if lockLang, let lockedTag = ud?.string(forKey: "tgsb_speak_lang"),
+           let locked = Self.languageMap.first(where: { $0.tgsb == lockedTag }) {
+            espeakLang = locked.espeak
+            tgsbLang = locked.tgsb
+        } else {
+            let langEntry = Self.languageMap.first {
+                $0.bcp47.lowercased() == bcp47.lowercased()
+            }
+            espeakLang = langEntry?.espeak ?? "en-us"
+            tgsbLang = langEntry?.tgsb ?? "en-us"
         }
-        let espeakLang = langEntry?.espeak ?? "en-us"
-        let tgsbLang = langEntry?.tgsb ?? "en-us"
 
         let ssml = speechRequest.ssmlRepresentation
         var speed = extractRate(from: ssml)

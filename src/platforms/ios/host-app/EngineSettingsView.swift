@@ -79,6 +79,9 @@ struct EngineSettingsView: View {
     @State private var globalRate: Double
     @State private var rateBoostEnabled: Bool
 
+    // Lock language: force AU extension to use Speak tab's language
+    @State private var lockLanguage: Bool
+
     private var defaults: UserDefaults? { UserDefaults(suiteName: kAppGroupId) }
 
     @State private var showResetAlert = false
@@ -136,6 +139,7 @@ struct EngineSettingsView: View {
             ? d!.double(forKey: "adv_globalRate") : 1.0
         _globalRate = State(initialValue: savedGlobalRate > 0.0 ? savedGlobalRate : 1.0)
         _rateBoostEnabled = State(initialValue: d?.bool(forKey: "rateBoost") ?? false)
+        _lockLanguage = State(initialValue: d?.bool(forKey: "adv_lockLanguage") ?? false)
     }
 
     var body: some View {
@@ -331,6 +335,22 @@ struct EngineSettingsView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("System voice volume")
                 .accessibilityValue("\(Int(systemVolume * 100)) percent")
+
+                Toggle("Lock language", isOn: $lockLanguage)
+                    .onChange(of: lockLanguage) { val in
+                        defaults?.set(val, forKey: "adv_lockLanguage")
+                        bumpVersion()
+                    }
+                    .accessibilityLabel(lockLanguage
+                        ? "Lock language, \(engine.selectedLanguage.displayName), change in Speak tab"
+                        : "Lock language")
+
+                if lockLanguage {
+                    Text(engine.selectedLanguage.displayName)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .accessibilityHidden(true)
+                }
             }
             .padding(20)
         }
@@ -389,6 +409,7 @@ struct EngineSettingsView: View {
         overrideRate = false
         globalRate = 1.0
         rateBoostEnabled = false
+        lockLanguage = false
 
         // Persist per-voice defaults
         let d = defaults
@@ -423,6 +444,7 @@ struct EngineSettingsView: View {
         d?.set(false,           forKey: "adv_overrideRate")
         d?.set(1.0,             forKey: "adv_globalRate")
         d?.set(false,           forKey: "rateBoost")
+        d?.set(false,           forKey: "adv_lockLanguage")
 
         // Apply to engine
         engine.setPitchMode(pitchMode)

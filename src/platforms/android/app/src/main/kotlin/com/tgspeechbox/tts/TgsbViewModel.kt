@@ -80,6 +80,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── Output (global, NOT per-voice) ───────────────────────────────
 
+    val lockLanguage = MutableStateFlow(loadGlobalBool("lockLanguage", false))
     val pauseMode = MutableStateFlow(loadGlobalInt("pauseMode", 1))  // 0=off, 1=short, 2=long
     val systemVolume = MutableStateFlow(loadGlobalFloat("systemVolume", 1.0f))
     val sampleRateIndex = MutableStateFlow(loadGlobalInt("sampleRate", 22050).let { rate ->
@@ -310,6 +311,10 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         saveGlobalInt("sampleRate", rate)
         engine.setSampleRate(rate)
     }
+    fun onLockLanguageChanged(enabled: Boolean) {
+        lockLanguage.value = enabled
+        saveGlobalBool("lockLanguage", enabled)
+    }
     fun onPauseModeChanged(mode: Int) {
         pauseMode.value = mode
         saveGlobalInt("pauseMode", mode)
@@ -379,6 +384,7 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         globalRate.value = 1.0f;     onGlobalRateChanged(1.0f)
 
         // Global: Output
+        onLockLanguageChanged(false)
         onPauseModeChanged(1)  // short
         onSampleRateChanged(2f)  // 22050 Hz
         onSystemVolumeChanged(1.0f)
@@ -544,9 +550,11 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun buildLanguageList(): List<LanguageItem> {
+        val enabledKeys = TgsbTtsService.getEnabledLocaleKeys(prefs)
         val seen = mutableSetOf<String>()
         val items = mutableListOf<LanguageItem>()
         for (ld in TgsbTtsService.LANGUAGES) {
+            if (!TgsbTtsService.isLangEnabled(ld, enabledKeys)) continue
             val key = ld.displayLocale.toString()
             if (key in seen) continue
             seen.add(key)

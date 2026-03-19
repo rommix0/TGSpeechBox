@@ -394,6 +394,39 @@ fun AdvancedScreen(
                         stateDescription = "$currentRate Hz"
                     }
             )
+
+            Spacer(Modifier.height(8.dp))
+
+            val lockLang by viewModel.lockLanguage.collectAsState()
+            val langIdx by viewModel.selectedLanguageIndex.collectAsState()
+            val lockLangName = viewModel.languages.getOrNull(langIdx)?.displayName ?: ""
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = lockLang,
+                        onValueChange = { viewModel.onLockLanguageChanged(it) },
+                        role = androidx.compose.ui.semantics.Role.Checkbox
+                    )
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = lockLang,
+                    onCheckedChange = null
+                )
+                Column(modifier = Modifier.padding(start = 12.dp)) {
+                    Text(text = "Lock language")
+                    if (lockLang) {
+                        Text(
+                            text = lockLangName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.height(16.dp))
