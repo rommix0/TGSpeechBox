@@ -275,8 +275,18 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         let tgsbLang = langEntry?.tgsb ?? "en-us"
 
         let ssml = speechRequest.ssmlRepresentation
-        let speed = extractRate(from: ssml)
+        var speed = extractRate(from: ssml)
         let pitch = extractPitch(from: ssml)
+
+        // Apply user rate overrides from Engine Settings.
+        let ud = UserDefaults(suiteName: "group.com.tgspeechbox.app")
+        if ud?.bool(forKey: "adv_overrideRate") == true {
+            let globalRate = ud?.double(forKey: "adv_globalRate") ?? 1.0
+            if globalRate > 0.0 { speed = globalRate }
+        }
+        if ud?.bool(forKey: "rateBoost") == true {
+            speed *= 1.35
+        }
 
         // Volume: SSML prosody if present, multiplied by shared app setting
         var vol = Float32(extractVolume(from: ssml))
