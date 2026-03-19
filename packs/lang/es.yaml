@@ -18,6 +18,13 @@ settings:
   segmentBoundaryGapMs: 20
   segmentBoundaryFadeMs: 6
 
+  # Diphthong offglide duration: default 20ms starves /ei/, /eu/ glides
+  # ("rey", "rei", "reu" lose the final vowel).  30ms gives the formant
+  # sweep time to settle at the offglide target.
+  tiedFromVowelDurationMs: 30
+  # Resist speed compression on diphthongs (0=none, 1=fully rate-invariant).
+  diphthongRateCompensation: 0.3
+
   # Boundary smoothing disabled - we want crisp consonants
   boundarySmoothing:
     enabled: false
@@ -55,6 +62,10 @@ settings:
     enabled: false
   lengthContrast:
     enabled: false
+  # Auto-tie vowel+semivowel pairs into diphthongs so collapse pass
+  # gives them proper formant interpolation (fixes /ei/, /eu/ offglides).
+  autoTieDiphthongs: true
+
   allophoneRulesEnabled: true
   allophoneRules:
     enabled: false
@@ -303,6 +314,12 @@ normalization:
       to: "ɡᵊl"
     - from: "ɡl"
       to: "ɡᵊl"
-    # Set our own r trill r. The default one lacks naturalness.
+    # Word-initial /r/: sonorant trill (no burst, voicing through closure).
+    # Base /r/ has pa1-pa6 burst energy that makes it sound like /d/.
+    - from: "r"
+      to: "r_es"
+      when:
+        atWordStart: true
+    # Non-initial /r/ as double-tap trill for words like "perro", "madre".
     - from: "r"
       to: "ɾᵊɾ"

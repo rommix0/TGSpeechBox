@@ -2129,6 +2129,59 @@ phonemes:
     pf5: 3750
     pf6: 4900
     voiceAmplitude: 0.9
+  r_es:
+    # Spanish alveolar trill.  Sonorant realization — voicing continues
+    # through closure phases, NO burst (pa=0).  Trill modulation
+    # (_isTrill: true) provides the periodic amplitude cycling at ~30 Hz.
+    # Research: Blecua 2001, Sole 2002.  F1 raised vs base /r/ for more
+    # sonorant quality; F3 ~2200 Hz (rhotic signature).
+    _isLiquid: false
+    _isNasal: false
+    _isSemivowel: false
+    _isStop: false
+    _isTap: false
+    _isTrill: true
+    _isVoiced: true
+    _isVowel: false
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 80
+    cb2: 90
+    cb3: 130
+    cb4: 320
+    cb5: 400
+    cb6: 1400
+    cbN0: 100
+    cbNP: 100
+    cf1: 420
+    cf2: 1500
+    cf3: 2200
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 70
+    pb2: 100
+    pb3: 170
+    pb4: 320
+    pb5: 400
+    pb6: 1400
+    pf1: 420
+    pf2: 1500
+    pf3: 2200
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.85
   s:
     _isLiquid: false
     _isNasal: false
