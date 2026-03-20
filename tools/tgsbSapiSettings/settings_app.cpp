@@ -176,6 +176,11 @@ struct Settings {
     int frameExJitter      = 0;
     int frameExShimmer     = 0;
     int frameExSharpness   = 50;
+
+    // Rate controls.
+    bool rateBoostEnabled = false;
+    bool overrideSystemRate = false;
+    int globalRate = 50; // 0-100 slider, maps to 0.3-4.0x
 };
 
 void write_ini_int(const std::wstring& path, const wchar_t* section, const wchar_t* key, int val)
@@ -232,6 +237,10 @@ Settings load_settings(const std::wstring& ini_path)
     s.frameExShimmer     = rd(L"frameExShimmer", 0);
     s.frameExSharpness   = rd(L"frameExSharpness", 50);
 
+    s.rateBoostEnabled   = GetPrivateProfileIntW(L"Audio", L"rateBoost", 0, ini_path.c_str()) != 0;
+    s.overrideSystemRate = GetPrivateProfileIntW(L"Audio", L"overrideRate", 0, ini_path.c_str()) != 0;
+    s.globalRate         = GetPrivateProfileIntW(L"Audio", L"globalRate", 50, ini_path.c_str());
+
     return s;
 }
 
@@ -287,6 +296,12 @@ bool save_settings(const std::wstring& ini_path, const Settings& s)
     wr(L"frameExJitter",      s.frameExJitter);
     wr(L"frameExShimmer",     s.frameExShimmer);
     wr(L"frameExSharpness",   s.frameExSharpness);
+
+    WritePrivateProfileStringW(L"Audio", L"rateBoost",
+        s.rateBoostEnabled ? L"1" : L"0", ini_path.c_str());
+    WritePrivateProfileStringW(L"Audio", L"overrideRate",
+        s.overrideSystemRate ? L"1" : L"0", ini_path.c_str());
+    write_ini_int(ini_path, L"Audio", L"globalRate", s.globalRate);
 
     return true;
 }
@@ -417,6 +432,10 @@ void populate_sliders_from_settings(HWND hDlg, const Settings& s)
     init_slider(hDlg, IDC_SL_JITTER,      s.frameExJitter);
     init_slider(hDlg, IDC_SL_SHIMMER,     s.frameExShimmer);
     init_slider(hDlg, IDC_SL_SHARPNESS,   s.frameExSharpness);
+
+    CheckDlgButton(hDlg, IDC_RATE_BOOST,    s.rateBoostEnabled ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_OVERRIDE_RATE,  s.overrideSystemRate ? BST_CHECKED : BST_UNCHECKED);
+    init_slider(hDlg, IDC_SL_GLOBAL_RATE,   s.globalRate);
 }
 
 void read_sliders_to_settings(HWND hDlg, Settings& s)
@@ -436,6 +455,10 @@ void read_sliders_to_settings(HWND hDlg, Settings& s)
     s.frameExJitter      = get_slider(hDlg, IDC_SL_JITTER);
     s.frameExShimmer     = get_slider(hDlg, IDC_SL_SHIMMER);
     s.frameExSharpness   = get_slider(hDlg, IDC_SL_SHARPNESS);
+
+    s.rateBoostEnabled   = IsDlgButtonChecked(hDlg, IDC_RATE_BOOST) == BST_CHECKED;
+    s.overrideSystemRate = IsDlgButtonChecked(hDlg, IDC_OVERRIDE_RATE) == BST_CHECKED;
+    s.globalRate         = get_slider(hDlg, IDC_SL_GLOBAL_RATE);
 }
 
 void reset_sliders_to_defaults(HWND hDlg)
@@ -461,6 +484,10 @@ void reset_sliders_to_defaults(HWND hDlg)
     SendDlgItemMessageW(hDlg, IDC_PAUSE_MODE, CB_SETCURSEL, 1, 0);
     SendDlgItemMessageW(hDlg, IDC_PITCH_MODE, CB_SETCURSEL, 0, 0);
     set_slider(hDlg, IDC_SL_INFLECTION, 50);
+
+    CheckDlgButton(hDlg, IDC_RATE_BOOST,   BST_UNCHECKED);
+    CheckDlgButton(hDlg, IDC_OVERRIDE_RATE, BST_UNCHECKED);
+    set_slider(hDlg, IDC_SL_GLOBAL_RATE, 50);
 }
 
 // -----------------------------

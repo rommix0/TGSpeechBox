@@ -866,6 +866,13 @@ int runtime::synthesize(int max_samples, sample* out_samples)
     return speechPlayer_synthesize(speech_player_, static_cast<unsigned int>(max_samples), out_samples);
 }
 
+void runtime::set_time_stretch(double factor)
+{
+    if (speech_player_)
+        speechPlayer_setTimeStretch(
+            static_cast<speechPlayer_handle_t>(speech_player_), factor);
+}
+
 void runtime::purge()
 {
     if (!speech_player_) return;

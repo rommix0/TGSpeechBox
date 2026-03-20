@@ -35,5 +35,10 @@ Licensed under the MIT License. See LICENSE for details.
 #define IDC_SL_SHIMMER         1113
 #define IDC_SL_SHARPNESS       1114
 
+// Rate controls
+#define IDC_RATE_BOOST         1120
+#define IDC_OVERRIDE_RATE      1121
+#define IDC_SL_GLOBAL_RATE     1122
+
 // Reset button
 #define IDC_RESET_DEFAULTS     1200

@@ -53,6 +53,11 @@ struct wrapper_settings {
     int frameExJitter = -1;       // 0 = off
     int frameExShimmer = -1;      // 0 = off
     int frameExSharpness = -1;    // 50 = neutral
+
+    // Rate controls.
+    bool rateBoostEnabled = false;    // DSP time-stretch 1.35x
+    bool overrideSystemRate = false;  // ignore SAPI rate, use globalRate
+    int globalRate = 50;              // 0-100 slider, maps to 0.3-4.0x
 };
 
 // Normalizes a language tag for comparisons (trim, '_' -> '-', lowercase).

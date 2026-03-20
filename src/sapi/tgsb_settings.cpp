@@ -201,6 +201,11 @@ wrapper_settings load_settings(const std::wstring& base_dir)
     out.frameExShimmer     = readSlider(L"frameExShimmer");
     out.frameExSharpness   = readSlider(L"frameExSharpness");
 
+    // Rate controls.
+    out.rateBoostEnabled   = GetPrivateProfileIntW(L"Audio", L"rateBoost", 0, ini_path.c_str()) != 0;
+    out.overrideSystemRate = GetPrivateProfileIntW(L"Audio", L"overrideRate", 0, ini_path.c_str()) != 0;
+    out.globalRate         = GetPrivateProfileIntW(L"Audio", L"globalRate", 50, ini_path.c_str());
+
     return out;
 }
 
