@@ -102,6 +102,55 @@ bool is_soft_clause_punct(wchar_t c) {
     return c == L';' || c == L':';
 }
 
+// Pad emoji codepoints with spaces so eSpeak treats them as separate
+// words for $textmode dictionary lookup.  On Windows, wchar_t is UTF-16
+// so emoji above U+FFFF are surrogate pairs.
+static std::wstring padEmojiWithSpacesW(const std::wstring& text)
+{
+    std::wstring out;
+    out.reserve(text.size() * 2);
+    for (size_t i = 0; i < text.size(); ++i) {
+        wchar_t c = text[i];
+        // Detect surrogate pair (emoji above U+FFFF)
+        if (c >= 0xD800 && c <= 0xDBFF && i + 1 < text.size()) {
+            wchar_t lo = text[i + 1];
+            if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                uint32_t cp = 0x10000 + ((c - 0xD800) << 10) + (lo - 0xDC00);
+                bool isEmoji = (cp >= 0x1F000 && cp <= 0x1FBFF) ||
+                               (cp >= 0x1F1E0 && cp <= 0x1F1FF);
+                if (isEmoji) {
+                    if (!out.empty() && out.back() != L' ') out += L' ';
+                    out += c; out += lo;
+                    i++;
+                    // Skip variation selectors (U+FE0E/FE0F)
+                    while (i + 1 < text.size() &&
+                           (text[i + 1] == 0xFE0E || text[i + 1] == 0xFE0F))
+                        out += text[++i];
+                    if (i + 1 < text.size() && text[i + 1] != L' ') out += L' ';
+                    continue;
+                }
+                // Non-emoji surrogate pair — pass through
+                out += c; out += lo;
+                i++;
+                continue;
+            }
+        }
+        // BMP emoji: U+2600..U+27BF (Misc Symbols + Dingbats)
+        if (c >= 0x2600 && c <= 0x27BF) {
+            if (!out.empty() && out.back() != L' ') out += L' ';
+            out += c;
+            // Skip variation selectors
+            while (i + 1 < text.size() &&
+                   (text[i + 1] == 0xFE0E || text[i + 1] == 0xFE0F))
+                out += text[++i];
+            if (i + 1 < text.size() && text[i + 1] != L' ') out += L' ';
+            continue;
+        }
+        out += c;
+    }
+    return out;
+}
+
 // Split a SAPI text fragment into clauses. Each clause gets its own
 // clauseType so the frontend can apply correct intonation contours.
 // Same pattern as the Linux renderer and NVDA driver fixes.
@@ -625,7 +674,8 @@ STDMETHODIMP ISpTTSEngineImpl::Speak(DWORD /*dwSpeakFlags*/,
         std::vector<tgsb::sample_t> audio_buf;
         for (const auto& clause : clauses) {
             if (ctx.aborted) break;
-            std::wstring clauseText = batch.text.substr(clause.start, clause.len);
+            std::wstring clauseText = padEmojiWithSpacesW(
+                batch.text.substr(clause.start, clause.len));
             params.clause_type = clause.clause_type;
             hr = rt_->queue_text(clauseText, params);
             if (FAILED(hr)) {

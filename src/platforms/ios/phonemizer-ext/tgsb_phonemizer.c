@@ -12,6 +12,51 @@
 
 static int g_initialized = 0;
 
+/* Pad emoji codepoints with spaces so eSpeak treats them as separate
+ * words for $textmode dictionary lookup.  Caller must free() result. */
+static char *pad_emoji(const char *text)
+{
+    size_t slen = strlen(text);
+    size_t cap = slen * 2 + 1;
+    char *out = (char *)malloc(cap);
+    if (!out) return NULL;
+    size_t oi = 0;
+    const unsigned char *p = (const unsigned char *)text;
+    while (*p) {
+        /* 4-byte UTF-8: emoji in U+1F000..U+1FFFF */
+        if (p[0] == 0xF0 && p[1] >= 0x9F && p[1] <= 0x9F &&
+            (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+            if (oi > 0 && out[oi-1] != ' ') out[oi++] = ' ';
+            out[oi++] = p[0]; out[oi++] = p[1];
+            out[oi++] = p[2]; out[oi++] = p[3];
+            p += 4;
+            /* skip variation selectors */
+            while (p[0] == 0xEF && p[1] == 0xB8 && (p[2] == 0x8E || p[2] == 0x8F)) {
+                out[oi++] = p[0]; out[oi++] = p[1]; out[oi++] = p[2];
+                p += 3;
+            }
+            if (*p && *p != ' ') out[oi++] = ' ';
+            continue;
+        }
+        /* 3-byte UTF-8: U+2600..U+27BF */
+        if (p[0] == 0xE2 && p[1] >= 0x98 && p[1] <= 0x9E &&
+            (p[2] & 0xC0) == 0x80) {
+            if (oi > 0 && out[oi-1] != ' ') out[oi++] = ' ';
+            out[oi++] = p[0]; out[oi++] = p[1]; out[oi++] = p[2];
+            p += 3;
+            while (p[0] == 0xEF && p[1] == 0xB8 && (p[2] == 0x8E || p[2] == 0x8F)) {
+                out[oi++] = p[0]; out[oi++] = p[1]; out[oi++] = p[2];
+                p += 3;
+            }
+            if (*p && *p != ' ') out[oi++] = ' ';
+            continue;
+        }
+        out[oi++] = *p++;
+    }
+    out[oi] = '\0';
+    return out;
+}
+
 int tgsb_phonemizer_init(const char *espeakDataPath)
 {
     if (g_initialized) return 1;
@@ -62,7 +107,11 @@ char *tgsb_phonemizer_phonemize(const char *text)
     if (!buf) return NULL;
     buf[0] = '\0';
 
-    const void *textPtr = text;
+    /* Pad emoji with spaces so eSpeak treats them as separate words */
+    char *emojiPadded = pad_emoji(text);
+    const char *inputText = emojiPadded ? emojiPadded : text;
+
+    const void *textPtr = inputText;
     while (textPtr && *(const char *)textPtr) {
         const char *clauseStart = (const char *)textPtr;
         const char *ipa = espeak_TextToPhonemes(
@@ -115,5 +164,6 @@ char *tgsb_phonemizer_phonemize(const char *text)
         buf[len] = '\0';
     }
 
+    free(emojiPadded);
     return buf;
 }
