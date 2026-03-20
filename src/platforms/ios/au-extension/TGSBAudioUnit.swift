@@ -268,6 +268,9 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
             return
         }
 
+        // Shared UserDefaults for Engine Settings.
+        let ud = UserDefaults(suiteName: "group.com.tgspeechbox.app")
+
         // Lock language: if enabled, use the Speak tab's saved language
         // instead of the VoiceOver request's BCP-47 tag.
         let lockLang = ud?.bool(forKey: "adv_lockLanguage") == true
@@ -290,7 +293,6 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         let pitch = extractPitch(from: ssml)
 
         // Apply user rate overrides from Engine Settings.
-        let ud = UserDefaults(suiteName: "group.com.tgspeechbox.app")
         if ud?.bool(forKey: "adv_overrideRate") == true {
             let globalRate = ud?.double(forKey: "adv_globalRate") ?? 1.0
             if globalRate > 0.0 { speed = globalRate }

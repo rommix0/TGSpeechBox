@@ -7,6 +7,7 @@ Licensed under the MIT License. See LICENSE for details.
 #include "dict_lookup.h"
 
 #include <cctype>
+#include <cstdint>
 #include <string>
 
 // Debug logging (shares TPARSER_DEBUG_LOG toggle from text_parser.cpp).
@@ -30,6 +31,27 @@ static FILE* dlLogFile() {
 #endif
 
 namespace nvsp_frontend {
+
+// Strip Unicode variation selectors (U+FE0E text, U+FE0F emoji) from a
+// UTF-8 string.  iOS often appends U+FE0F when copying emoji, which
+// prevents dictionary lookup from matching the bare codepoint.
+// U+FE0E = EF B8 8E, U+FE0F = EF B8 8F in UTF-8.
+static std::string stripVariationSelectors(const std::string& s) {
+  std::string out;
+  out.reserve(s.size());
+  for (size_t i = 0; i < s.size(); ++i) {
+    if (i + 2 < s.size() &&
+        static_cast<uint8_t>(s[i])   == 0xEF &&
+        static_cast<uint8_t>(s[i+1]) == 0xB8 &&
+        (static_cast<uint8_t>(s[i+2]) == 0x8E ||
+         static_cast<uint8_t>(s[i+2]) == 0x8F)) {
+      i += 2;  // skip 3-byte sequence
+      continue;
+    }
+    out.push_back(s[i]);
+  }
+  return out;
+}
 
 std::string dictReplaceInText(const std::string& text, const PronDict& dict) {
   if (text.empty() || dict.entries.empty()) return text;
@@ -74,7 +96,9 @@ std::string dictReplaceInText(const std::string& text, const PronDict& dict) {
     // noun), then fallback to lowercase (e.g., "parton" as common word).
     // This lets users have different pronunciations for capitalized vs
     // lowercase variants of the same word.
-    std::string exactKey(token, lo, hi - lo);
+    // Strip variation selectors so "🦯\uFE0F" matches dict key "🦯".
+    std::string exactKey = stripVariationSelectors(
+        std::string(token, lo, hi - lo));
     std::string lowerKey;
     lowerKey.reserve(hi - lo);
     for (size_t k = lo; k < hi; ++k)
