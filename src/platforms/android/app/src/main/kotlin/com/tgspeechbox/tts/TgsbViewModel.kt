@@ -211,9 +211,21 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         engine.speak(text, effectiveSpeed, pitchHz.value.toDouble())
     }
 
-    /** Preview a dictionary entry: speaks the replacement text. */
-    fun previewDictEntry(fromText: String, toText: String) {
-        speakText(toText)
+    /** Preview a dictionary entry: uses IPA directly if available, else speaks replacement text. */
+    fun previewDictEntry(fromText: String, toText: String, toIpa: String = "") {
+        if (toIpa.isNotBlank()) {
+            val ld = languages[selectedLanguageIndex.value].langDef
+            engine.setLanguage(ld.espeakLang, ld.tgsbLang)
+            applyStoredOverrides(ld.tgsbLang)
+            engine.setVoice(voices[selectedVoiceIndex.value].id)
+            applyVoicingTone()
+            applyFrameExDefaults()
+            applyPitchSettings()
+            val effectiveSpeed = speedRate.value.toDouble() * (if (rateBoostEnabled.value) 2.0 else 1.0)
+            engine.previewPhoneme(toIpa, effectiveSpeed, pitchHz.value.toDouble())
+        } else {
+            speakText(toText)
+        }
     }
 
     fun stop() {

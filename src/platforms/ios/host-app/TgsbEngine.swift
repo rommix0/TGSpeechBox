@@ -1311,8 +1311,12 @@ class TgsbEngine: ObservableObject {
     }
 
     /// Preview a dictionary entry: speaks the replacement text.
-    func previewDictEntry(from: String, to: String) {
-        speak(to)
+    func previewDictEntry(from: String, to: String, toIpa: String = "") {
+        if !toIpa.trimmingCharacters(in: .whitespaces).isEmpty {
+            previewPhoneme(ipa: toIpa)
+        } else {
+            speak(to)
+        }
     }
 
     func speak(_ text: String) {

@@ -246,8 +246,8 @@ struct DictionaryEditorView: View {
                             onDelete: {
                                 engine.deleteDictEntry(fromText: entry.fromText)
                             },
-                            onPreview: (selectedType == "pronounce" || selectedType == "character") ? {
-                                engine.previewDictEntry(from: entry.fromText, to: entry.toText)
+                            onPreview: (selectedType == "pronounce" || selectedType == "character") ? { _, _, _ in
+                                engine.previewDictEntry(from: entry.fromText, to: entry.toText, toIpa: entry.toIpa)
                             } : nil
                         )
                     }
@@ -333,8 +333,8 @@ struct DictionaryEditorView: View {
                     engine.addDictEntry(fromText: from, toText: to, category: cat,
                                         fromIpa: fIpa, toIpa: tIpa)
                 },
-                onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to in
-                    engine.previewDictEntry(from: from, to: to)
+                onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to, tIpa in
+                    engine.previewDictEntry(from: from, to: to, toIpa: tIpa)
                 } : nil,
                 onTextToIpa: selectedType == "pronounce" ? { text in
                     engine.textToIpa(text)
@@ -361,8 +361,8 @@ struct DictionaryEditorView: View {
                     engine.addDictEntry(fromText: from, toText: to, category: cat,
                                         fromIpa: fIpa, toIpa: tIpa)
                 },
-                onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to in
-                    engine.previewDictEntry(from: from, to: to)
+                onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to, tIpa in
+                    engine.previewDictEntry(from: from, to: to, toIpa: tIpa)
                 } : nil,
                 onTextToIpa: selectedType == "pronounce" ? { text in
                     engine.textToIpa(text)
@@ -565,7 +565,7 @@ private struct DictEntrySheet: View {
     @State var caseSensitive: Bool = false
     var isEdit: Bool = false
     let onSave: (String, String, String, String, String) -> Void
-    var onPreview: ((String, String) -> Void)? = nil
+    var onPreview: ((String, String, String) -> Void)? = nil
     var onTextToIpa: ((String) -> String)? = nil
     var onGetPhonemeKeys: (() -> [(key: String, cls: String)])? = nil
     @Environment(\.dismiss) private var dismiss
@@ -577,7 +577,7 @@ private struct DictEntrySheet: View {
          initialFromIpa: String = "", initialToIpa: String = "",
          isEdit: Bool = false,
          onSave: @escaping (String, String, String, String, String) -> Void,
-         onPreview: ((String, String) -> Void)? = nil,
+         onPreview: ((String, String, String) -> Void)? = nil,
          onTextToIpa: ((String) -> String)? = nil,
          onGetPhonemeKeys: (() -> [(key: String, cls: String)])? = nil) {
         self.title = title
@@ -716,7 +716,7 @@ private struct DictEntrySheet: View {
                             let word = fromText.trimmingCharacters(in: .whitespaces)
                             let replacement = toText.trimmingCharacters(in: .whitespaces)
                             if !word.isEmpty && !replacement.isEmpty {
-                                onPreview(word, replacement)
+                                onPreview(word, replacement, toIpa.trimmingCharacters(in: .whitespaces))
                             }
                         }
                         .disabled(

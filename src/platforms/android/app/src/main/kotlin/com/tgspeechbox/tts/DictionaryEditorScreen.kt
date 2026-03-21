@@ -439,7 +439,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                                     customActions = buildList {
                                         if (selectedType == "pronounce" || selectedType == "character") {
                                             add(CustomAccessibilityAction("Preview") {
-                                                viewModel.previewDictEntry(entry.fromText, entry.toText); true
+                                                viewModel.previewDictEntry(entry.fromText, entry.toText, entry.toIpa); true
                                             })
                                         }
                                         add(CustomAccessibilityAction("Edit") {
@@ -510,7 +510,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                                 DropdownMenuItem(
                                     text = { Text("Preview") },
                                     onClick = {
-                                        viewModel.previewDictEntry(entry.fromText, entry.toText)
+                                        viewModel.previewDictEntry(entry.fromText, entry.toText, entry.toIpa)
                                         contextMenuEntry = null
                                     }
                                 )
@@ -586,7 +586,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                 showAddDialog = false
             },
             onPreview = if (selectedType == "pronounce" || selectedType == "character") {
-                { from, to -> viewModel.previewDictEntry(from, to) }
+                { from, to, tIpa -> viewModel.previewDictEntry(from, to, tIpa) }
             } else null,
             onTextToIpa = if (selectedType == "pronounce") {
                 { text -> viewModel.textToIpa(text) }
@@ -610,7 +610,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                 editingEntry = null
             },
             onPreview = if (selectedType == "pronounce" || selectedType == "character") {
-                { from, to -> viewModel.previewDictEntry(from, to) }
+                { from, to, tIpa -> viewModel.previewDictEntry(from, to, tIpa) }
             } else null,
             onTextToIpa = if (selectedType == "pronounce") {
                 { text -> viewModel.textToIpa(text) }
@@ -722,7 +722,7 @@ private fun DictAddDialog(
     dictType: String,
     onDismiss: () -> Unit,
     onConfirm: (from: String, to: String, category: String, fromIpa: String, toIpa: String) -> Unit,
-    onPreview: ((from: String, to: String) -> Unit)? = null,
+    onPreview: ((from: String, to: String, toIpa: String) -> Unit)? = null,
     onTextToIpa: ((String) -> String)? = null,
     onGetPhonemeKeys: (() -> List<Pair<String, String>>)? = null
 ) {
@@ -878,7 +878,7 @@ private fun DictAddDialog(
                 }
                 if (onPreview != null) {
                     TextButton(
-                        onClick = { onPreview(finalFromText(), toText.trim()) },
+                        onClick = { onPreview(finalFromText(), toText.trim(), toIpa.trim()) },
                         enabled = fromText.isNotBlank() && toText.isNotBlank()
                     ) { Text("Preview") }
                 }
@@ -918,7 +918,7 @@ private fun DictEditDialog(
     entry: TgsbViewModel.DictEntry,
     onDismiss: () -> Unit,
     onConfirm: (from: String, to: String, category: String, fromIpa: String, toIpa: String) -> Unit,
-    onPreview: ((from: String, to: String) -> Unit)? = null,
+    onPreview: ((from: String, to: String, toIpa: String) -> Unit)? = null,
     onTextToIpa: ((String) -> String)? = null,
     onGetPhonemeKeys: (() -> List<Pair<String, String>>)? = null
 ) {
@@ -1057,7 +1057,7 @@ private fun DictEditDialog(
                 }
                 if (onPreview != null) {
                     TextButton(
-                        onClick = { onPreview(fromText.trim(), toText.trim()) },
+                        onClick = { onPreview(fromText.trim(), toText.trim(), toIpa.trim()) },
                         enabled = fromText.isNotBlank() && toText.isNotBlank()
                     ) { Text("Preview") }
                 }
