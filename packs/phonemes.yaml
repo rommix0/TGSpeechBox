@@ -753,8 +753,8 @@ phonemes:
     _isVowel: true
     aspirationAmplitude: 0
     caNP: 0
-    cb1: 116.6
-    cb2: 76.5
+    cb1: 140
+    cb2: 90
     cb3: 178
     cb4: 250
     cb5: 200
@@ -777,8 +777,8 @@ phonemes:
     pa5: 0
     pa6: 0
     parallelBypass: 0
-    pb1: 130
-    pb2: 70
+    pb1: 140
+    pb2: 90
     pb3: 160
     pb4: 250
     pb5: 200
