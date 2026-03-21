@@ -351,3 +351,5 @@ Licensed under the MIT License. See LICENSE for details.
 #define IDC_DENTRY_LBL_CATEGORY      3710
 #define IDC_DENTRY_LBL_FROM_IPA      3711
 #define IDC_DENTRY_LBL_TO_IPA        3712
+#define IDC_DENTRY_FROM_IPA_PICK     3713
+#define IDC_DENTRY_TO_IPA_PICK       3714

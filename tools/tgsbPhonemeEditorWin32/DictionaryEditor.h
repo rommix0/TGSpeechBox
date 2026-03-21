@@ -24,6 +24,11 @@ struct DictEntryData {
   std::string category;
 };
 
+struct PhonemeKeyInfo {
+  std::string key;
+  std::string cls;  // "vowel", "stop", etc.
+};
+
 struct DictionaryEditorState {
   // Input
   std::wstring packDir;                    // packs root (for dict/ subdir)
@@ -32,6 +37,9 @@ struct DictionaryEditorState {
 
   // IPA conversion callback (wraps phonemizer CLI)
   std::function<bool(const std::wstring& text, std::string& outIpa, std::string& outErr)> convertToIpa;
+
+  // Phoneme key list callback (for "Insert phoneme..." picker)
+  std::function<std::vector<PhonemeKeyInfo>()> getPhonemeKeys;
 
   // Working state (managed by dialog)
   std::string currentLang;
@@ -47,6 +55,7 @@ struct DictEntryDialogState {
   DictEntryData entry;
   std::string dictType;  // controls which fields are visible
   std::function<bool(const std::wstring&, std::string&, std::string&)> convertToIpa;
+  std::function<std::vector<PhonemeKeyInfo>()> getPhonemeKeys;
   bool isEdit = false;    // true = editing existing, false = adding new
   bool ok = false;
 };

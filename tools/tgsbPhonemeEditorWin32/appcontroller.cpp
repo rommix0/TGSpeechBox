@@ -2328,6 +2328,31 @@ LRESULT AppController::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
         dst.convertToIpa = [&app](const std::wstring& text, std::string& ipa, std::string& err) -> bool {
           return convertTextToIpaViaPhonemizer(app, text, ipa, err);
         };
+        // Wire up phoneme key list callback.
+        dst.getPhonemeKeys = [&app]() -> std::vector<tgsb_editor::PhonemeKeyInfo> {
+          std::vector<tgsb_editor::PhonemeKeyInfo> result;
+          for (const auto& k : app.phonemeKeys) {
+            tgsb_editor::PhonemeKeyInfo info;
+            info.key = k;
+            // Look up the phoneme class from YAML flags.
+            const auto* node = app.phonemes.getPhonemeNode(k);
+            if (node) {
+              auto flag = [&](const char* f) -> bool {
+                auto it = node->map.find(f);
+                if (it == node->map.end()) return false;
+                bool v = false;
+                return it->second.asBool(v) && v;
+              };
+              if (flag("_isVowel")) info.cls = "vowel";
+              else if (flag("_isStop")) info.cls = "stop";
+              else if (flag("_isNasal")) info.cls = "nasal";
+              else if (flag("_isLiquid")) info.cls = "liquid";
+              else info.cls = "consonant";
+            }
+            result.push_back(std::move(info));
+          }
+          return result;
+        };
         tgsb_editor::ShowDictionaryEditorDialog(app.hInst, hWnd, dst);
         return 0;
       }
