@@ -339,6 +339,38 @@ if (endsSentence && (i + 1) < chunks.size()) {
 }
   }
 
+  // Strip eSpeak language-switch tags like "(en)", "(bg)", "(es)" from the
+  // IPA output.  These are parenthesized 2-3 letter codes that eSpeak inserts
+  // when it switches languages mid-utterance (e.g. for proper nouns).
+  {
+    std::string stripped;
+    stripped.reserve(joined.size());
+    for (size_t i = 0; i < joined.size(); ) {
+      if (joined[i] == '(') {
+        // Look ahead for a closing ')' within 2-5 chars (lang tag).
+        size_t close = joined.find(')', i + 1);
+        if (close != std::string::npos && (close - i) <= 6) {
+          // Check that content is all lowercase ASCII letters or hyphens.
+          bool isLangTag = true;
+          for (size_t j = i + 1; j < close; ++j) {
+            char c = joined[j];
+            if (!((c >= 'a' && c <= 'z') || c == '-')) {
+              isLangTag = false;
+              break;
+            }
+          }
+          if (isLangTag) {
+            i = close + 1;
+            continue;
+          }
+        }
+      }
+      stripped.push_back(joined[i]);
+      ++i;
+    }
+    joined = std::move(stripped);
+  }
+
   outIpaUtf8 = std::move(joined);
   return true;
 }
