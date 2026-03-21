@@ -50,6 +50,131 @@ struct DictionaryEditorView: View {
         return "\(dictTypeLabel(selectedType)) (\(engine.dictionaryTotalCount))"
     }
 
+    @ViewBuilder
+    private var entryListView: some View {
+        if langFilter.isEmpty || selectedType.isEmpty {
+            Spacer()
+            Text("Select a type and language to view dictionary entries.")
+                .foregroundColor(.secondary)
+                .padding()
+            Spacer()
+        } else if engine.dictionaryEntries.isEmpty {
+            Spacer()
+            VStack(spacing: 8) {
+                if !activeSearch.isEmpty {
+                    Text("No matches for \"\(activeSearch)\"")
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("No \(dictTypeLabel(selectedType).lowercased()) entries yet")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    Text("Want to be the first to add one? Tap the + (add) button above.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding()
+            Spacer()
+        } else {
+            List {
+                ForEach(engine.dictionaryEntries) { entry in
+                    DictEntryRow(
+                        entry: entry,
+                        onEdit: { editingEntry = entry },
+                        onMask: {
+                            engine.maskDictEntry(fromText: entry.fromText,
+                                                 masked: !entry.masked)
+                        },
+                        onDelete: {
+                            engine.deleteDictEntry(fromText: entry.fromText)
+                        },
+                        onPreview: (selectedType == "pronounce" || selectedType == "character") ? {
+                            engine.previewDictEntry(from: entry.fromText, to: entry.toText, toIpa: entry.toIpa)
+                        } : nil
+                    )
+                }
+                if engine.dictionaryEntries.count < engine.dictionaryTotalCount
+                    && activeSearch.isEmpty {
+                    Button(action: {
+                        engine.loadDictionary(
+                            langTag: langFilter,
+                            subType: selectedType,
+                            offset: loadedCount,
+                            limit: 100,
+                            append: true
+                        )
+                        loadedCount += 100
+                    }) {
+                        HStack {
+                            Spacer()
+                            Text("Load more")
+                            Spacer()
+                        }
+                    }
+                    .accessibilityLabel("Load more entries, showing \(engine.dictionaryEntries.count) of \(engine.dictionaryTotalCount)")
+                }
+            }
+            .listStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var moreOptionsMenu: some View {
+        if selectedType == "pronounce" || selectedType == "character" {
+            Button(action: {
+                exportUserOnly = false
+                showExportPicker = true
+            }) {
+                Label("Export all", systemImage: "square.and.arrow.up")
+            }
+        }
+        Button(action: {
+            exportUserOnly = true
+            showExportPicker = true
+        }) {
+            Label("Export changed", systemImage: "square.and.arrow.up")
+        }
+        if selectedType == "pronounce" || selectedType == "character" {
+            if let url = exportDictToTempFile(userOnly: false) {
+                ShareLink("Share all", item: url)
+            }
+        }
+        if let url = exportDictToTempFile(userOnly: true) {
+            ShareLink("Share changed", item: url)
+        }
+        Button(action: { showImportPicker = true }) {
+            Label("Import", systemImage: "square.and.arrow.down")
+        }
+        .disabled(selectedType != "pronounce" && selectedType != "character")
+        Divider()
+        Button(action: {
+            let mainKeys = Set(engine.dictionaryEntries.filter { $0.source == "main" }.map { $0.fromText.lowercased() })
+            let dupes = engine.dictionaryEntries.filter { $0.source == "user" && mainKeys.contains($0.fromText.lowercased()) }
+            if dupes.count > 500 {
+                statusMessage = "Too many duplicates (\(dupes.count)), remove manually"
+            } else if dupes.isEmpty {
+                statusMessage = "No duplicates found"
+            } else {
+                for d in dupes { engine.deleteDictEntry(fromText: d.fromText) }
+                statusMessage = "Removed \(dupes.count) duplicates"
+            }
+        }) {
+            Label("Remove duplicates", systemImage: "doc.on.doc")
+        }
+        Button(action: { showExcludeSheet = true }) {
+            Label("Exclude dictionaries", systemImage: "eye.slash")
+        }
+        if selectedType == "pronounce" {
+            Button(action: { showExcludeCategoriesSheet = true }) {
+                Label("Exclude categories", systemImage: "tag.slash")
+            }
+        }
+        Button(role: .destructive, action: { showRemoveConfirm = true }) {
+            Label("Remove changed entries", systemImage: "trash")
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Type dropdown + Language dropdown row
@@ -124,76 +249,7 @@ struct DictionaryEditorView: View {
 
                 // More options menu
                 Menu {
-                    // Export all (pronunciation + character)
-                    if selectedType == "pronounce" || selectedType == "character" {
-                        Button(action: {
-                            exportUserOnly = false
-                            showExportPicker = true
-                        }) {
-                            Label("Export all", systemImage: "square.and.arrow.up")
-                        }
-                    }
-
-                    // Export changed (all types)
-                    Button(action: {
-                        exportUserOnly = true
-                        showExportPicker = true
-                    }) {
-                        Label("Export changed", systemImage: "square.and.arrow.up")
-                    }
-
-                    // Share all (pronunciation + character)
-                    if selectedType == "pronounce" || selectedType == "character" {
-                        if let url = exportDictToTempFile(userOnly: false) {
-                            ShareLink("Share all", item: url)
-                        }
-                    }
-
-                    // Share changed (all types)
-                    if let url = exportDictToTempFile(userOnly: true) {
-                        ShareLink("Share changed", item: url)
-                    }
-
-                    // Import (pronunciation + character)
-                    Button(action: { showImportPicker = true }) {
-                        Label("Import", systemImage: "square.and.arrow.down")
-                    }
-                    .disabled(selectedType != "pronounce" && selectedType != "character")
-
-                    Divider()
-
-                    // Remove duplicates
-                    Button(action: {
-                        let mainKeys = Set(engine.dictionaryEntries.filter { $0.source == "main" }.map { $0.fromText.lowercased() })
-                        let duplicates = engine.dictionaryEntries.filter { $0.source == "user" && mainKeys.contains($0.fromText.lowercased()) }
-                        if duplicates.count > 500 {
-                            statusMessage = "Too many duplicates (\(duplicates.count)), remove manually"
-                        } else if duplicates.isEmpty {
-                            statusMessage = "No duplicates found"
-                        } else {
-                            for d in duplicates { engine.deleteDictEntry(fromText: d.fromText) }
-                            statusMessage = "Removed \(duplicates.count) duplicates"
-                        }
-                    }) {
-                        Label("Remove duplicates", systemImage: "doc.on.doc")
-                    }
-
-                    // Exclude dictionaries
-                    Button(action: { showExcludeSheet = true }) {
-                        Label("Exclude dictionaries", systemImage: "eye.slash")
-                    }
-
-                    // Exclude categories (pronunciation only)
-                    if selectedType == "pronounce" {
-                        Button(action: { showExcludeCategoriesSheet = true }) {
-                            Label("Exclude categories", systemImage: "tag.slash")
-                        }
-                    }
-
-                    // Remove changed entries
-                    Button(role: .destructive, action: { showRemoveConfirm = true }) {
-                        Label("Remove changed entries", systemImage: "trash")
-                    }
+                    moreOptionsMenu
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.body)
@@ -209,73 +265,7 @@ struct DictionaryEditorView: View {
             .padding(.vertical, 4)
 
             // Entry list
-            if langFilter.isEmpty || selectedType.isEmpty {
-                Spacer()
-                Text("Select a type and language to view dictionary entries.")
-                    .foregroundColor(.secondary)
-                    .padding()
-                Spacer()
-            } else if engine.dictionaryEntries.isEmpty {
-                Spacer()
-                VStack(spacing: 8) {
-                    if !activeSearch.isEmpty {
-                        Text("No matches for \"\(activeSearch)\"")
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("No \(dictTypeLabel(selectedType).lowercased()) entries yet")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        Text("Want to be the first to add one? Tap the + (add) button above.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-                .padding()
-                Spacer()
-            } else {
-                List {
-                    ForEach(engine.dictionaryEntries) { entry in
-                        DictEntryRow(
-                            entry: entry,
-                            onEdit: { editingEntry = entry },
-                            onMask: {
-                                engine.maskDictEntry(fromText: entry.fromText,
-                                                     masked: !entry.masked)
-                            },
-                            onDelete: {
-                                engine.deleteDictEntry(fromText: entry.fromText)
-                            },
-                            onPreview: (selectedType == "pronounce" || selectedType == "character") ? { _, _, _ in
-                                engine.previewDictEntry(from: entry.fromText, to: entry.toText, toIpa: entry.toIpa)
-                            } : nil
-                        )
-                    }
-
-                    // Load more button
-                    if engine.dictionaryEntries.count < engine.dictionaryTotalCount
-                        && activeSearch.isEmpty {
-                        Button(action: {
-                            engine.loadDictionary(
-                                langTag: langFilter,
-                                subType: selectedType,
-                                offset: loadedCount,
-                                limit: 100,
-                                append: true
-                            )
-                            loadedCount += 100
-                        }) {
-                            HStack {
-                                Spacer()
-                                Text("Load more")
-                                Spacer()
-                            }
-                        }
-                        .accessibilityLabel("Load more entries, showing \(engine.dictionaryEntries.count) of \(engine.dictionaryTotalCount)")
-                    }
-                }
-                .listStyle(.plain)
-            }
+            entryListView
         }
         .onAppear {
             if !engineStarted {
@@ -548,7 +538,6 @@ private struct DictEntryRow: View {
             (entry.category.isEmpty ? "" : ", \(entry.category)")
         )
         .accessibilityAction(named: "Edit") { onEdit() }
-        .accessibilityAction(named: "Preview") { onPreview?() }
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to edit")
     }
