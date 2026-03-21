@@ -715,10 +715,28 @@ std::string runTextParser(
         // tokenizer treats them as key separators within a single word,
         // not word boundaries.  This enables space-delimited phoneme
         // keys like "k n iː v o_es l" in toIpa fields.
+        //
+        // Also protect underscores within phoneme keys: ipa_normalize
+        // strips all '_' → ' ' (eSpeak pause markers).  We encode '_'
+        // as U+F0001 (PUA-A) which survives normalization and gets
+        // decoded back to '_' in the tokenizer's \x1F handler.
         std::string spliced;
-        spliced.reserve(it->second.size());
-        for (char ch : it->second) {
-          spliced.push_back(ch == ' ' ? '\x1F' : ch);
+        spliced.reserve(it->second.size() * 2);
+        for (size_t si = 0; si < it->second.size(); ) {
+          unsigned char ch = static_cast<unsigned char>(it->second[si]);
+          if (ch == ' ') {
+            spliced.push_back('\x1F');
+            ++si;
+          } else if (ch == '_') {
+            // U+E001 in UTF-8: EE 80 81 (BMP PUA, survives normalization)
+            spliced.push_back(static_cast<char>(0xEE));
+            spliced.push_back(static_cast<char>(0x80));
+            spliced.push_back(static_cast<char>(0x81));
+            ++si;
+          } else {
+            spliced.push_back(static_cast<char>(ch));
+            ++si;
+          }
         }
         ipaChunks[ipaIdx] = std::move(spliced);
         hadIpaSplice = true;

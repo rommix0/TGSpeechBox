@@ -280,9 +280,45 @@ bool parseToTokens(const PackSet& pack, const std::u32string& text, std::vector<
 
     // Phoneme boundary marker (U+001F Unit Separator) — used in
     // space-delimited toIpa fields to separate phoneme keys within a
-    // single word.  Resets greedy matching without starting a new word.
+    // single word.  Extract the full token up to the next boundary and
+    // try it as a complete phoneme key (e.g. "a_es", "ʊ_tr").  If it
+    // matches a known phoneme, emit it directly.  If not, let the
+    // characters fall through to normal greedy matching.
     if (c == U'\x1F') {
       ++i;
+      // Extract token to next \x1F, space, or end.
+      size_t tokStart = i;
+      while (i < n && text[i] != U'\x1F' && text[i] != U' ') ++i;
+      if (i > tokStart) {
+        std::u32string tok(text, tokStart, i - tokStart);
+        // Decode U+E001 (BMP PUA underscore escape) back to '_' for key lookup.
+        for (auto& ch : tok) {
+          if (ch == U'\xE001') ch = U'_';
+        }
+        const PhonemeDef* def = findPhoneme(pack, tok);
+        if (def) {
+          // Matched a phoneme key — emit it as a token.
+          Token t;
+          t.def = def;
+          t.setMask = def->setMask;
+          for (int f = 0; f < kFrameFieldCount; ++f)
+            t.field[f] = def->field[f];
+          t.baseChar = tok[0];
+          t.stress = pendingStress;
+          pendingStress = 0;
+          t.wordStart = newWord;
+          t.syllableStart = newWord || pendingSyllableBoundary;
+          pendingSyllableBoundary = false;
+          newWord = false;
+          outTokens.push_back(t);
+          lastIndex = static_cast<int>(outTokens.size()) - 1;
+          syllableStartIndex = (outTokens.back().syllableStart)
+              ? lastIndex : syllableStartIndex;
+          continue;
+        }
+        // Not a phoneme key — rewind so characters get greedy-matched.
+        i = tokStart;
+      }
       continue;
     }
 
