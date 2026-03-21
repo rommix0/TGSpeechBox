@@ -338,6 +338,9 @@ struct DictionaryEditorView: View {
                 } : nil,
                 onTextToIpa: selectedType == "pronounce" ? { text in
                     engine.textToIpa(text)
+                } : nil,
+                onGetPhonemeKeys: selectedType == "pronounce" ? {
+                    engine.getPhonemeKeys()
                 } : nil
             )
         }
@@ -363,6 +366,9 @@ struct DictionaryEditorView: View {
                 } : nil,
                 onTextToIpa: selectedType == "pronounce" ? { text in
                     engine.textToIpa(text)
+                } : nil,
+                onGetPhonemeKeys: selectedType == "pronounce" ? {
+                    engine.getPhonemeKeys()
                 } : nil
             )
         }
@@ -561,7 +567,10 @@ private struct DictEntrySheet: View {
     let onSave: (String, String, String, String, String) -> Void
     var onPreview: ((String, String) -> Void)? = nil
     var onTextToIpa: ((String) -> String)? = nil
+    var onGetPhonemeKeys: (() -> [(key: String, cls: String)])? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var showPhonemePicker = false
+    @State private var phonemePickerTarget = ""
 
     init(title: String, dictType: String, initialFrom: String = "",
          initialTo: String = "", initialCategory: String = "",
@@ -569,7 +578,8 @@ private struct DictEntrySheet: View {
          isEdit: Bool = false,
          onSave: @escaping (String, String, String, String, String) -> Void,
          onPreview: ((String, String) -> Void)? = nil,
-         onTextToIpa: ((String) -> String)? = nil) {
+         onTextToIpa: ((String) -> String)? = nil,
+         onGetPhonemeKeys: (() -> [(key: String, cls: String)])? = nil) {
         self.title = title
         self.dictType = dictType
         self._fromText = State(initialValue: initialFrom)
@@ -582,6 +592,7 @@ private struct DictEntrySheet: View {
         self.onSave = onSave
         self.onPreview = onPreview
         self.onTextToIpa = onTextToIpa
+        self.onGetPhonemeKeys = onGetPhonemeKeys
     }
 
     private var toLabel: String {
@@ -655,11 +666,23 @@ private struct DictEntrySheet: View {
                             #if os(iOS)
                             .textInputAutocapitalization(.never)
                             #endif
+                        if onGetPhonemeKeys != nil {
+                            Button("Insert phoneme into From IPA") {
+                                phonemePickerTarget = "fromIpa"
+                                showPhonemePicker = true
+                            }
+                        }
                         TextField("To IPA (overrides respelling)", text: $toIpa)
                             .autocorrectionDisabled()
                             #if os(iOS)
                             .textInputAutocapitalization(.never)
                             #endif
+                        if onGetPhonemeKeys != nil {
+                            Button("Insert phoneme into To IPA") {
+                                phonemePickerTarget = "toIpa"
+                                showPhonemePicker = true
+                            }
+                        }
                         if let onTextToIpa = onTextToIpa {
                             Button("Fill IPA from eSpeak") {
                                 let from = fromText.trimmingCharacters(in: .whitespaces)
@@ -721,6 +744,58 @@ private struct DictEntrySheet: View {
                         fromText.trimmingCharacters(in: .whitespaces).isEmpty ||
                         toText.trimmingCharacters(in: .whitespaces).isEmpty
                     )
+                }
+            }
+        }
+#if os(iOS)
+        .presentationDetents([.medium])
+#endif
+        .sheet(isPresented: $showPhonemePicker) {
+            if let getKeys = onGetPhonemeKeys {
+                PhonemePickerSheet(
+                    keys: getKeys(),
+                    onSelect: { key in
+                        if phonemePickerTarget == "fromIpa" {
+                            fromIpa = fromIpa.isEmpty ? key : "\(fromIpa) \(key)"
+                        } else {
+                            toIpa = toIpa.isEmpty ? key : "\(toIpa) \(key)"
+                        }
+                        showPhonemePicker = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Phoneme Picker Sheet
+
+private struct PhonemePickerSheet: View {
+    let keys: [(key: String, cls: String)]
+    let onSelect: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            List {
+                if keys.isEmpty {
+                    Text("No phonemes available for the current language.")
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(keys, id: \.key) { entry in
+                        Button(action: { onSelect(entry.key) }) {
+                            Text("\(entry.key) (\(entry.cls))")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Insert phoneme")
+#if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+#endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
                 }
             }
         }

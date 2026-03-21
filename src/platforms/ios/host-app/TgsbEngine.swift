@@ -1176,6 +1176,24 @@ class TgsbEngine: ObservableObject {
         loadDictionary(langTag: dictLangTag, subType: dictSubType)
     }
 
+    func getPhonemeKeys() -> [(key: String, cls: String)] {
+        guard let eng = engine else { return [] }
+        let tag = dictLangTag.isEmpty ? "en-us" : dictLangTag
+        guard let ptr = tgsb_query_data(eng, TGSB_DATA_PHONEMES, tag, 0, 0) else { return [] }
+        let jsonStr = String(cString: ptr)
+        free(ptr)
+        guard let data = jsonStr.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        var seen = Set<String>()
+        var result: [(key: String, cls: String)] = []
+        for obj in arr {
+            guard let group = obj["group"] as? String, !group.isEmpty, !seen.contains(group) else { continue }
+            seen.insert(group)
+            result.append((key: group, cls: (obj["class"] as? String) ?? ""))
+        }
+        return result
+    }
+
     func textToIpa(_ text: String) -> String {
         guard let eng = engine else { return "" }
         guard let ptr = tgsb_text_to_ipa(eng, text) else { return "" }

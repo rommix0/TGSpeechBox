@@ -590,6 +590,9 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             } else null,
             onTextToIpa = if (selectedType == "pronounce") {
                 { text -> viewModel.textToIpa(text) }
+            } else null,
+            onGetPhonemeKeys = if (selectedType == "pronounce") {
+                { viewModel.getPhonemeKeys() }
             } else null
         )
     }
@@ -611,6 +614,9 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             } else null,
             onTextToIpa = if (selectedType == "pronounce") {
                 { text -> viewModel.textToIpa(text) }
+            } else null,
+            onGetPhonemeKeys = if (selectedType == "pronounce") {
+                { viewModel.getPhonemeKeys() }
             } else null
         )
     }
@@ -717,7 +723,8 @@ private fun DictAddDialog(
     onDismiss: () -> Unit,
     onConfirm: (from: String, to: String, category: String, fromIpa: String, toIpa: String) -> Unit,
     onPreview: ((from: String, to: String) -> Unit)? = null,
-    onTextToIpa: ((String) -> String)? = null
+    onTextToIpa: ((String) -> String)? = null,
+    onGetPhonemeKeys: (() -> List<Pair<String, String>>)? = null
 ) {
     var fromText by rememberSaveable { mutableStateOf("") }
     var toText by rememberSaveable { mutableStateOf("") }
@@ -725,6 +732,7 @@ private fun DictAddDialog(
     var fromIpa by rememberSaveable { mutableStateOf("") }
     var toIpa by rememberSaveable { mutableStateOf("") }
     var caseSensitive by rememberSaveable { mutableStateOf(false) }
+    var phonemePickerTarget by remember { mutableStateOf("") }
 
     // On save: lowercase the word if case-sensitive is off (default).
     val finalFromText = {
@@ -823,6 +831,11 @@ private fun DictAddDialog(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (onGetPhonemeKeys != null) {
+                        TextButton(onClick = { phonemePickerTarget = "fromIpa" }) {
+                            Text("Insert phoneme into From IPA")
+                        }
+                    }
                     OutlinedTextField(
                         value = toIpa,
                         onValueChange = { toIpa = it },
@@ -834,6 +847,11 @@ private fun DictAddDialog(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (onGetPhonemeKeys != null) {
+                        TextButton(onClick = { phonemePickerTarget = "toIpa" }) {
+                            Text("Insert phoneme into To IPA")
+                        }
+                    }
                     if (onTextToIpa != null) {
                         TextButton(
                             onClick = {
@@ -876,6 +894,22 @@ private fun DictAddDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+
+    if (phonemePickerTarget.isNotEmpty() && onGetPhonemeKeys != null) {
+        PhonemePickerDialog(
+            keys = onGetPhonemeKeys(),
+            onSelect = { key ->
+                val spaced = if (phonemePickerTarget == "fromIpa") {
+                    if (fromIpa.isEmpty()) key else "$fromIpa $key"
+                } else {
+                    if (toIpa.isEmpty()) key else "$toIpa $key"
+                }
+                if (phonemePickerTarget == "fromIpa") fromIpa = spaced else toIpa = spaced
+                phonemePickerTarget = ""
+            },
+            onDismiss = { phonemePickerTarget = "" }
+        )
+    }
 }
 
 @Composable
@@ -885,13 +919,15 @@ private fun DictEditDialog(
     onDismiss: () -> Unit,
     onConfirm: (from: String, to: String, category: String, fromIpa: String, toIpa: String) -> Unit,
     onPreview: ((from: String, to: String) -> Unit)? = null,
-    onTextToIpa: ((String) -> String)? = null
+    onTextToIpa: ((String) -> String)? = null,
+    onGetPhonemeKeys: (() -> List<Pair<String, String>>)? = null
 ) {
     var fromText by rememberSaveable { mutableStateOf(entry.fromText) }
     var toText by rememberSaveable { mutableStateOf(entry.toText) }
     var category by rememberSaveable { mutableStateOf(entry.category) }
     var fromIpa by rememberSaveable { mutableStateOf(entry.fromIpa) }
     var toIpa by rememberSaveable { mutableStateOf(entry.toIpa) }
+    var phonemePickerTarget by remember { mutableStateOf("") }
     // Default case-sensitive ON if the existing entry has uppercase chars.
     var caseSensitive by rememberSaveable {
         mutableStateOf(entry.fromText != entry.fromText.lowercase())
@@ -974,6 +1010,11 @@ private fun DictEditDialog(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (onGetPhonemeKeys != null) {
+                        TextButton(onClick = { phonemePickerTarget = "fromIpa" }) {
+                            Text("Insert phoneme into From IPA")
+                        }
+                    }
                     OutlinedTextField(
                         value = toIpa,
                         onValueChange = { toIpa = it },
@@ -985,6 +1026,11 @@ private fun DictEditDialog(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (onGetPhonemeKeys != null) {
+                        TextButton(onClick = { phonemePickerTarget = "toIpa" }) {
+                            Text("Insert phoneme into To IPA")
+                        }
+                    }
                     if (onTextToIpa != null) {
                         TextButton(
                             onClick = {
@@ -1031,6 +1077,22 @@ private fun DictEditDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+
+    if (phonemePickerTarget.isNotEmpty() && onGetPhonemeKeys != null) {
+        PhonemePickerDialog(
+            keys = onGetPhonemeKeys(),
+            onSelect = { key ->
+                val spaced = if (phonemePickerTarget == "fromIpa") {
+                    if (fromIpa.isEmpty()) key else "$fromIpa $key"
+                } else {
+                    if (toIpa.isEmpty()) key else "$toIpa $key"
+                }
+                if (phonemePickerTarget == "fromIpa") fromIpa = spaced else toIpa = spaced
+                phonemePickerTarget = ""
+            },
+            onDismiss = { phonemePickerTarget = "" }
+        )
+    }
 }
 
 @Composable
@@ -1139,6 +1201,40 @@ private fun ExcludeCategoriesDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+@Composable
+private fun PhonemePickerDialog(
+    keys: List<Pair<String, String>>,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Insert phoneme") },
+        text = {
+            if (keys.isEmpty()) {
+                Text("No phonemes available for the current language.")
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    items(keys) { (key, cls) ->
+                        TextButton(
+                            onClick = { onSelect(key) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "$key ($cls)",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }

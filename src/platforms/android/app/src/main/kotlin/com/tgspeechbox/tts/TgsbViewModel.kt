@@ -880,6 +880,23 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
 
     fun textToIpa(text: String): String = engine.textToIpa(text)
 
+    fun getPhonemeKeys(): List<Pair<String, String>> {
+        val json = engine.queryData(TgsbSpeakEngine.DATA_PHONEMES, dictLangTag) ?: return emptyList()
+        return try {
+            val arr = org.json.JSONArray(json)
+            val seen = linkedSetOf<String>()
+            val result = mutableListOf<Pair<String, String>>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val group = obj.optString("group", "")
+                if (group.isNotEmpty() && seen.add(group)) {
+                    result.add(group to obj.optString("class", ""))
+                }
+            }
+            result
+        } catch (_: Exception) { emptyList() }
+    }
+
     fun maskDictEntry(fromText: String, masked: Boolean) {
         val prefixed = prefixedLangTag(dictSubType, dictLangTag)
         val json = org.json.JSONObject().apply {
