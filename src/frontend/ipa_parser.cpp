@@ -278,6 +278,14 @@ bool parseToTokens(const PackSet& pack, const std::u32string& text, std::vector<
       continue;
     }
 
+    // Phoneme boundary marker (U+001F Unit Separator) — used in
+    // space-delimited toIpa fields to separate phoneme keys within a
+    // single word.  Resets greedy matching without starting a new word.
+    if (c == U'\x1F') {
+      ++i;
+      continue;
+    }
+
     // Primary/secondary stress.
     if (c == U'\u02C8') { // ˈ
       pendingStress = 1;

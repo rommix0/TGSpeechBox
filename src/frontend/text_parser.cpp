@@ -695,17 +695,35 @@ std::string runTextParser(
   // Words whose dict entry had toIpa set were left untouched in the text
   // so eSpeak could phonemize the surrounding context naturally.  Now
   // replace eSpeak's IPA for those words with the dict-provided IPA.
+  //
+  // Walk text words and IPA chunks in parallel.  Text may have more
+  // words than IPA chunks because NVDA expands punctuation to spoken
+  // words (e.g. "quote", ".") that eSpeak doesn't phonemize.  Skip
+  // text words with no alpha content when advancing the IPA index.
   bool hadIpaSplice = false;
-  if (!ipaOverrides.empty() && textWords.size() == ipaChunks.size()) {
+  if (!ipaOverrides.empty()) {
+    size_t ipaIdx = 0;
     for (size_t i = 0; i < textWords.size(); ++i) {
       std::string key = asciiLower(stripPunct(textWords[i]));
+      if (key.empty()) continue;  // punctuation-only word, no IPA chunk
+      if (ipaIdx >= ipaChunks.size()) break;
       auto it = ipaOverrides.find(key);
       if (it != ipaOverrides.end()) {
         TPLOG("  ipaSplice: [%s] eSpeak=\"%s\" -> override=\"%s\"\n",
-              key.c_str(), ipaChunks[i].c_str(), it->second.c_str());
-        ipaChunks[i] = it->second;
+              key.c_str(), ipaChunks[ipaIdx].c_str(), it->second.c_str());
+        // Convert spaces to U+001F (phoneme boundary) so the IPA
+        // tokenizer treats them as key separators within a single word,
+        // not word boundaries.  This enables space-delimited phoneme
+        // keys like "k n iː v o_es l" in toIpa fields.
+        std::string spliced;
+        spliced.reserve(it->second.size());
+        for (char ch : it->second) {
+          spliced.push_back(ch == ' ' ? '\x1F' : ch);
+        }
+        ipaChunks[ipaIdx] = std::move(spliced);
         hadIpaSplice = true;
       }
+      ++ipaIdx;
     }
   }
 

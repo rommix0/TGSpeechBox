@@ -53,6 +53,35 @@ static std::string stripVariationSelectors(const std::string& s) {
   return out;
 }
 
+// Return the byte length of a Unicode punctuation codepoint at position i,
+// or 0 if the byte at i is not the start of one.  Covers ASCII punctuation
+// plus common multi-byte quotation marks and Spanish inverted punctuation.
+static size_t unicodePunctLen(const std::string& s, size_t i) {
+  auto b = static_cast<uint8_t>(s[i]);
+
+  // ASCII punctuation — single byte.
+  if (b < 0x80 && std::ispunct(b)) return 1;
+
+  // 2-byte: C2 xx
+  if (b == 0xC2 && i + 1 < s.size()) {
+    auto b1 = static_cast<uint8_t>(s[i + 1]);
+    if (b1 == 0xA1 || b1 == 0xAB || b1 == 0xBB || b1 == 0xBF)
+      return 2;  // ¡ « » ¿
+  }
+
+  // 3-byte: E2 80 xx
+  if (b == 0xE2 && i + 2 < s.size() && static_cast<uint8_t>(s[i + 1]) == 0x80) {
+    auto b2 = static_cast<uint8_t>(s[i + 2]);
+    // U+2018–U+201F: quotation marks (98–9F)
+    // U+2026: ellipsis (A6)
+    // U+2013–U+2014: en/em dash (93–94)
+    if ((b2 >= 0x93 && b2 <= 0x9F) || b2 == 0xA6)
+      return 3;
+  }
+
+  return 0;
+}
+
 std::string dictReplaceInText(const std::string& text, const PronDict& dict,
     std::unordered_map<std::string, std::string>* ipaOverrides) {
   if (text.empty() || dict.entries.empty()) return text;
@@ -77,16 +106,30 @@ std::string dictReplaceInText(const std::string& text, const PronDict& dict,
       ++i;
     }
     std::string token = text.substr(wordStart, i - wordStart);
+    DLLOG("  token: \"%s\" (len=%zu)\n", token.c_str(), token.size());
 
     // Strip leading/trailing punctuation for lookup.
+    // Uses Unicode-aware check so curly quotes, inverted punctuation,
+    // en/em dashes, and ellipsis are stripped alongside ASCII punctuation.
     size_t lo = 0;
-    while (lo < token.size() &&
-           std::ispunct(static_cast<unsigned char>(token[lo])))
-      ++lo;
+    while (lo < token.size()) {
+      size_t plen = unicodePunctLen(token, lo);
+      if (!plen) break;
+      lo += plen;
+    }
     size_t hi = token.size();
-    while (hi > lo &&
-           std::ispunct(static_cast<unsigned char>(token[hi - 1])))
-      --hi;
+    while (hi > lo) {
+      // Scan backwards: find the start of the last UTF-8 character.
+      size_t back = hi - 1;
+      while (back > lo && (static_cast<uint8_t>(token[back]) & 0xC0) == 0x80)
+        --back;
+      size_t plen = unicodePunctLen(token, back);
+      if (!plen || back + plen != hi) break;
+      hi = back;
+    }
+
+    DLLOG("    lo=%zu hi=%zu core=\"%s\"\n", lo, hi,
+          std::string(token, lo, hi - lo).c_str());
 
     if (lo >= hi) {
       result += token;
