@@ -688,8 +688,12 @@ private struct DictEntrySheet: View {
                                 let from = fromText.trimmingCharacters(in: .whitespaces)
                                 let to = toText.trimmingCharacters(in: .whitespaces)
                                 if from.isEmpty && to.isEmpty { return }
-                                if !from.isEmpty { fromIpa = onTextToIpa(from) }
-                                if !to.isEmpty { toIpa = onTextToIpa(to) }
+                                if !from.isEmpty && fromIpa.trimmingCharacters(in: .whitespaces).isEmpty {
+                                    fromIpa = onTextToIpa(from)
+                                }
+                                if !to.isEmpty && toIpa.trimmingCharacters(in: .whitespaces).isEmpty {
+                                    toIpa = onTextToIpa(to)
+                                }
                             }
                             .disabled(
                                 fromText.trimmingCharacters(in: .whitespaces).isEmpty &&

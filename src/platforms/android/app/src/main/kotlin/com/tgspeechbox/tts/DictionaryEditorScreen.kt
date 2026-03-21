@@ -856,8 +856,10 @@ private fun DictAddDialog(
                         TextButton(
                             onClick = {
                                 if (fromText.isBlank() && toText.isBlank()) return@TextButton
-                                if (fromText.isNotBlank()) fromIpa = onTextToIpa(fromText.trim())
-                                if (toText.isNotBlank()) toIpa = onTextToIpa(toText.trim())
+                                if (fromText.isNotBlank() && fromIpa.isBlank())
+                                    fromIpa = onTextToIpa(fromText.trim())
+                                if (toText.isNotBlank() && toIpa.isBlank())
+                                    toIpa = onTextToIpa(toText.trim())
                             },
                             enabled = fromText.isNotBlank() || toText.isNotBlank()
                         ) { Text("Fill IPA from eSpeak") }
@@ -1035,8 +1037,10 @@ private fun DictEditDialog(
                         TextButton(
                             onClick = {
                                 if (fromText.isBlank() && toText.isBlank()) return@TextButton
-                                if (fromText.isNotBlank()) fromIpa = onTextToIpa(fromText.trim())
-                                if (toText.isNotBlank()) toIpa = onTextToIpa(toText.trim())
+                                if (fromText.isNotBlank() && fromIpa.isBlank())
+                                    fromIpa = onTextToIpa(fromText.trim())
+                                if (toText.isNotBlank() && toIpa.isBlank())
+                                    toIpa = onTextToIpa(toText.trim())
                             },
                             enabled = fromText.isNotBlank() || toText.isNotBlank()
                         ) { Text("Fill IPA from eSpeak") }
