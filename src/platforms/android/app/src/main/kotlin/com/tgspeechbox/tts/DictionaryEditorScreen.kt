@@ -581,12 +581,15 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
         DictAddDialog(
             dictType = selectedType,
             onDismiss = { showAddDialog = false },
-            onConfirm = { from, to, cat ->
-                viewModel.addDictEntry(from, to, cat)
+            onConfirm = { from, to, cat, fIpa, tIpa ->
+                viewModel.addDictEntry(from, to, cat, fIpa, tIpa)
                 showAddDialog = false
             },
             onPreview = if (selectedType == "pronounce" || selectedType == "character") {
                 { from, to -> viewModel.previewDictEntry(from, to) }
+            } else null,
+            onTextToIpa = if (selectedType == "pronounce") {
+                { text -> viewModel.textToIpa(text) }
             } else null
         )
     }
@@ -598,13 +601,16 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             dictType = selectedType,
             entry = entry,
             onDismiss = { editingEntry = null },
-            onConfirm = { from, to, cat ->
+            onConfirm = { from, to, cat, fIpa, tIpa ->
                 if (from != entry.fromText) viewModel.deleteDictEntry(entry.fromText)
-                viewModel.addDictEntry(from, to, cat)
+                viewModel.addDictEntry(from, to, cat, fIpa, tIpa)
                 editingEntry = null
             },
             onPreview = if (selectedType == "pronounce" || selectedType == "character") {
                 { from, to -> viewModel.previewDictEntry(from, to) }
+            } else null,
+            onTextToIpa = if (selectedType == "pronounce") {
+                { text -> viewModel.textToIpa(text) }
             } else null
         )
     }
@@ -709,12 +715,15 @@ private fun shareDictEntries(
 private fun DictAddDialog(
     dictType: String,
     onDismiss: () -> Unit,
-    onConfirm: (from: String, to: String, category: String) -> Unit,
-    onPreview: ((from: String, to: String) -> Unit)? = null
+    onConfirm: (from: String, to: String, category: String, fromIpa: String, toIpa: String) -> Unit,
+    onPreview: ((from: String, to: String) -> Unit)? = null,
+    onTextToIpa: ((String) -> String)? = null
 ) {
     var fromText by rememberSaveable { mutableStateOf("") }
     var toText by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("") }
+    var fromIpa by rememberSaveable { mutableStateOf("") }
+    var toIpa by rememberSaveable { mutableStateOf("") }
     var caseSensitive by rememberSaveable { mutableStateOf(false) }
 
     // On save: lowercase the word if case-sensitive is off (default).
@@ -803,6 +812,38 @@ private fun DictAddDialog(
                     )
                 }
                 if (dictType == "pronounce") {
+                    OutlinedTextField(
+                        value = fromIpa,
+                        onValueChange = { fromIpa = it },
+                        label = { Text("From IPA (optional)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrect = false
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = toIpa,
+                        onValueChange = { toIpa = it },
+                        label = { Text("To IPA (optional, overrides respelling)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrect = false
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (onTextToIpa != null) {
+                        TextButton(
+                            onClick = {
+                                if (fromText.isBlank() && toText.isBlank()) return@TextButton
+                                if (fromText.isNotBlank()) fromIpa = onTextToIpa(fromText.trim())
+                                if (toText.isNotBlank()) toIpa = onTextToIpa(toText.trim())
+                            },
+                            enabled = fromText.isNotBlank() || toText.isNotBlank()
+                        ) { Text("Fill IPA from eSpeak") }
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -827,7 +868,7 @@ private fun DictAddDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(finalFromText(), toText.trim(), category.trim()) },
+                onClick = { onConfirm(finalFromText(), toText.trim(), category.trim(), fromIpa.trim(), toIpa.trim()) },
                 enabled = fromText.isNotBlank() && toText.isNotBlank()
             ) { Text("Save") }
         },
@@ -842,12 +883,15 @@ private fun DictEditDialog(
     dictType: String,
     entry: TgsbViewModel.DictEntry,
     onDismiss: () -> Unit,
-    onConfirm: (from: String, to: String, category: String) -> Unit,
-    onPreview: ((from: String, to: String) -> Unit)? = null
+    onConfirm: (from: String, to: String, category: String, fromIpa: String, toIpa: String) -> Unit,
+    onPreview: ((from: String, to: String) -> Unit)? = null,
+    onTextToIpa: ((String) -> String)? = null
 ) {
     var fromText by rememberSaveable { mutableStateOf(entry.fromText) }
     var toText by rememberSaveable { mutableStateOf(entry.toText) }
     var category by rememberSaveable { mutableStateOf(entry.category) }
+    var fromIpa by rememberSaveable { mutableStateOf(entry.fromIpa) }
+    var toIpa by rememberSaveable { mutableStateOf(entry.toIpa) }
     // Default case-sensitive ON if the existing entry has uppercase chars.
     var caseSensitive by rememberSaveable {
         mutableStateOf(entry.fromText != entry.fromText.lowercase())
@@ -919,6 +963,38 @@ private fun DictEditDialog(
                     )
                 }
                 if (dictType == "pronounce") {
+                    OutlinedTextField(
+                        value = fromIpa,
+                        onValueChange = { fromIpa = it },
+                        label = { Text("From IPA (optional)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrect = false
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = toIpa,
+                        onValueChange = { toIpa = it },
+                        label = { Text("To IPA (optional, overrides respelling)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrect = false
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (onTextToIpa != null) {
+                        TextButton(
+                            onClick = {
+                                if (fromText.isBlank() && toText.isBlank()) return@TextButton
+                                if (fromText.isNotBlank()) fromIpa = onTextToIpa(fromText.trim())
+                                if (toText.isNotBlank()) toIpa = onTextToIpa(toText.trim())
+                            },
+                            enabled = fromText.isNotBlank() || toText.isNotBlank()
+                        ) { Text("Fill IPA from eSpeak") }
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -946,7 +1022,7 @@ private fun DictEditDialog(
                 onClick = {
                     val word = if (!caseSensitive && dictType == "pronounce")
                         fromText.trim().lowercase() else fromText.trim()
-                    onConfirm(word, toText.trim(), category.trim())
+                    onConfirm(word, toText.trim(), category.trim(), fromIpa.trim(), toIpa.trim())
                 },
                 enabled = fromText.isNotBlank() && toText.isNotBlank()
             ) { Text("Save") }

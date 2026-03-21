@@ -159,6 +159,9 @@ char *tgsb_query_data(TgsbEngine *engine, int domain, const char *langTag,
 int tgsb_set_data(TgsbEngine *engine, int domain, const char *langTag,
                   const char *key, const char *value);
 
+/* Convert text to IPA via eSpeak.  Caller must free() the result. */
+char *tgsb_text_to_ipa(TgsbEngine *engine, const char *text);
+
 #ifdef __cplusplus
 }
 #endif

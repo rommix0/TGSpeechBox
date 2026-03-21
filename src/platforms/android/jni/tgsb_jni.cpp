@@ -1272,4 +1272,42 @@ Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeExportData(
         env, thiz, handle, domain, langTag, overridesJson);
 }
 
+/* ── Text-to-IPA via eSpeak ───────────────────────────────────────── */
+
+JNIEXPORT jstring JNICALL
+Java_com_tgspeechbox_tts_TgsbTtsService_nativeTextToIpa(
+    JNIEnv *env, jobject thiz, jlong handle, jstring text
+) {
+    TgsbEngine *engine = (TgsbEngine *)(intptr_t)handle;
+    if (!engine || !text) return env->NewStringUTF("");
+
+    const char *textUtf8 = env->GetStringUTFChars(text, nullptr);
+    if (!textUtf8 || !*textUtf8) {
+        if (textUtf8) env->ReleaseStringUTFChars(text, textUtf8);
+        return env->NewStringUTF("");
+    }
+
+    /* espeak_TextToPhonemes walks the text pointer forward. */
+    const void *ePtr = textUtf8;
+    std::string ipa;
+    while (ePtr && *(const char *)ePtr) {
+        const char *chunk = espeak_TextToPhonemes(
+            &ePtr, espeakCHARS_UTF8, 0x02 /* IPA */);
+        if (!chunk || !*chunk) continue;
+        if (!ipa.empty()) ipa += ' ';
+        ipa += chunk;
+    }
+
+    env->ReleaseStringUTFChars(text, textUtf8);
+    return env->NewStringUTF(ipa.c_str());
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_tgspeechbox_tts_TgsbSpeakEngine_nativeTextToIpa(
+    JNIEnv *env, jobject thiz, jlong handle, jstring text
+) {
+    return Java_com_tgspeechbox_tts_TgsbTtsService_nativeTextToIpa(
+        env, thiz, handle, text);
+}
+
 } /* extern "C" */

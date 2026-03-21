@@ -772,4 +772,20 @@ int tgsb_set_data(TgsbEngine *engine, int domain, const char *langTag,
     return nvspFrontend_setData(engine->frontend, domain, langTag, key, value);
 }
 
+char *tgsb_text_to_ipa(TgsbEngine *engine, const char *text)
+{
+    if (!engine || !text || !*text) return strdup("");
+
+    const void *ePtr = text;
+    std::string ipa;
+    while (ePtr && *(const char *)ePtr) {
+        const char *chunk = espeak_TextToPhonemes(
+            &ePtr, espeakCHARS_UTF8, 0x02 /* IPA */);
+        if (!chunk || !*chunk) continue;
+        if (!ipa.empty()) ipa += ' ';
+        ipa += chunk;
+    }
+    return strdup(ipa.c_str());
+}
+
 } /* extern "C" */

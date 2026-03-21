@@ -861,17 +861,24 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         dictionaryCategories.value = cats.sorted()
     }
 
-    fun addDictEntry(fromText: String, toText: String, category: String = "") {
+    fun addDictEntry(
+        fromText: String, toText: String, category: String = "",
+        fromIpa: String = "", toIpa: String = ""
+    ) {
         if (fromText.isBlank() || toText.isBlank()) return
         val prefixed = prefixedLangTag(dictSubType, dictLangTag)
         val json = org.json.JSONObject().apply {
             put("toText", toText)
             if (category.isNotEmpty()) put("category", category)
+            if (fromIpa.isNotEmpty()) put("fromIpa", fromIpa)
+            if (toIpa.isNotEmpty()) put("toIpa", toIpa)
         }
         engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, fromText, json.toString())
         saveDictOverride(prefixed, fromText, json.toString())
         loadDictionary(dictLangTag, dictSubType)
     }
+
+    fun textToIpa(text: String): String = engine.textToIpa(text)
 
     fun maskDictEntry(fromText: String, masked: Boolean) {
         val prefixed = prefixedLangTag(dictSubType, dictLangTag)

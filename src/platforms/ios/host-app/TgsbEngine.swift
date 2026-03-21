@@ -1137,11 +1137,14 @@ class TgsbEngine: ObservableObject {
         dictionaryCategories = cats.sorted()
     }
 
-    func addDictEntry(fromText: String, toText: String, category: String = "") {
+    func addDictEntry(fromText: String, toText: String, category: String = "",
+                      fromIpa: String = "", toIpa: String = "") {
         guard let eng = engine, !fromText.isEmpty, !toText.isEmpty else { return }
         let tag = prefixedLangTag(dictSubType, dictLangTag)
         var dict: [String: Any] = ["toText": toText]
         if !category.isEmpty { dict["category"] = category }
+        if !fromIpa.isEmpty { dict["fromIpa"] = fromIpa }
+        if !toIpa.isEmpty { dict["toIpa"] = toIpa }
         if let data = try? JSONSerialization.data(withJSONObject: dict),
            let str = String(data: data, encoding: .utf8) {
             tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, fromText, str)
@@ -1171,6 +1174,14 @@ class TgsbEngine: ObservableObject {
         tgsb_set_language(eng, dictLangTag, dictLangTag)
         reapplyDictOverrides(dictLangTag)
         loadDictionary(langTag: dictLangTag, subType: dictSubType)
+    }
+
+    func textToIpa(_ text: String) -> String {
+        guard let eng = engine else { return "" }
+        guard let ptr = tgsb_text_to_ipa(eng, text) else { return "" }
+        let result = String(cString: ptr)
+        free(ptr)
+        return result
     }
 
     // ── Dictionary override persistence ────────────────────────────

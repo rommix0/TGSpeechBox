@@ -329,11 +329,15 @@ struct DictionaryEditorView: View {
             DictEntrySheet(
                 title: "Add Entry",
                 dictType: selectedType,
-                onSave: { from, to, cat in
-                    engine.addDictEntry(fromText: from, toText: to, category: cat)
+                onSave: { from, to, cat, fIpa, tIpa in
+                    engine.addDictEntry(fromText: from, toText: to, category: cat,
+                                        fromIpa: fIpa, toIpa: tIpa)
                 },
                 onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to in
                     engine.previewDictEntry(from: from, to: to)
+                } : nil,
+                onTextToIpa: selectedType == "pronounce" ? { text in
+                    engine.textToIpa(text)
                 } : nil
             )
         }
@@ -344,15 +348,21 @@ struct DictionaryEditorView: View {
                 initialFrom: entry.fromText,
                 initialTo: entry.toText,
                 initialCategory: entry.category,
+                initialFromIpa: entry.fromIpa,
+                initialToIpa: entry.toIpa,
                 isEdit: true,
-                onSave: { from, to, cat in
+                onSave: { from, to, cat, fIpa, tIpa in
                     if from != entry.fromText {
                         engine.deleteDictEntry(fromText: entry.fromText)
                     }
-                    engine.addDictEntry(fromText: from, toText: to, category: cat)
+                    engine.addDictEntry(fromText: from, toText: to, category: cat,
+                                        fromIpa: fIpa, toIpa: tIpa)
                 },
                 onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to in
                     engine.previewDictEntry(from: from, to: to)
+                } : nil,
+                onTextToIpa: selectedType == "pronounce" ? { text in
+                    engine.textToIpa(text)
                 } : nil
             )
         }
@@ -544,26 +554,34 @@ private struct DictEntrySheet: View {
     @State var fromText: String = ""
     @State var toText: String = ""
     @State var category: String = ""
+    @State var fromIpa: String = ""
+    @State var toIpa: String = ""
     @State var caseSensitive: Bool = false
     var isEdit: Bool = false
-    let onSave: (String, String, String) -> Void
+    let onSave: (String, String, String, String, String) -> Void
     var onPreview: ((String, String) -> Void)? = nil
+    var onTextToIpa: ((String) -> String)? = nil
     @Environment(\.dismiss) private var dismiss
 
     init(title: String, dictType: String, initialFrom: String = "",
          initialTo: String = "", initialCategory: String = "",
+         initialFromIpa: String = "", initialToIpa: String = "",
          isEdit: Bool = false,
-         onSave: @escaping (String, String, String) -> Void,
-         onPreview: ((String, String) -> Void)? = nil) {
+         onSave: @escaping (String, String, String, String, String) -> Void,
+         onPreview: ((String, String) -> Void)? = nil,
+         onTextToIpa: ((String) -> String)? = nil) {
         self.title = title
         self.dictType = dictType
         self._fromText = State(initialValue: initialFrom)
         self._toText = State(initialValue: initialTo)
         self._category = State(initialValue: initialCategory)
+        self._fromIpa = State(initialValue: initialFromIpa)
+        self._toIpa = State(initialValue: initialToIpa)
         self._caseSensitive = State(initialValue: initialFrom != initialFrom.lowercased())
         self.isEdit = isEdit
         self.onSave = onSave
         self.onPreview = onPreview
+        self.onTextToIpa = onTextToIpa
     }
 
     private var toLabel: String {
@@ -631,6 +649,31 @@ private struct DictEntrySheet: View {
                     }
                 }
                 if dictType == "pronounce" {
+                    Section("IPA (optional)") {
+                        TextField("From IPA", text: $fromIpa)
+                            .autocorrectionDisabled()
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            #endif
+                        TextField("To IPA (overrides respelling)", text: $toIpa)
+                            .autocorrectionDisabled()
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            #endif
+                        if let onTextToIpa = onTextToIpa {
+                            Button("Fill IPA from eSpeak") {
+                                let from = fromText.trimmingCharacters(in: .whitespaces)
+                                let to = toText.trimmingCharacters(in: .whitespaces)
+                                if from.isEmpty && to.isEmpty { return }
+                                if !from.isEmpty { fromIpa = onTextToIpa(from) }
+                                if !to.isEmpty { toIpa = onTextToIpa(to) }
+                            }
+                            .disabled(
+                                fromText.trimmingCharacters(in: .whitespaces).isEmpty &&
+                                toText.trimmingCharacters(in: .whitespaces).isEmpty
+                            )
+                        }
+                    }
                     Section {
                         Toggle("Match capitalization", isOn: $caseSensitive)
                     }
@@ -668,7 +711,9 @@ private struct DictEntrySheet: View {
                         onSave(
                             word,
                             toText.trimmingCharacters(in: .whitespaces),
-                            category.trimmingCharacters(in: .whitespaces)
+                            category.trimmingCharacters(in: .whitespaces),
+                            fromIpa.trimmingCharacters(in: .whitespaces),
+                            toIpa.trimmingCharacters(in: .whitespaces)
                         )
                         dismiss()
                     }
