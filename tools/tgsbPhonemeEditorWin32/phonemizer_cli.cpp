@@ -341,19 +341,34 @@ if (endsSentence && (i + 1) < chunks.size()) {
 
   // Strip eSpeak language-switch tags like "(en)", "(bg)", "(es)" from the
   // IPA output.  These are parenthesized 2-3 letter codes that eSpeak inserts
-  // when it switches languages mid-utterance (e.g. for proper nouns).
+  // when it switches languages mid-utterance.  With --ipa=3 mode, ZWJ
+  // (U+200D, UTF-8: E2 80 8D) characters are embedded inside the tags,
+  // e.g. "(\u200De\u200Dn)" — skip them when checking.
   {
     std::string stripped;
     stripped.reserve(joined.size());
     for (size_t i = 0; i < joined.size(); ) {
       if (joined[i] == '(') {
-        // Look ahead for a closing ')' within 2-5 chars (lang tag).
+        // Look ahead for a closing ')' — allow up to 20 bytes for
+        // ZWJ-padded tags like "(\u200De\u200Dn)" (2 letters + 2 ZWJs).
         size_t close = joined.find(')', i + 1);
-        if (close != std::string::npos && (close - i) <= 6) {
-          // Check that content is all lowercase ASCII letters or hyphens.
-          bool isLangTag = true;
+        if (close != std::string::npos && (close - i) <= 20) {
+          // Extract only ASCII letters/hyphens, skipping ZWJ sequences.
+          std::string inner;
           for (size_t j = i + 1; j < close; ++j) {
-            char c = joined[j];
+            auto b = static_cast<unsigned char>(joined[j]);
+            // Skip ZWJ: E2 80 8D (3-byte UTF-8 sequence)
+            if (b == 0xE2 && j + 2 < close &&
+                static_cast<unsigned char>(joined[j+1]) == 0x80 &&
+                static_cast<unsigned char>(joined[j+2]) == 0x8D) {
+              j += 2;  // skip 3 bytes total (loop increments once more)
+              continue;
+            }
+            inner.push_back(joined[j]);
+          }
+          // Check that the non-ZWJ content is a 2-5 char lang tag.
+          bool isLangTag = inner.size() >= 2 && inner.size() <= 5;
+          for (char c : inner) {
             if (!((c >= 'a' && c <= 'z') || c == '-')) {
               isLangTag = false;
               break;
