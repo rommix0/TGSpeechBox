@@ -872,29 +872,34 @@ private fun DictAddDialog(
                         ) { Text("Fill IPA from eSpeak") }
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clearAndSetSemantics {
+                                contentDescription = "Match capitalization, ${if (caseSensitive) "on" else "off"}"
+                            }
+                            .clickable { caseSensitive = !caseSensitive },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Match capitalization", modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = caseSensitive,
-                            onCheckedChange = { caseSensitive = it }
-                        )
+                        Switch(checked = caseSensitive, onCheckedChange = null)
                     }
                 }
+                // Preview moved to button row to avoid accessibility ordering issues
+            }
+        },
+        confirmButton = {
+            Row {
                 if (onPreview != null) {
                     TextButton(
                         onClick = { onPreview(finalFromText(), toText.trim(), toIpa.trim()) },
                         enabled = fromText.isNotBlank() && toText.isNotBlank()
                     ) { Text("Preview") }
                 }
+                TextButton(
+                    onClick = { onConfirm(finalFromText(), toText.trim(), category.trim(), fromIpa.trim(), toIpa.trim()) },
+                    enabled = fromText.isNotBlank() && toText.isNotBlank()
+                ) { Text("Save") }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(finalFromText(), toText.trim(), category.trim(), fromIpa.trim(), toIpa.trim()) },
-                enabled = fromText.isNotBlank() && toText.isNotBlank()
-            ) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -1053,33 +1058,38 @@ private fun DictEditDialog(
                         ) { Text("Fill IPA from eSpeak") }
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clearAndSetSemantics {
+                                contentDescription = "Match capitalization, ${if (caseSensitive) "on" else "off"}"
+                            }
+                            .clickable { caseSensitive = !caseSensitive },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Match capitalization", modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = caseSensitive,
-                            onCheckedChange = { caseSensitive = it }
-                        )
+                        Switch(checked = caseSensitive, onCheckedChange = null)
                     }
                 }
+                // Preview moved to button row to avoid accessibility ordering issues
+            }
+        },
+        confirmButton = {
+            Row {
                 if (onPreview != null) {
                     TextButton(
                         onClick = { onPreview(fromText.trim(), toText.trim(), toIpa.trim()) },
                         enabled = fromText.isNotBlank() && toText.isNotBlank()
                     ) { Text("Preview") }
                 }
+                TextButton(
+                    onClick = {
+                        val word = if (!caseSensitive && dictType == "pronounce")
+                            fromText.trim().lowercase() else fromText.trim()
+                        onConfirm(word, toText.trim(), category.trim(), fromIpa.trim(), toIpa.trim())
+                    },
+                    enabled = fromText.isNotBlank() && toText.isNotBlank()
+                ) { Text("Save") }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val word = if (!caseSensitive && dictType == "pronounce")
-                        fromText.trim().lowercase() else fromText.trim()
-                    onConfirm(word, toText.trim(), category.trim(), fromIpa.trim(), toIpa.trim())
-                },
-                enabled = fromText.isNotBlank() && toText.isNotBlank()
-            ) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -1137,15 +1147,15 @@ private fun ExcludeDictionariesDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 2.dp)
-                            .clearAndSetSemantics {
-                                contentDescription = dictTypeLabel(type)
-                                stateDescription = if (enabled) "checked" else "not checked"
-                            }
-                            .clickable {
-                                val newVal = !(config[type] ?: true)
-                                config[type] = newVal
-                                viewModel.setDictTypeEnabled(langTag, type, newVal)
-                            }
+                            .semantics(mergeDescendants = true) {}
+                            .toggleable(
+                                value = enabled,
+                                onValueChange = { checked ->
+                                    config[type] = checked
+                                    viewModel.setDictTypeEnabled(langTag, type, checked)
+                                },
+                                role = androidx.compose.ui.semantics.Role.Checkbox
+                            )
                     ) {
                         Checkbox(
                             checked = enabled,
@@ -1178,6 +1188,17 @@ private fun ExcludeCategoriesDialog(
             .distinct()
             .sorted()
     }
+    // Track which categories are checked (all start checked = included).
+    val checked = remember(categories) {
+        mutableStateMapOf<String, Boolean>().apply {
+            for (cat in categories) {
+                val anyUnmasked = entries.any {
+                    it.category.equals(cat, ignoreCase = true) && !it.masked
+                }
+                put(cat, anyUnmasked)
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1188,25 +1209,36 @@ private fun ExcludeCategoriesDialog(
             } else {
                 Column {
                     Text(
-                        "Select a category to exclude all its entries.",
+                        "Uncheck a category to exclude all its entries.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     for (cat in categories) {
+                        val isChecked = checked[cat] ?: true
                         val count = entries.count {
-                            it.category.equals(cat, ignoreCase = true) && !it.masked
+                            it.category.equals(cat, ignoreCase = true)
                         }
-                        TextButton(
-                            onClick = {
-                                onExclude(cat)
-                                onDismiss()
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                                .semantics(mergeDescendants = true) {}
+                                .toggleable(
+                                    value = isChecked,
+                                    onValueChange = { newVal ->
+                                        checked[cat] = newVal
+                                        if (!newVal) onExclude(cat)
+                                    },
+                                    role = androidx.compose.ui.semantics.Role.Checkbox
+                                )
                         ) {
+                            Checkbox(checked = isChecked, onCheckedChange = null)
                             Text(
                                 text = "$cat ($count)",
-                                modifier = Modifier.fillMaxWidth()
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 8.dp)
                             )
                         }
                     }
@@ -1214,7 +1246,7 @@ private fun ExcludeCategoriesDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text("Done") }
         }
     )
 }
