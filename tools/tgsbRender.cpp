@@ -186,6 +186,8 @@ struct Options {
 
   bool help = false;
   bool listVoices = false;        // --list-voices: print available voice profiles and exit
+  bool rateBoost = false;         // --rate-boost: double speed, DSP time-stretch handles excess
+  bool prepareTextMode = false;   // --prepare-text: output normalized text to stdout and exit
 };
 
 // ============================================================================
@@ -232,6 +234,14 @@ static void printHelp(const char* argv0) {
     << "  --jitter <int>        Pitch period variation (default: 0)\n"
     << "  --shimmer <int>       Amplitude variation (default: 0)\n"
     << "  --sharpness <int>     Glottal closure sharpness (default: 50)\n"
+    << "\n"
+    << "Rate boost:\n"
+    << "  --rate-boost          Double effective speed with DSP time-stretch\n"
+    << "\n"
+    << "Text normalization:\n"
+    << "  --prepare-text        Read text from stdin, apply dict/compound\n"
+    << "                        normalization, write result to stdout, and exit.\n"
+    << "                        Use in wrapper scripts before piping to eSpeak.\n"
     << "\n"
     << "  -h, --help            Show this help\n";
 }
@@ -345,6 +355,8 @@ static Options parseArgs(int argc, char** argv) {
       continue;
     }
     if (a == "--inflection") { parseDoubleArg("--inflection", opt.inflection); continue; }
+    if (a == "--rate-boost") { opt.rateBoost = true; continue; }
+    if (a == "--prepare-text") { opt.prepareTextMode = true; continue; }
 
     // VoicingTone parameters
     if (a == "--voicing-peak-pos") { parseIntArg(a.c_str(), opt.voicingPeakPos); continue; }
@@ -612,6 +624,29 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  // --prepare-text mode: read text from stdin, normalize, write to stdout.
+  // Used by wrapper scripts to apply dict/compound transforms before eSpeak.
+  if (opt.prepareTextMode) {
+    const std::string text = readAllStdin();
+    if (text.empty()) return 0;
+
+    nvspFrontend_handle_t fe = nvspFrontend_create(opt.packDir.c_str());
+    if (!fe) {
+      std::cerr << "nvspFrontend_create failed\n";
+      return 1;
+    }
+    if (!opt.language.empty()) {
+      nvspFrontend_setLanguage(fe, opt.language.c_str(), opt.language.c_str());
+    }
+
+    char* prepared = nvspFrontend_prepareText(fe, text.c_str());
+    const char* output = prepared ? prepared : text.c_str();
+    std::fwrite(output, 1, std::strlen(output), stdout);
+    if (prepared) nvspFrontend_freeString(prepared);
+    nvspFrontend_destroy(fe);
+    return 0;
+  }
+
 #if defined(_WIN32)
   _setmode(_fileno(stdout), _O_BINARY);
 #endif
@@ -734,7 +769,15 @@ int main(int argc, char** argv) {
   cbCtx.userFrameEx = userFrameEx;
   cbCtx.hasUserFrameEx = hasUserFrameEx;
 
-  const double speed = ssipRateToSpeed(opt.rate);
+  double speed = ssipRateToSpeed(opt.rate);
+  if (opt.rateBoost) speed *= 2.0;
+  // Cap synthesis at 2.0x, put excess into DSP time-stretch.
+  double timeStretch = 1.0;
+  if (speed > 2.0) {
+    timeStretch = speed / 2.0;
+    speed = 2.0;
+  }
+  speechPlayer_setTimeStretch(player, timeStretch);
   const double basePitchHz = sliderPitchToBaseHz(opt.pitch);
   const double inflection = opt.inflection;
 
