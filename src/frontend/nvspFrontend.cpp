@@ -359,7 +359,8 @@ static int queueIPA_ExImpl(
   }
 
   // Run text parser if text is available and there's work to do
-  // (stress dict for stress correction, OR compound map for IPA merge).
+  // (stress dict for stress correction, compound map for IPA merge,
+  // or IPA overrides from the pronunciation dictionary).
   // Respect per-language dict type disabling.
   std::string parsedIpa;
   const char* finalIpa = ipaUtf8;
@@ -368,14 +369,16 @@ static int queueIPA_ExImpl(
         ? h->disabledDictTypes.at(h->langTag) : std::unordered_set<std::string>{};
     const bool stressOk = !h->pack.stressDict.empty() && dis.count("stress") == 0;
     const bool compoundOk = !h->pack.compoundMap.empty() && dis.count("compound") == 0;
+    const bool hasIpaOverrides = !h->ipaOverrides.empty();
     static const std::unordered_map<std::string, std::vector<int>> emptyStress;
     static const std::unordered_map<std::string, std::vector<std::string>> emptyCompound;
-    if (textUtf8 && textUtf8[0] && (stressOk || compoundOk)) {
+    if (textUtf8 && textUtf8[0] && (stressOk || compoundOk || hasIpaOverrides)) {
       parsedIpa = runTextParser(textUtf8, ipaUtf8,
                                  stressOk ? h->pack.stressDict : emptyStress,
                                  compoundOk ? h->pack.compoundMap : emptyCompound,
                                  h->pack.lang.legalOnsets,
-                                 h->pack.lang.numberExpansion);
+                                 h->pack.lang.numberExpansion,
+                                 h->ipaOverrides);
       finalIpa = parsedIpa.c_str();
     }
   }
@@ -952,11 +955,13 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
   // Get disabled dict types for current language (empty set if none disabled).
   const auto& disabled = h->disabledDictTypes.count(h->langTag)
       ? h->disabledDictTypes.at(h->langTag) : std::unordered_set<std::string>{};
+  h->ipaOverrides.clear();
   std::string result = prepareTextForEspeak(input, h->pack.compoundMap,
                                              h->pack.pronDict, disabled,
                                              h->langTag,
                                              h->pack.lang.yearSplittingEnabled,
-                                             h->pack.lang.numberExpansion.ohDigit);
+                                             h->pack.lang.numberExpansion.ohDigit,
+                                             &h->ipaOverrides);
 
   if (result == original) return nullptr;  // no changes
 

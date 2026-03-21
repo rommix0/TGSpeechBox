@@ -544,7 +544,8 @@ std::string runTextParser(
     const std::unordered_map<std::string, std::vector<int>>& stressDict,
     const std::unordered_map<std::string, std::vector<std::string>>& compoundMap,
     const std::vector<std::u32string>& legalOnsets,
-    const NumberExpansionRules& numberRules)
+    const NumberExpansionRules& numberRules,
+    const std::unordered_map<std::string, std::string>& ipaOverrides)
 {
   if (text.empty()) return ipa;
 
@@ -689,6 +690,24 @@ std::string runTextParser(
   }
 
   if (textWords.empty() || ipaChunks.empty()) return ipa;
+
+  // ── IPA override splicing ────────────────────────────────────────────
+  // Words whose dict entry had toIpa set were left untouched in the text
+  // so eSpeak could phonemize the surrounding context naturally.  Now
+  // replace eSpeak's IPA for those words with the dict-provided IPA.
+  bool hadIpaSplice = false;
+  if (!ipaOverrides.empty() && textWords.size() == ipaChunks.size()) {
+    for (size_t i = 0; i < textWords.size(); ++i) {
+      std::string key = asciiLower(stripPunct(textWords[i]));
+      auto it = ipaOverrides.find(key);
+      if (it != ipaOverrides.end()) {
+        TPLOG("  ipaSplice: [%s] eSpeak=\"%s\" -> override=\"%s\"\n",
+              key.c_str(), ipaChunks[i].c_str(), it->second.c_str());
+        ipaChunks[i] = it->second;
+        hadIpaSplice = true;
+      }
+    }
+  }
 
   // If there's no stress dict (e.g. en-gb), compound merge was still useful
   // but stress correction can't run.  Reassemble and return.
@@ -951,7 +970,7 @@ std::string runTextParser(
     }
   }
 
-  if (!anyChange) return ipa;
+  if (!anyChange && !hadIpaSplice) return ipa;
 
   // Reassemble.  Split multi-stress chunks for IPA engine word boundaries.
   splitMultiStressChunks(ipaChunks);
@@ -973,7 +992,8 @@ std::string prepareTextForEspeak(
     const std::unordered_set<std::string>& disabledDictTypes,
     const std::string& langTag,
     bool yearSplitting,
-    const std::string& ohDigit)
+    const std::string& ohDigit,
+    std::unordered_map<std::string, std::string>* ipaOverrides)
 {
   if (text.empty()) return text;
 
@@ -983,8 +1003,10 @@ std::string prepareTextForEspeak(
   std::string result = text;
 
   // 0. Pronunciation dictionary replacement (highest priority).
+  // Words with toIpa set are left in place; their overrides are collected
+  // in ipaOverrides for downstream splicing in runTextParser.
   if (!pronDict.entries.empty() && disabledDictTypes.count("pronounce") == 0) {
-    result = dictReplaceInText(result, pronDict);
+    result = dictReplaceInText(result, pronDict, ipaOverrides);
   }
 
   // 1. Compound splitting.

@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE for details.
 #include "pack.h"
 
 #include <string>
+#include <unordered_map>
 
 namespace nvsp_frontend {
 
@@ -18,7 +19,13 @@ namespace nvsp_frontend {
 // Hyphens in replacement text are converted to spaces for eSpeak
 // consistency between isolation and phrase context.
 // Masked entries are skipped.
-std::string dictReplaceInText(const std::string& text, const PronDict& dict);
+//
+// If ipaOverrides is non-null, words whose dict entry has a non-empty
+// toIpa are NOT replaced in the text (left for eSpeak to phonemize
+// naturally).  Instead, their lowercase key and toIpa value are
+// recorded in the map for downstream IPA splicing.
+std::string dictReplaceInText(const std::string& text, const PronDict& dict,
+    std::unordered_map<std::string, std::string>* ipaOverrides = nullptr);
 
 }  // namespace nvsp_frontend
 

@@ -53,7 +53,8 @@ static std::string stripVariationSelectors(const std::string& s) {
   return out;
 }
 
-std::string dictReplaceInText(const std::string& text, const PronDict& dict) {
+std::string dictReplaceInText(const std::string& text, const PronDict& dict,
+    std::unordered_map<std::string, std::string>* ipaOverrides) {
   if (text.empty() || dict.entries.empty()) return text;
 
   std::string result;
@@ -113,6 +114,17 @@ std::string dictReplaceInText(const std::string& text, const PronDict& dict) {
         result += token;
         continue;
       }
+    }
+
+    // If this entry has a toIpa override, don't replace the text — leave
+    // the original word so eSpeak phonemizes it naturally.  Record the
+    // override for downstream IPA splicing in runTextParser.
+    if (ipaOverrides && !it->second.toIpa.empty()) {
+      DLLOG("  dictIpaOverride: \"%s\" -> ipa \"%s\"\n",
+            lowerKey.c_str(), it->second.toIpa.c_str());
+      (*ipaOverrides)[lowerKey] = it->second.toIpa;
+      result += token;  // keep original word
+      continue;
     }
 
     // Convert hyphens to spaces in toText — users write them as pronunciation

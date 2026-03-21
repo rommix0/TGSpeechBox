@@ -35,7 +35,8 @@ std::string runTextParser(
     const std::unordered_map<std::string, std::vector<int>>& stressDict,
     const std::unordered_map<std::string, std::vector<std::string>>& compoundMap,
     const std::vector<std::u32string>& legalOnsets,
-    const NumberExpansionRules& numberRules);
+    const NumberExpansionRules& numberRules,
+    const std::unordered_map<std::string, std::string>& ipaOverrides = {});
 
 // Pre-eSpeak text normalization.
 //
@@ -54,7 +55,8 @@ std::string prepareTextForEspeak(
     const std::unordered_set<std::string>& disabledDictTypes,
     const std::string& langTag,
     bool yearSplitting,
-    const std::string& ohDigit = "");
+    const std::string& ohDigit = "",
+    std::unordered_map<std::string, std::string>* ipaOverrides = nullptr);
 
 }  // namespace nvsp_frontend
 

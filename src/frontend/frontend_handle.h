@@ -65,6 +65,11 @@ struct Handle {
   double frameExShimmer = 0.0;
   double frameExSharpness = 1.0;  // multiplier, 1.0 = neutral
 
+  // IPA overrides collected during prepareText — words whose dict entry
+  // has toIpa set.  Keyed on lowercase word text.  Consumed by the next
+  // runTextParser call, then cleared.
+  std::unordered_map<std::string, std::string> ipaOverrides;
+
   // Buffer for getVoiceProfileNames return value
   std::string profileNamesBuffer;
 
