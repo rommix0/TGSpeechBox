@@ -241,6 +241,8 @@ normalization:
       to: "kᵊɾ"
     - from: "pɾ"
       to: "pᵊɾ"
+    - from: "dɾ"
+      to: "dᵊɾ"
     # Custom phoneme tune replacements.
     # Make vowels more central:
     - from: a
