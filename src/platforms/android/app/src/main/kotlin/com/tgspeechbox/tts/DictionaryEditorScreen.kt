@@ -75,6 +75,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
     var showMoreMenu by remember { mutableStateOf(false) }
     var showRemoveConfirm by remember { mutableStateOf(false) }
     var showExcludeDialog by remember { mutableStateOf(false) }
+    var showExcludeCategoriesDialog by remember { mutableStateOf(false) }
     var pendingExportUserOnly by remember { mutableStateOf(true) }
 
     // Export launcher (file picker → save TSV)
@@ -381,6 +382,16 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                             showExcludeDialog = true
                         }
                     )
+                    // Exclude categories (pronunciation only)
+                    if (selectedType == "pronounce") {
+                        DropdownMenuItem(
+                            text = { Text("Exclude categories") },
+                            onClick = {
+                                showMoreMenu = false
+                                showExcludeCategoriesDialog = true
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -604,6 +615,25 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             langTag = langFilter,
             viewModel = viewModel,
             onDismiss = { showExcludeDialog = false }
+        )
+    }
+
+    // Exclude categories dialog (pronunciation only)
+    if (showExcludeCategoriesDialog) {
+        ExcludeCategoriesDialog(
+            entries = entries,
+            onExclude = { category ->
+                val toMask = entries.filter {
+                    it.category.equals(category, ignoreCase = true) && !it.masked
+                }
+                for (e in toMask) viewModel.maskDictEntry(e.fromText, true)
+                Toast.makeText(
+                    context,
+                    "Excluded ${toMask.size} entries in \"$category\"",
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            onDismiss = { showExcludeCategoriesDialog = false }
         )
     }
 
@@ -980,6 +1010,59 @@ private fun ExcludeDictionariesDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Done") }
+        }
+    )
+}
+
+@Composable
+private fun ExcludeCategoriesDialog(
+    entries: List<TgsbViewModel.DictEntry>,
+    onExclude: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val categories = remember(entries) {
+        entries.filter { it.category.isNotEmpty() }
+            .map { it.category }
+            .distinct()
+            .sorted()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Exclude categories") },
+        text = {
+            if (categories.isEmpty()) {
+                Text("No categories found in the current dictionary.")
+            } else {
+                Column {
+                    Text(
+                        "Select a category to exclude all its entries.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    for (cat in categories) {
+                        val count = entries.count {
+                            it.category.equals(cat, ignoreCase = true) && !it.masked
+                        }
+                        TextButton(
+                            onClick = {
+                                onExclude(cat)
+                                onDismiss()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "$cat ($count)",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
         }
     )
 }

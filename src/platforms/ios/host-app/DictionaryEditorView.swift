@@ -37,6 +37,7 @@ struct DictionaryEditorView: View {
     @State private var editingEntry: TgsbEngine.DictEntry? = nil
     @State private var showRemoveConfirm = false
     @State private var showExcludeSheet = false
+    @State private var showExcludeCategoriesSheet = false
     @State private var statusMessage: String?
 
     // Export state — single fileExporter to avoid SwiftUI dual-modifier conflict
@@ -180,6 +181,13 @@ struct DictionaryEditorView: View {
                     // Exclude dictionaries
                     Button(action: { showExcludeSheet = true }) {
                         Label("Exclude dictionaries", systemImage: "eye.slash")
+                    }
+
+                    // Exclude categories (pronunciation only)
+                    if selectedType == "pronounce" {
+                        Button(action: { showExcludeCategoriesSheet = true }) {
+                            Label("Exclude categories", systemImage: "tag.slash")
+                        }
                     }
 
                     // Remove changed entries
@@ -366,6 +374,9 @@ struct DictionaryEditorView: View {
         }
         .sheet(isPresented: $showExcludeSheet) {
             ExcludeDictionariesSheet(engine: engine, langTag: langFilter)
+        }
+        .sheet(isPresented: $showExcludeCategoriesSheet) {
+            ExcludeCategoriesSheet(engine: engine, langTag: langFilter)
         }
         .fileExporter(
             isPresented: $showExportPicker,
@@ -719,6 +730,77 @@ private struct ExcludeDictionariesSheet: View {
         .onAppear {
             config = engine.loadDictConfig(langTag: langTag)
                 .sorted(by: { $0.type < $1.type })
+        }
+#if os(iOS)
+        .presentationDetents([.medium])
+#endif
+    }
+}
+
+// MARK: - Exclude Categories Sheet
+
+private struct ExcludeCategoriesSheet: View {
+    @ObservedObject var engine: TgsbEngine
+    let langTag: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var statusMessage = ""
+
+    private var categories: [String] {
+        let cats = Set(engine.dictionaryEntries
+            .filter { !$0.category.isEmpty }
+            .map { $0.category })
+        return cats.sorted()
+    }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                if categories.isEmpty {
+                    Section {
+                        Text("No categories found in the current dictionary.")
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    Section {
+                        Text("Select a category to exclude all its entries.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Section {
+                        ForEach(categories, id: \.self) { cat in
+                            let count = engine.dictionaryEntries.count {
+                                $0.category.caseInsensitiveCompare(cat) == .orderedSame && !$0.masked
+                            }
+                            Button(action: {
+                                let toMask = engine.dictionaryEntries.filter {
+                                    $0.category.caseInsensitiveCompare(cat) == .orderedSame && !$0.masked
+                                }
+                                for entry in toMask {
+                                    engine.maskDictEntry(fromText: entry.fromText, masked: true)
+                                }
+                                statusMessage = "Excluded \(toMask.count) entries in \"\(cat)\""
+                            }) {
+                                Text("\(cat) (\(count))")
+                            }
+                        }
+                    }
+                    if !statusMessage.isEmpty {
+                        Section {
+                            Text(statusMessage)
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Exclude categories")
+#if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+#endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
 #if os(iOS)
         .presentationDetents([.medium])
