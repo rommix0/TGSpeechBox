@@ -84,11 +84,15 @@ Basic options:
   --lang <tag>          Language tag: en, en-us, en-gb, de, fr, etc. (default: en)
   --voice <name>        Voice profile name from phonemes.yaml (default: none)
   --list-voices         List available voice profiles and exit
+  --text <string>       Original text for stress correction + IPA overrides
+  --clause <char>       Clause type override: . ? ! , (default: auto-detect)
   --rate <int>          Speech rate -100..100 (default: 0)
+  --rate-boost          Double effective speed with DSP time-stretch
   --pitch <int>         Base pitch 0..100 (default: 50)
   --volume <float>      Output gain multiplier (default: 1.0)
   --samplerate <int>    Output sample rate in Hz (default: 16000)
   --inflection <float>  Pitch variation amount (default: 0.5)
+  --prepare-text        Text normalization mode (see below)
   -h, --help            Show help
 
 VoicingTone parameters (0-100 sliders, 50 = neutral):
@@ -141,6 +145,29 @@ echo 'həˈloʊ' | ./bin/tgsp --lang en-us --jitter 15 --shimmer 10 | aplay -q -
 # Brighter voice (more high frequencies)
 echo 'həˈloʊ' | ./bin/tgsp --lang en-us --voiced-tilt 35 --aspiration-tilt 60 | aplay -q -r 16000 -f S16_LE -t raw -
 ```
+
+### Rate Boost
+
+Rate boost doubles the effective speech rate using DSP time-stretch, matching the behavior on NVDA, Android, iOS, and SAPI:
+
+```bash
+# Rate boost via command line
+echo 'həˈloʊ wɜːld' | ./bin/tgsp --lang en-us --rate-boost | aplay -q -r 16000 -f S16_LE -t raw -
+
+# Rate boost via environment variable (for Speech Dispatcher)
+export TGSB_RATE_BOOST=1
+```
+
+### Text Normalization and Dictionary Support
+
+The `--prepare-text` mode applies pronunciation dictionary replacements, compound splitting, and other text-level transforms before eSpeak phonemization. This enables the same dictionary and IPA override features available on other platforms.
+
+```bash
+# Normalize text before piping to eSpeak (used by tgsb-speak wrapper)
+printf 'Hello world' | tgsbRender --prepare-text --packdir /usr/share/tgspeechbox --lang en-us
+```
+
+The `tgsb-speak` wrapper script runs this automatically. When `--text` is also passed during synthesis, the engine applies stress correction and IPA overrides from the pronunciation dictionary.
 
 ### With eSpeak-ng for Text-to-IPA
 
