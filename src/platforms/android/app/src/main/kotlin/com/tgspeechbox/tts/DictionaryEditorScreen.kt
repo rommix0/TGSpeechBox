@@ -39,6 +39,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -870,17 +872,14 @@ private fun DictAddDialog(
                         ) { Text("Fill IPA from eSpeak") }
                     }
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .toggleable(
-                                value = caseSensitive,
-                                onValueChange = { caseSensitive = it },
-                                role = androidx.compose.ui.semantics.Role.Switch
-                            ),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Match capitalization", modifier = Modifier.weight(1f))
-                        Switch(checked = caseSensitive, onCheckedChange = null)
+                        Switch(
+                            checked = caseSensitive,
+                            onCheckedChange = { caseSensitive = it }
+                        )
                     }
                 }
                 if (onPreview != null) {
@@ -1054,17 +1053,14 @@ private fun DictEditDialog(
                         ) { Text("Fill IPA from eSpeak") }
                     }
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .toggleable(
-                                value = caseSensitive,
-                                onValueChange = { caseSensitive = it },
-                                role = androidx.compose.ui.semantics.Role.Switch
-                            ),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Match capitalization", modifier = Modifier.weight(1f))
-                        Switch(checked = caseSensitive, onCheckedChange = null)
+                        Switch(
+                            checked = caseSensitive,
+                            onCheckedChange = { caseSensitive = it }
+                        )
                     }
                 }
                 if (onPreview != null) {
@@ -1141,13 +1137,19 @@ private fun ExcludeDictionariesDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 2.dp)
+                            .clearAndSetSemantics {
+                                contentDescription = dictTypeLabel(type)
+                                stateDescription = if (enabled) "checked" else "not checked"
+                            }
+                            .clickable {
+                                val newVal = !(config[type] ?: true)
+                                config[type] = newVal
+                                viewModel.setDictTypeEnabled(langTag, type, newVal)
+                            }
                     ) {
                         Checkbox(
                             checked = enabled,
-                            onCheckedChange = { checked ->
-                                config[type] = checked
-                                viewModel.setDictTypeEnabled(langTag, type, checked)
-                            }
+                            onCheckedChange = null
                         )
                         Text(
                             text = dictTypeLabel(type),
