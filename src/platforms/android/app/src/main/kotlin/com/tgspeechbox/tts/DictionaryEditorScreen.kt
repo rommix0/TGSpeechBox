@@ -15,6 +15,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -878,7 +879,8 @@ private fun DictAddDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clearAndSetSemantics {
-                                contentDescription = "Match capitalization, ${if (caseSensitive) "on" else "off"}"
+                                contentDescription = "Match capitalization"
+                                stateDescription = if (caseSensitive) "on" else "off"
                             }
                             .clickable { caseSensitive = !caseSensitive },
                         verticalAlignment = Alignment.CenterVertically
@@ -1066,7 +1068,8 @@ private fun DictEditDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clearAndSetSemantics {
-                                contentDescription = "Match capitalization, ${if (caseSensitive) "on" else "off"}"
+                                contentDescription = "Match capitalization"
+                                stateDescription = if (caseSensitive) "on" else "off"
                             }
                             .clickable { caseSensitive = !caseSensitive },
                         verticalAlignment = Alignment.CenterVertically
