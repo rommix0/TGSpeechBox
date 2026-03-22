@@ -1194,6 +1194,25 @@ class TgsbEngine: ObservableObject {
         return result
     }
 
+    func maskDictCategory(category: String, masked: Bool) {
+        guard let eng = engine else { return }
+        let tag = prefixedLangTag(dictSubType, dictLangTag)
+        let matching = dictionaryEntries.filter {
+            $0.category.caseInsensitiveCompare(category) == .orderedSame && $0.masked != masked
+        }
+        for entry in matching {
+            let dict: [String: Any] = ["masked": masked]
+            if let data = try? JSONSerialization.data(withJSONObject: dict),
+               let str = String(data: data, encoding: .utf8) {
+                tgsb_set_data(eng, TGSB_DATA_DICTIONARY, tag, entry.fromText, str)
+                saveDictOverride(dictLangTag, key: entry.fromText, value: str)
+            }
+        }
+        if !matching.isEmpty {
+            loadDictionary(langTag: dictLangTag, subType: dictSubType)
+        }
+    }
+
     func textToIpa(_ text: String) -> String {
         guard let eng = engine else { return "" }
         guard let ptr = tgsb_text_to_ipa(eng, text) else { return "" }

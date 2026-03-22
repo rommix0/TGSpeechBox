@@ -638,16 +638,8 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
     if (showExcludeCategoriesDialog) {
         ExcludeCategoriesDialog(
             entries = entries,
-            onExclude = { category ->
-                val toMask = entries.filter {
-                    it.category.equals(category, ignoreCase = true) && !it.masked
-                }
-                for (e in toMask) viewModel.maskDictEntry(e.fromText, true)
-                Toast.makeText(
-                    context,
-                    "Excluded ${toMask.size} entries in \"$category\"",
-                    Toast.LENGTH_SHORT
-                ).show()
+            onToggleCategory = { category, masked ->
+                viewModel.maskDictCategory(category, masked, entries)
             },
             onDismiss = { showExcludeCategoriesDialog = false }
         )
@@ -1179,7 +1171,7 @@ private fun ExcludeDictionariesDialog(
 @Composable
 private fun ExcludeCategoriesDialog(
     entries: List<TgsbViewModel.DictEntry>,
-    onExclude: (String) -> Unit,
+    onToggleCategory: (category: String, masked: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     val categories = remember(entries) {
@@ -1188,14 +1180,13 @@ private fun ExcludeCategoriesDialog(
             .distinct()
             .sorted()
     }
-    // Track which categories are checked (all start checked = included).
+    // Checked = included (has unmasked entries), unchecked = excluded.
     val checked = remember(categories) {
         mutableStateMapOf<String, Boolean>().apply {
             for (cat in categories) {
-                val anyUnmasked = entries.any {
+                put(cat, entries.any {
                     it.category.equals(cat, ignoreCase = true) && !it.masked
-                }
-                put(cat, anyUnmasked)
+                })
             }
         }
     }
@@ -1229,7 +1220,7 @@ private fun ExcludeCategoriesDialog(
                                     value = isChecked,
                                     onValueChange = { newVal ->
                                         checked[cat] = newVal
-                                        if (!newVal) onExclude(cat)
+                                        onToggleCategory(cat, !newVal)
                                     },
                                     role = androidx.compose.ui.semantics.Role.Checkbox
                                 )

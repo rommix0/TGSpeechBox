@@ -890,6 +890,19 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         loadDictionary(dictLangTag, dictSubType)
     }
 
+    fun maskDictCategory(category: String, masked: Boolean, entries: List<DictEntry>) {
+        val prefixed = prefixedLangTag(dictSubType, dictLangTag)
+        val matching = entries.filter {
+            it.category.equals(category, ignoreCase = true) && it.masked != masked
+        }
+        for (e in matching) {
+            val json = org.json.JSONObject().apply { put("masked", masked) }
+            engine.setData(TgsbSpeakEngine.DATA_DICTIONARY, prefixed, e.fromText, json.toString())
+            saveDictOverride(prefixed, e.fromText, json.toString())
+        }
+        if (matching.isNotEmpty()) loadDictionary(dictLangTag, dictSubType)
+    }
+
     fun textToIpa(text: String): String = engine.textToIpa(text)
 
     fun getPhonemeKeys(): List<Pair<String, String>> {
