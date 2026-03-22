@@ -514,7 +514,6 @@ private struct DictEntryRow: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onEdit() }
-        .accessibilityAction { onEdit() }
         .swipeActions(edge: .trailing) {
             if entry.source == "user" {
                 Button("Delete", role: .destructive) { onDelete() }
