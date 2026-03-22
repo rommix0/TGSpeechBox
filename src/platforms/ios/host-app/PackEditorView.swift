@@ -18,7 +18,7 @@ struct PhonemeNav: Hashable { let key: String }
 struct PackEditorView: View {
     @ObservedObject var engine: TgsbEngine
     @Binding var engineStarted: Bool
-    @SceneStorage("editorSelectedTab3") private var selectedTab = 0
+    @State private var selectedTab = 0
     @State private var langFilter: String = ""
 
     var body: some View {

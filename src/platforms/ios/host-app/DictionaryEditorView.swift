@@ -50,6 +50,21 @@ struct DictionaryEditorView: View {
         return "\(dictTypeLabel(selectedType)) (\(engine.dictionaryTotalCount))"
     }
 
+    private var previewClosure: ((String, String, String) -> Void)? {
+        (selectedType == "pronounce" || selectedType == "character")
+            ? { from, to, tIpa in engine.previewDictEntry(from: from, to: to, toIpa: tIpa) }
+            : nil
+    }
+    private var textToIpaClosure: ((String) -> String)? {
+        selectedType == "pronounce" ? { text in engine.textToIpa(text) } : nil
+    }
+    private var phonemeKeysClosure: (() -> [(key: String, cls: String)])? {
+        selectedType == "pronounce" ? { engine.getPhonemeKeys() } : nil
+    }
+    private var previewPhonemeClosure: ((String) -> Void)? {
+        selectedType == "pronounce" ? { key in engine.previewPhoneme(key) } : nil
+    }
+
     @ViewBuilder
     private var entryListView: some View {
         if langFilter.isEmpty || selectedType.isEmpty {
@@ -275,6 +290,11 @@ struct DictionaryEditorView: View {
                 engine.loadEditorLanguages()
                 engine.loadDictTypes()
             }
+            // Default type if not yet set (handles tab switching recreation).
+            if selectedType.isEmpty && !engine.dictTypes.isEmpty {
+                let pronounce = engine.dictTypes.first(where: { $0.type == "pronounce" })
+                selectedType = pronounce?.type ?? (engine.dictTypes.first?.type ?? "")
+            }
             // Default language from system locale if not yet set.
             if langFilter.isEmpty && !engine.editorLanguages.isEmpty {
                 let engineLang = engine.currentEngineLangTag()
@@ -323,18 +343,10 @@ struct DictionaryEditorView: View {
                     engine.addDictEntry(fromText: from, toText: to, category: cat,
                                         fromIpa: fIpa, toIpa: tIpa)
                 },
-                onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to, tIpa in
-                    engine.previewDictEntry(from: from, to: to, toIpa: tIpa)
-                } : nil,
-                onTextToIpa: selectedType == "pronounce" ? { text in
-                    engine.textToIpa(text)
-                } : nil,
-                onGetPhonemeKeys: selectedType == "pronounce" ? {
-                    engine.getPhonemeKeys()
-                } : nil,
-                onPreviewPhoneme: selectedType == "pronounce" ? { key in
-                    engine.previewPhoneme(phonemeKey: key)
-                } : nil
+                onPreview: previewClosure,
+                onTextToIpa: textToIpaClosure,
+                onGetPhonemeKeys: phonemeKeysClosure,
+                onPreviewPhoneme: previewPhonemeClosure
             )
         }
         .sheet(item: $editingEntry) { entry in
@@ -354,18 +366,10 @@ struct DictionaryEditorView: View {
                     engine.addDictEntry(fromText: from, toText: to, category: cat,
                                         fromIpa: fIpa, toIpa: tIpa)
                 },
-                onPreview: (selectedType == "pronounce" || selectedType == "character") ? { from, to, tIpa in
-                    engine.previewDictEntry(from: from, to: to, toIpa: tIpa)
-                } : nil,
-                onTextToIpa: selectedType == "pronounce" ? { text in
-                    engine.textToIpa(text)
-                } : nil,
-                onGetPhonemeKeys: selectedType == "pronounce" ? {
-                    engine.getPhonemeKeys()
-                } : nil,
-                onPreviewPhoneme: selectedType == "pronounce" ? { key in
-                    engine.previewPhoneme(phonemeKey: key)
-                } : nil
+                onPreview: previewClosure,
+                onTextToIpa: textToIpaClosure,
+                onGetPhonemeKeys: phonemeKeysClosure,
+                onPreviewPhoneme: previewPhonemeClosure
             )
         }
         .alert("Remove changed entries", isPresented: $showRemoveConfirm) {
@@ -547,6 +551,7 @@ private struct DictEntryRow: View {
                 (entry.masked ? ", excluded" : "") +
                 (entry.category.isEmpty ? "" : ", \(entry.category)")
         }())
+        .accessibilityAction(.default) { onEdit() }
         .accessibilityAction(named: "Edit") { onEdit() }
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to edit")
@@ -654,15 +659,6 @@ private struct DictEntrySheet: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                if showCategory {
-                    Section("Category (optional)") {
-                        TextField("Category", text: $category)
-                            .autocorrectionDisabled()
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            #endif
-                    }
-                }
                 if dictType == "pronounce" {
                     Section("IPA (optional)") {
                         TextField("From IPA", text: $fromIpa)
@@ -707,6 +703,15 @@ private struct DictEntrySheet: View {
                     }
                     Section {
                         Toggle("Match capitalization", isOn: $caseSensitive)
+                    }
+                }
+                if showCategory {
+                    Section("Category (optional)") {
+                        TextField("Category", text: $category)
+                            .autocorrectionDisabled()
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            #endif
                     }
                 }
             }
