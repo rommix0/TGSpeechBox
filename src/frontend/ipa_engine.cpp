@@ -585,6 +585,22 @@ bool convertIpaToTokens(
     return false;
   }
 
+  // Inflection hard gate: at 0% inflection, force true monotone by flattening
+  // all pitch to basePitch and zeroing vibrato.  Without this gate, microprosody
+  // (voiceless F0 raise, voiced F0 lower, intrinsic F0) and vibrato still
+  // modulate pitch even though the pitch modes themselves scale to zero.
+  if (inflection <= 0.0) {
+    const int vp  = static_cast<int>(FieldId::voicePitch);
+    const int evp = static_cast<int>(FieldId::endVoicePitch);
+    const int vib = static_cast<int>(FieldId::vibratoPitchOffset);
+    for (Token& t : outTokens) {
+      t.field[vp]  = basePitch;
+      t.field[evp] = basePitch;
+      t.field[vib] = 0.0;
+      t.setMask |= (1ull << vp) | (1ull << evp) | (1ull << vib);
+    }
+  }
+
   // Optional single-word tail tuning.
   //
   // The frame engine cuts to silence abruptly when the queue becomes empty.
