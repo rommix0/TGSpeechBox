@@ -315,7 +315,7 @@ normalization:
     - from: "aː"
       to: "áː"
     - from: "eː"
-      to: "éː"
+      to: "e_huː"
     - from: "iː"
       to: "íː"
     - from: "oː"

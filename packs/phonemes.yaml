@@ -1227,6 +1227,51 @@ phonemes:
     pf5: 3750
     pf6: 4900
     voiceAmplitude: 0.9
+  e_hu:
+    # Hungarian /eː/ (é) — close-mid front unrounded vowel.
+    # More closed (lower F1) and more front (higher F2) than the base /e/.
+    # Targets from Gósy/Siptar (2015) and Gill et al. (2021), male estimates.
+    _isVowel: true
+    _isVoiced: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 77
+    cb2: 75
+    cb3: 150
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 400
+    cf2: 2100
+    cf3: 2700
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 70
+    pb2: 100
+    pb3: 200
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 400
+    pf2: 1900
+    pf3: 2600
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
   e_es:
     # This is a plain, central /e/ vowel for Spanish.
     _isVowel: true
