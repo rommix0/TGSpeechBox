@@ -530,12 +530,17 @@ private struct DictEntryRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(entry.fromText) maps to \(entry.toText), " +
-            "\(entry.source) dictionary" +
-            (entry.masked ? ", excluded" : "") +
-            (entry.category.isEmpty ? "" : ", \(entry.category)")
-        )
+        .accessibilityLabel({
+            let label: String
+            if !entry.toIpa.isEmpty {
+                label = "\(entry.fromText), pronunciation override"
+            } else {
+                label = "\(entry.fromText) maps to \(entry.toText)"
+            }
+            return label + ", \(entry.source) dictionary" +
+                (entry.masked ? ", excluded" : "") +
+                (entry.category.isEmpty ? "" : ", \(entry.category)")
+        }())
         .accessibilityAction(named: "Edit") { onEdit() }
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to edit")

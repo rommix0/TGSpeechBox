@@ -435,7 +435,11 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                                 )
                                 .semantics {
                                     contentDescription = buildString {
-                                        append("${entry.fromText} maps to ${entry.toText}")
+                                        if (entry.toIpa.isNotEmpty()) {
+                                            append("${entry.fromText}, pronunciation override")
+                                        } else {
+                                            append("${entry.fromText} maps to ${entry.toText}")
+                                        }
                                         append(", ${entry.source} dictionary")
                                         if (entry.masked) append(", masked")
                                         if (entry.category.isNotEmpty()) append(", ${entry.category}")
