@@ -331,6 +331,9 @@ struct DictionaryEditorView: View {
                 } : nil,
                 onGetPhonemeKeys: selectedType == "pronounce" ? {
                     engine.getPhonemeKeys()
+                } : nil,
+                onPreviewPhoneme: selectedType == "pronounce" ? { key in
+                    engine.previewPhoneme(phonemeKey: key)
                 } : nil
             )
         }
@@ -359,6 +362,9 @@ struct DictionaryEditorView: View {
                 } : nil,
                 onGetPhonemeKeys: selectedType == "pronounce" ? {
                     engine.getPhonemeKeys()
+                } : nil,
+                onPreviewPhoneme: selectedType == "pronounce" ? { key in
+                    engine.previewPhoneme(phonemeKey: key)
                 } : nil
             )
         }
@@ -563,6 +569,7 @@ private struct DictEntrySheet: View {
     var onPreview: ((String, String, String) -> Void)? = nil
     var onTextToIpa: ((String) -> String)? = nil
     var onGetPhonemeKeys: (() -> [(key: String, cls: String)])? = nil
+    var onPreviewPhoneme: ((String) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var showPhonemePicker = false
     @State private var phonemePickerTarget = ""
@@ -574,7 +581,8 @@ private struct DictEntrySheet: View {
          onSave: @escaping (String, String, String, String, String) -> Void,
          onPreview: ((String, String, String) -> Void)? = nil,
          onTextToIpa: ((String) -> String)? = nil,
-         onGetPhonemeKeys: (() -> [(key: String, cls: String)])? = nil) {
+         onGetPhonemeKeys: (() -> [(key: String, cls: String)])? = nil,
+         onPreviewPhoneme: ((String) -> Void)? = nil) {
         self.title = title
         self.dictType = dictType
         self._fromText = State(initialValue: initialFrom)
@@ -588,6 +596,7 @@ private struct DictEntrySheet: View {
         self.onPreview = onPreview
         self.onTextToIpa = onTextToIpa
         self.onGetPhonemeKeys = onGetPhonemeKeys
+        self.onPreviewPhoneme = onPreviewPhoneme
     }
 
     private var toLabel: String {
@@ -760,7 +769,8 @@ private struct DictEntrySheet: View {
                             toIpa = toIpa.isEmpty ? key : "\(toIpa) \(key)"
                         }
                         showPhonemePicker = false
-                    }
+                    },
+                    onPreview: onPreviewPhoneme
                 )
             }
         }
@@ -772,6 +782,7 @@ private struct DictEntrySheet: View {
 private struct PhonemePickerSheet: View {
     let keys: [(key: String, cls: String)]
     let onSelect: (String) -> Void
+    var onPreview: ((String) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -784,6 +795,9 @@ private struct PhonemePickerSheet: View {
                     ForEach(keys, id: \.key) { entry in
                         Button(action: { onSelect(entry.key) }) {
                             Text("\(entry.key) (\(entry.cls))")
+                        }
+                        .accessibilityAction(named: "Preview") {
+                            onPreview?(entry.key)
                         }
                     }
                 }

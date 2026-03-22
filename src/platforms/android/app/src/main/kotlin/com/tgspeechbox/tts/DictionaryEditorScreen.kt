@@ -601,6 +601,9 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             } else null,
             onGetPhonemeKeys = if (selectedType == "pronounce") {
                 { viewModel.getPhonemeKeys() }
+            } else null,
+            onPreviewPhoneme = if (selectedType == "pronounce") {
+                { key -> viewModel.previewPhoneme(key) }
             } else null
         )
     }
@@ -625,6 +628,9 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             } else null,
             onGetPhonemeKeys = if (selectedType == "pronounce") {
                 { viewModel.getPhonemeKeys() }
+            } else null,
+            onPreviewPhoneme = if (selectedType == "pronounce") {
+                { key -> viewModel.previewPhoneme(key) }
             } else null
         )
     }
@@ -724,7 +730,8 @@ private fun DictAddDialog(
     onConfirm: (from: String, to: String, category: String, fromIpa: String, toIpa: String) -> Unit,
     onPreview: ((from: String, to: String, toIpa: String) -> Unit)? = null,
     onTextToIpa: ((String) -> String)? = null,
-    onGetPhonemeKeys: (() -> List<Pair<String, String>>)? = null
+    onGetPhonemeKeys: (() -> List<Pair<String, String>>)? = null,
+    onPreviewPhoneme: ((String) -> Unit)? = null
 ) {
     var fromText by rememberSaveable { mutableStateOf("") }
     var toText by rememberSaveable { mutableStateOf("") }
@@ -914,6 +921,7 @@ private fun DictAddDialog(
                 if (phonemePickerTarget == "fromIpa") fromIpa = spaced else toIpa = spaced
                 phonemePickerTarget = ""
             },
+            onPreview = onPreviewPhoneme,
             onDismiss = { phonemePickerTarget = "" }
         )
     }
@@ -927,7 +935,8 @@ private fun DictEditDialog(
     onConfirm: (from: String, to: String, category: String, fromIpa: String, toIpa: String) -> Unit,
     onPreview: ((from: String, to: String, toIpa: String) -> Unit)? = null,
     onTextToIpa: ((String) -> String)? = null,
-    onGetPhonemeKeys: (() -> List<Pair<String, String>>)? = null
+    onGetPhonemeKeys: (() -> List<Pair<String, String>>)? = null,
+    onPreviewPhoneme: ((String) -> Unit)? = null
 ) {
     var fromText by rememberSaveable { mutableStateOf(entry.fromText) }
     var toText by rememberSaveable { mutableStateOf(entry.toText) }
@@ -1104,6 +1113,7 @@ private fun DictEditDialog(
                 if (phonemePickerTarget == "fromIpa") fromIpa = spaced else toIpa = spaced
                 phonemePickerTarget = ""
             },
+            onPreview = onPreviewPhoneme,
             onDismiss = { phonemePickerTarget = "" }
         )
     }
@@ -1250,6 +1260,7 @@ private fun ExcludeCategoriesDialog(
 private fun PhonemePickerDialog(
     keys: List<Pair<String, String>>,
     onSelect: (String) -> Unit,
+    onPreview: ((String) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -1263,7 +1274,21 @@ private fun PhonemePickerDialog(
                     items(keys) { (key, cls) ->
                         TextButton(
                             onClick = { onSelect(key) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { onSelect(key) },
+                                    onLongClick = { onPreview?.invoke(key) }
+                                )
+                                .semantics {
+                                    if (onPreview != null) {
+                                        customActions = listOf(
+                                            CustomAccessibilityAction("Preview") {
+                                                onPreview(key); true
+                                            }
+                                        )
+                                    }
+                                }
                         ) {
                             Text(
                                 text = "$key ($cls)",
