@@ -1256,6 +1256,7 @@ private fun ExcludeCategoriesDialog(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PhonemePickerDialog(
     keys: List<Pair<String, String>>,
