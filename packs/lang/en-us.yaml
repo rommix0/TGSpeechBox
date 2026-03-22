@@ -504,11 +504,27 @@ settings:
     # Close the vowel before /ɹ/ to get the FORCE quality right.
       - name: thought_pre_rhotic_close
         phonemes: ["ᴐ", "ᴐː"]
-        beforePhonemes: ["ɹ"]
-        action: set
-        fieldValues:
-          cf1: 500
-          cf2: 920
+        before: ["ɹ"]
+        action: shift
+        fieldShifts:
+          - field: cf1
+            targetHz: 540
+            blend: 1.0
+          - field: pf1
+            targetHz: 540
+            blend: 1.0
+          - field: cf2
+            targetHz: 960
+            blend: 1.0
+          - field: pf2
+            targetHz: 960
+            blend: 1.0
+          - field: cf3
+            targetHz: 1900
+            blend: 1.0
+          - field: pf3
+            targetHz: 1900
+            blend: 1.0
 
       # ── Diphthong offglide sharpening ──────────────────────────────
       # When /ɪ/ is the second element of a tied diphthong (FACE /eɪ/,
