@@ -504,7 +504,7 @@ settings:
     # Close the vowel before /ɹ/ to get the FORCE quality right.
       - name: thought_pre_rhotic_close
         phonemes: ["ᴐ", "ᴐː"]
-        before: ["ɹ"]
+        before: ["ɹ", "ɻ"]
         action: shift
         fieldShifts:
           - field: cf1
