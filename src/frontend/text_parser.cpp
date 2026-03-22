@@ -1038,6 +1038,27 @@ std::string prepareTextForEspeak(
 
   std::string result = text;
 
+  // -1. Normalize bracket punctuation: ensure spaces around ( ) [ ].
+  // Screen readers expand these to spoken words ("left paren", "right bracket")
+  // but may leave the original character glued to adjacent text (e.g. NVDA sends
+  // "left paren(Knievel" for "(Knievel)"), breaking dict lookup and word-IPA
+  // alignment.  Splitting here lets the tokenizer see each word separately.
+  {
+    std::string norm;
+    norm.reserve(result.size() + 16);
+    for (size_t i = 0; i < result.size(); ++i) {
+      char c = result[i];
+      if (c == '(' || c == ')' || c == '[' || c == ']') {
+        if (!norm.empty() && norm.back() != ' ') norm += ' ';
+        norm += c;
+        if (i + 1 < result.size() && result[i + 1] != ' ') norm += ' ';
+      } else {
+        norm += c;
+      }
+    }
+    result = std::move(norm);
+  }
+
   // 0. Pronunciation dictionary replacement (highest priority).
   // Words with toIpa set are left in place; their overrides are collected
   // in ipaOverrides for downstream splicing in runTextParser.
