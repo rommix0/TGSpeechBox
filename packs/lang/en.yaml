@@ -46,10 +46,13 @@ settings:
   singleWordFinalFadeMs: 18
   # Hold for the final voiced sonorant in ALL utterances (multi-word included).
   clauseFinalHoldMs: 30
-  # If the caller uses clauseType ',' for continuation, use a statement contour
-  # for isolated words/letters to avoid the odd "comma rise".
-  singleWordClauseTypeOverride: "."
-  singleWordClauseTypeOverrideCommaOnly: true
+  # Disabled: this override forced comma→period for single-word clauses to
+  # avoid an odd "comma rise" on isolated words, but it also broke the first
+  # clause of comma-separated lists ("Hi, How, Are, You" — "Hi" fell like a
+  # statement).  Re-enable via option A (multiClause handle flag) if isolated
+  # single words sound wrong without it.
+  # singleWordClauseTypeOverride: "."
+  # singleWordClauseTypeOverrideCommaOnly: true
 
 
   # Keep length scaling close to the global default.
