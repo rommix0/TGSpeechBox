@@ -79,7 +79,7 @@ private:
     bool espeak_initialized_ = false;
 
     // --- configuration/state ---
-    int sample_rate_ = 16000;
+    int sample_rate_ = 22050;
     std::wstring module_dir_;
     std::wstring base_dir_;
     std::wstring espeak_data_dir_;

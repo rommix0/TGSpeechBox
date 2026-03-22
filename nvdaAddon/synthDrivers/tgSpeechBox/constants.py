@@ -65,8 +65,8 @@ pauseModes = OrderedDict(
 sampleRates = OrderedDict(
     (
         ("11025", VoiceInfo("11025", _("11025 Hz"))),
-        ("16000", VoiceInfo("16000", _("16000 Hz (default)"))),
-        ("22050", VoiceInfo("22050", _("22050 Hz"))),
+        ("16000", VoiceInfo("16000", _("16000 Hz"))),
+        ("22050", VoiceInfo("22050", _("22050 Hz (default)"))),
         ("44100", VoiceInfo("44100", _("44100 Hz"))),
     )
 )

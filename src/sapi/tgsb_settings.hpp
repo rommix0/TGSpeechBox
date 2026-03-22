@@ -22,7 +22,7 @@ struct wrapper_settings {
     // Normalized (lowercase, '-' separator) language tags that should be hidden.
     std::unordered_set<std::wstring> excluded_lang_tags;
 
-    // Sample rate (Hz). 0 = use default (16000).
+    // Sample rate (Hz). 0 = use default (22050).
     int sample_rate = 0;
 
     // Pause mode: 0 = off, 1 = short, 2 = long.

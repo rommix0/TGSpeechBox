@@ -24,7 +24,7 @@ namespace sapi {
 namespace {
 
 constexpr WORD k_audio_channels = 1;
-constexpr DWORD k_default_audio_sample_rate = 16000;
+constexpr DWORD k_default_audio_sample_rate = 22050;
 constexpr WORD k_audio_bits_per_sample = 16;
 
 constexpr double k_default_inflection = 0.55;

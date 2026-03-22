@@ -147,7 +147,7 @@ class SynthDriver(
         self._language = "auto"
         self._resolvedLang = "en-us"
         self._langPackSettingsCache: dict[str, object] = {}
-        self._sampleRate = 16000
+        self._sampleRate = 22050
 
         # Initialize containers immediately to avoid NoneType errors
         self._voiceProfiles = []
@@ -357,7 +357,7 @@ class SynthDriver(
     _get_availableSamplerates = _get_availableSampleRates
 
     def _get_sampleRate(self):
-        return str(getattr(self, "_sampleRate", 16000))
+        return str(getattr(self, "_sampleRate", 22050))
 
     def _set_sampleRate(self, rate):
         try:
