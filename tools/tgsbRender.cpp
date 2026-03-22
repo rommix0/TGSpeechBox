@@ -636,7 +636,7 @@ int main(int argc, char** argv) {
       return 1;
     }
     if (!opt.language.empty()) {
-      nvspFrontend_setLanguage(fe, opt.language.c_str(), opt.language.c_str());
+      nvspFrontend_setLanguage(fe, opt.language.c_str());
     }
 
     char* prepared = nvspFrontend_prepareText(fe, text.c_str());
