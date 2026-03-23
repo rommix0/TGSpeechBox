@@ -256,6 +256,12 @@ def _getPanelClass():
             )
             self.exportPhonemeFileButton.Bind(wx.EVT_BUTTON, self._onExportPhonemeFileClick)
 
+            # --- Import Voice Profile Sliders button ---
+            self.importPhonemeFileButton = sHelper.addItem(
+                wx.Button(self, label=_("Import Voice Profile Sliders..."))
+            )
+            self.importPhonemeFileButton.Bind(wx.EVT_BUTTON, self._onImportPhonemeFileClick)
+
             # --- Setting key/value editor ---
             sHelper.addItem(wx.StaticText(self, label=_("Edit setting:")))
 
@@ -1447,6 +1453,83 @@ def _getPanelClass():
                         wx.OK | wx.ICON_ERROR,
                         self,
                     )
+            dlg.Destroy()
+            evt.Skip()
+
+        def _onImportPhonemeFileClick(self, evt):
+            """Import a phonemes.yaml from a user-chosen location, replacing the current one."""
+            import os
+            import shutil
+            import wx
+
+            # Find the destination phonemes.yaml inside the pack directory
+            try:
+                import synthDriverHandler
+                synth = synthDriverHandler.getSynth()
+                frontend = getattr(synth, "_frontend", None) if synth else None
+                packDir = getattr(frontend, "_packDir", None) if frontend else None
+            except Exception:
+                packDir = None
+
+            if not packDir:
+                wx.MessageBox(
+                    _("Cannot determine pack directory."),
+                    _("Import Error"),
+                    wx.OK | wx.ICON_ERROR,
+                    self,
+                )
+                evt.Skip()
+                return
+
+            destPath = os.path.join(packDir, "packs", "phonemes.yaml")
+            if not os.path.isdir(os.path.dirname(destPath)):
+                destPath = os.path.join(packDir, "phonemes.yaml")
+
+            dlg = wx.FileDialog(
+                self,
+                _("Import Voice Profile Sliders"),
+                defaultDir=os.path.expanduser("~"),
+                defaultFile="phonemes.yaml",
+                wildcard="YAML files (*.yaml)|*.yaml|All files (*.*)|*.*",
+                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+            )
+            if dlg.ShowModal() == wx.ID_OK:
+                srcPath = dlg.GetPath()
+                result = wx.MessageBox(
+                    _("Replace the current phonemes.yaml with:\n{}\n\n"
+                      "Your current voice profile settings will be overwritten.\n"
+                      "The voice will reload automatically.").format(srcPath),
+                    _("Confirm Import"),
+                    wx.YES_NO | wx.ICON_QUESTION,
+                    self,
+                )
+                if result == wx.YES:
+                    try:
+                        shutil.copy2(srcPath, destPath)
+                        wx.MessageBox(
+                            _("Imported successfully. Reloading voice..."),
+                            _("Import Complete"),
+                            wx.OK | wx.ICON_INFORMATION,
+                            self,
+                        )
+                        # Reload the pack so the imported settings take effect
+                        try:
+                            langTag = getattr(synth, "_language", "en-us")
+                            frontend.setLanguage(langTag)
+                            curVoice = getattr(synth, "_curVoice", "")
+                            if curVoice.startswith("profile:"):
+                                profileName = curVoice[len("profile:"):]
+                                frontend.setVoiceProfile(profileName)
+                                synth._applyVoicingTone(profileName)
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        wx.MessageBox(
+                            _("Failed to import: {}").format(str(e)),
+                            _("Import Error"),
+                            wx.OK | wx.ICON_ERROR,
+                            self,
+                        )
             dlg.Destroy()
             evt.Skip()
 
