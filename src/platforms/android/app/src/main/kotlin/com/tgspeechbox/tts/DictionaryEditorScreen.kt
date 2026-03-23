@@ -233,13 +233,13 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                         contentDescription = buildString {
                             append("Type: ")
                             append(if (selectedType.isEmpty()) "Select type" else dictTypeLabel(selectedType))
-                            if (selectedType.isNotEmpty()) append(", $totalCount entries")
+                            if (selectedType.isNotEmpty()) append(", ${entries.size} entries")
                             append(", dropdown button")
                         }
                     }
                 ) {
                     val label = if (selectedType.isEmpty()) "Select type"
-                    else "${dictTypeLabel(selectedType)} ($totalCount)"
+                    else "${dictTypeLabel(selectedType)} (${entries.size})"
                     Text(label)
                 }
                 DropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
@@ -300,8 +300,9 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             val showingCount = entries.size
+            val displayTotal = if (isUserType) showingCount else totalCount
             Text(
-                "Showing $showingCount of $totalCount entries",
+                "Showing $showingCount of $displayTotal entries",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

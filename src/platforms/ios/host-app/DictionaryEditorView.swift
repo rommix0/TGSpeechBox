@@ -56,7 +56,7 @@ struct DictionaryEditorView: View {
     private var displayTypes: [TgsbEngine.DictType] {
         var result = engine.dictTypes
         if let idx = result.firstIndex(where: { $0.type == "pronounce" }) {
-            result.insert(TgsbEngine.DictType(type: "user", count: 0), at: result.index(after: idx))
+            result.insert(TgsbEngine.DictType(id: "user", type: "user", count: 0), at: result.index(after: idx))
         }
         return result
     }
@@ -71,8 +71,7 @@ struct DictionaryEditorView: View {
 
     private var typePickerLabel: String {
         if selectedType.isEmpty { return "Select type" }
-        let count = selectedType == "user" ? filteredEntries.count : engine.dictionaryTotalCount
-        return "\(dictTypeLabel(selectedType)) (\(count))"
+        return "\(dictTypeLabel(selectedType)) (\(filteredEntries.count))"
     }
 
     private var previewClosure: ((String, String, String) -> Void)? {
@@ -238,7 +237,7 @@ struct DictionaryEditorView: View {
                         desc += "Select type"
                     } else {
                         desc += dictTypeLabel(selectedType)
-                        desc += ", \(engine.dictionaryTotalCount) entries"
+                        desc += ", \(filteredEntries.count) entries"
                     }
                     return desc
                 }())
@@ -274,7 +273,7 @@ struct DictionaryEditorView: View {
 
             // Entry count + Add button + More options row
             HStack {
-                Text("Showing \(engine.dictionaryEntries.count) of \(engine.dictionaryTotalCount) entries")
+                Text("Showing \(filteredEntries.count) of \(selectedType == "user" ? filteredEntries.count : engine.dictionaryTotalCount) entries")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
