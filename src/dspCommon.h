@@ -98,22 +98,21 @@ const double kVoicedFricDuckPower = 1.0;
 
 // Sample-rate-aware cutoff frequencies for frication
 // At 11025 Hz, Nyquist is ~5512 Hz so we need lower cutoffs
-const double kFricBurstFc_11k   = 3800.0;   // 11025 Hz (Nyquist ~5512) - more aggressive
-const double kFricSustainFc_11k = 3000.0;
-const double kFricBurstFc_16k   = 5200.0;   // 16000 Hz (Nyquist 8000)
-const double kFricSustainFc_16k = 7200.0;
-const double kFricBurstFc_22k   = 3600.0;   // 22050 Hz (Nyquist ~11025)
-const double kFricSustainFc_22k = 9500.0;
-const double kFricBurstFc_44k   = 4200.0;   // 44100 Hz (Nyquist ~22050)
-const double kFricSustainFc_44k = 8000.0;
+const double kFricBurstFc_11k   = 3500.0;   // 11025 Hz (Nyquist ~5512)
+const double kFricSustainFc_11k = 3500.0;
+const double kFricBurstFc_16k   = 4500.0;   // 16000 Hz (Nyquist 8000)
+const double kFricSustainFc_16k = 6500.0;
+const double kFricBurstFc_22k   = 5000.0;   // 22050 Hz (Nyquist ~11025)
+const double kFricSustainFc_22k = 8500.0;
+const double kFricBurstFc_44k   = 5000.0;   // 44100 Hz (Nyquist ~22050) — plateau
+const double kFricSustainFc_44k = 8500.0;   // plateau — speech fricatives peak ~8-9 kHz
 
-// Sample-rate-aware cutoff frequencies for aspiration burst LP
-// More aggressive than frication since aspiration through cascade is often
-// the real culprit for "sharp" stop releases
-const double kAspBurstFc_11k = 2400.0;   // 11025 Hz - more aggressive
+// Sample-rate-aware cutoff frequencies for aspiration burst LP.
+// Monotonic ladder: higher sample rate = more bandwidth = higher cutoff.
+const double kAspBurstFc_11k = 2400.0;   // 11025 Hz
 const double kAspBurstFc_16k = 3200.0;   // 16000 Hz
-const double kAspBurstFc_22k = 2200.0;   // 22050 Hz
-const double kAspBurstFc_44k = 2500.0;   // 44100 Hz
+const double kAspBurstFc_22k = 3800.0;   // 22050 Hz
+const double kAspBurstFc_44k = 4000.0;   // 44100 Hz — plateau
 
 // Burstiness detection sensitivity (higher = more sensitive to fast rises)
 const double kBurstinessScale = 25.0;

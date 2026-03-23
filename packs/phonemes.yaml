@@ -2083,11 +2083,11 @@ phonemes:
     _isStop: true
     _isVoiced: false
     _isVowel: false
-    burstDurationMs: 5
-    burstDecayRate: 0.6
+    burstDurationMs: 7
+    burstDecayRate: 0.5
     burstSpectralTilt: 0.0
     durationScale: 1.1
-    aspirationAmplitude: 0.40
+    aspirationAmplitude: 0.32
     caNP: 0
     cb1: 300
     cb2: 150
@@ -2107,11 +2107,11 @@ phonemes:
     cfNP: 200
     fricationAmplitude: 0.50
     pa1: 0.30
-    pa2: 0.35
-    pa3: 0.20
-    pa4: 0.08
-    pa5: 0.04
-    pa6: 0.02
+    pa2: 0.40
+    pa3: 0.30
+    pa4: 0.18
+    pa5: 0.10
+    pa6: 0.05
     parallelBypass: 0.08
     pb1: 280
     pb2: 140
