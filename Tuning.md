@@ -2,6 +2,8 @@
 
 This document covers language pack configuration, phoneme tuning, voice profiles, normalization rules, and frontend processing passes.
 
+> **Note on dictionaries:** Pronunciation dictionaries, user dictionaries, stress dictionaries, and compound splitting are covered in **[Dictionary-editing.md](Dictionary-editing.md)**. Dictionaries operate above the phoneme/pack level — they intercept text before it reaches eSpeak and redirect pronunciation at the word level. This guide focuses on the lower-level tuning: phoneme formant values, language pack settings, allophone rules, and DSP parameters.
+
 ## phonemes.yaml
 `packs/phonemes.yaml` defines how each phoneme maps to Klatt-style frame parameters. Keys are IPA symbols or internal symbols (we use some private keys like `ᴇ`, `ᴒ`, etc. for language-specific tuning).
 
