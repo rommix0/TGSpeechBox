@@ -1,25 +1,48 @@
 # TGSpeechBox en-us pronunciation dictionary
 # Format: from_text	to_text	from_ipa	to_ipa	category
+Adalbert	adlebert			fictional
+Agrippa	agrippuh			fictional
+Amos	Aimus			proper
 Chantal	shontall			proper
+Delacour	de laCour			fictional
+Dumbledore	Dumbble door			fictional
+Gryffindor	griffinndor			fictional
+Guzman	goozMon			proper
+Knabl	knahbl		k ᵊ n ˈɑː b l̩	proper
+Peasegood	peezgood			fictional
+Peverell	Peverelle			fictional
+Poliever	poliEv			proper
 Proulx	proo			proper
+Taliaferro	Toliver			proper
+Toothill	tuthill			proper
 Tucson	toosahn			place
+Twelvetrees	twelve trees			fictional
+airmini	air mini			technology
 behemoth	behheemuth			noun
 chitin	kaiten			noun
-dectalk	decktawk			proper
+dectalk	decktawk			technology
+deredere	Deray deray			loanword
 fediverse	feddeverse			portmanteau
 headaches	headaiks			noun
 huawei	wahway		h w ˈɑː w eɪ	proper
 immanentize	imminentize			verb
 knievel	kneevel		k ᵊ n ˈiː v ə l	proper
 libra	leebra			astrology
+litrpg	lit RPG			noun
+makeitfable	make it fable			technology
+mayam	Myum			proper
 monster	mahnster			noun
 mueller	muller			proper
+odsp	o d s p			technology
 olivine	oliveen			noun
 pentagon	pentigone			place
 popeyes	poppeyes			proper
 resurrection	rezzereckshun			noun
 schitt's	shitts			proper
 secondary	secondairy			adjective
+tsundere	Sunderay			loanword
 tulip	toolip			noun
 werewolf	weerwolf			fictional
-winget	win get			proper
+winget	win get			technology
+xianxia	shangshia			loanword
+yandere	Yanderay			loanword
