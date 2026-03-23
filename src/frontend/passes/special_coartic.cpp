@@ -77,13 +77,23 @@ static bool matchesVowelFilter(const Token& vowel, double f2, const SpecialCoart
 }
 
 // Find the nearest non-silence token in a direction.
+// Respects word boundaries: coarticulation should not leak across words.
+// Within a word phonemes are adjacent (no silence), so we only need to
+// check the immediate neighbor — silence means a word/clause gap.
 static int findNeighbor(const std::vector<Token>& tokens, int from, int dir) {
-  int idx = from + dir;
-  while (idx >= 0 && idx < static_cast<int>(tokens.size())) {
-    if (!isSilence(tokens[static_cast<size_t>(idx)])) return idx;
-    idx += dir;
-  }
-  return -1;
+  // Scanning left from a word-initial token: no left neighbor in this word.
+  if (dir < 0 && tokens[static_cast<size_t>(from)].wordStart) return -1;
+
+  const int idx = from + dir;
+  if (idx < 0 || idx >= static_cast<int>(tokens.size())) return -1;
+
+  const Token& t = tokens[static_cast<size_t>(idx)];
+  // Scanning right: wordStart means a new word — stop.
+  if (dir > 0 && t.wordStart) return -1;
+  // Silence means a word/clause boundary — stop.
+  if (isSilence(t)) return -1;
+
+  return idx;
 }
 
 }  // namespace
