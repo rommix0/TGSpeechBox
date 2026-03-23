@@ -15,12 +15,19 @@ import UniformTypeIdentifiers
 private func dictTypeLabel(_ type: String) -> String {
     switch type {
     case "pronounce": return "Pronunciation"
+    case "user":      return "Pronunciation (user)"
     case "compound":  return "Compound"
     case "stress":    return "Stress"
     case "character": return "Characters"
     default:          return type.prefix(1).uppercased() + type.dropFirst()
     }
 }
+
+/// The backend dict type. "user" is a client-side filter on "pronounce".
+private func backendDictType(_ type: String) -> String { type == "user" ? "pronounce" : type }
+
+/// True if the type uses the pronounce format (5-column TSV with IPA).
+private func isPronounceType(_ type: String) -> Bool { type == "pronounce" || type == "user" }
 
 // MARK: - Dictionary Editor
 
@@ -45,24 +52,42 @@ struct DictionaryEditorView: View {
     @State private var exportUserOnly = false
     @State private var showImportPicker = false
 
+    /// Dict types with synthetic "user" injected after "pronounce".
+    private var displayTypes: [TgsbEngine.DictType] {
+        var result = engine.dictTypes
+        if let idx = result.firstIndex(where: { $0.type == "pronounce" }) {
+            result.insert(TgsbEngine.DictType(type: "user", count: 0), at: result.index(after: idx))
+        }
+        return result
+    }
+
+    /// When "user" is selected, filter to user-only entries.
+    private var filteredEntries: [TgsbEngine.DictEntry] {
+        if selectedType == "user" {
+            return engine.dictionaryEntries.filter { $0.source == "user" }
+        }
+        return engine.dictionaryEntries
+    }
+
     private var typePickerLabel: String {
         if selectedType.isEmpty { return "Select type" }
-        return "\(dictTypeLabel(selectedType)) (\(engine.dictionaryTotalCount))"
+        let count = selectedType == "user" ? filteredEntries.count : engine.dictionaryTotalCount
+        return "\(dictTypeLabel(selectedType)) (\(count))"
     }
 
     private var previewClosure: ((String, String, String) -> Void)? {
-        (selectedType == "pronounce" || selectedType == "character")
+        (isPronounceType(selectedType) || selectedType == "character")
             ? { from, to, tIpa in engine.previewDictEntry(from: from, to: to, toIpa: tIpa) }
             : nil
     }
     private var textToIpaClosure: ((String) -> String)? {
-        selectedType == "pronounce" ? { text in engine.textToIpa(text) } : nil
+        isPronounceType(selectedType) ? { text in engine.textToIpa(text) } : nil
     }
     private var phonemeKeysClosure: (() -> [(key: String, cls: String)])? {
-        selectedType == "pronounce" ? { engine.getPhonemeKeys() } : nil
+        isPronounceType(selectedType) ? { engine.getPhonemeKeys() } : nil
     }
     private var previewPhonemeClosure: ((String) -> Void)? {
-        selectedType == "pronounce" ? { key in engine.previewPhoneme(key) } : nil
+        isPronounceType(selectedType) ? { key in engine.previewPhoneme(key) } : nil
     }
 
     @ViewBuilder
@@ -73,7 +98,7 @@ struct DictionaryEditorView: View {
                 .foregroundColor(.secondary)
                 .padding()
             Spacer()
-        } else if engine.dictionaryEntries.isEmpty {
+        } else if filteredEntries.isEmpty {
             Spacer()
             VStack(spacing: 8) {
                 if !activeSearch.isEmpty {
@@ -93,7 +118,7 @@ struct DictionaryEditorView: View {
             Spacer()
         } else {
             List {
-                ForEach(engine.dictionaryEntries) { entry in
+                ForEach(filteredEntries) { entry in
                     DictEntryRow(
                         entry: entry,
                         onEdit: { editingEntry = entry },
@@ -104,7 +129,7 @@ struct DictionaryEditorView: View {
                         onDelete: {
                             engine.deleteDictEntry(fromText: entry.fromText)
                         },
-                        onPreview: (selectedType == "pronounce" || selectedType == "character") ? {
+                        onPreview: (isPronounceType(selectedType) || selectedType == "character") ? {
                             engine.previewDictEntry(from: entry.fromText, to: entry.toText, toIpa: entry.toIpa)
                         } : nil
                     )
@@ -114,7 +139,7 @@ struct DictionaryEditorView: View {
                     Button(action: {
                         engine.loadDictionary(
                             langTag: langFilter,
-                            subType: selectedType,
+                            subType: backendDictType(selectedType),
                             offset: loadedCount,
                             limit: 100,
                             append: true
@@ -136,7 +161,7 @@ struct DictionaryEditorView: View {
 
     @ViewBuilder
     private var moreOptionsMenu: some View {
-        if selectedType == "pronounce" || selectedType == "character" {
+        if isPronounceType(selectedType) || selectedType == "character" {
             Button(action: {
                 exportUserOnly = false
                 showExportPicker = true
@@ -150,7 +175,7 @@ struct DictionaryEditorView: View {
         }) {
             Label("Export changed", systemImage: "square.and.arrow.up")
         }
-        if selectedType == "pronounce" || selectedType == "character" {
+        if isPronounceType(selectedType) || selectedType == "character" {
             if let url = exportDictToTempFile(userOnly: false) {
                 ShareLink("Share all", item: url)
             }
@@ -180,7 +205,7 @@ struct DictionaryEditorView: View {
         Button(action: { showExcludeSheet = true }) {
             Label("Exclude dictionaries", systemImage: "eye.slash")
         }
-        if selectedType == "pronounce" {
+        if isPronounceType(selectedType) {
             Button(action: { showExcludeCategoriesSheet = true }) {
                 Label("Exclude categories", systemImage: "tag.slash")
             }
@@ -196,7 +221,7 @@ struct DictionaryEditorView: View {
             HStack(spacing: 8) {
                 // Type picker
                 Menu {
-                    ForEach(engine.dictTypes) { dt in
+                    ForEach(displayTypes) { dt in
                         let label = dictTypeLabel(dt.type) + " (\(dt.count))"
                         Button(label) { selectedType = dt.type }
                     }
@@ -291,9 +316,9 @@ struct DictionaryEditorView: View {
                 engine.loadDictTypes()
             }
             // Default type if not yet set (handles tab switching recreation).
-            if selectedType.isEmpty && !engine.dictTypes.isEmpty {
-                let pronounce = engine.dictTypes.first(where: { $0.type == "pronounce" })
-                selectedType = pronounce?.type ?? (engine.dictTypes.first?.type ?? "")
+            if selectedType.isEmpty && !displayTypes.isEmpty {
+                let pronounce = displayTypes.first(where: { $0.type == "pronounce" })
+                selectedType = pronounce?.type ?? (displayTypes.first?.type ?? "")
             }
             // Default language from system locale if not yet set.
             if langFilter.isEmpty && !engine.editorLanguages.isEmpty {
@@ -434,7 +459,7 @@ struct DictionaryEditorView: View {
         engine.loadDictTypes(langTag: langFilter)
         engine.loadDictionary(
             langTag: langFilter,
-            subType: selectedType,
+            subType: backendDictType(selectedType),
             offset: 0,
             limit: 100,
             search: activeSearch

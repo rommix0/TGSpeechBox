@@ -50,22 +50,45 @@ import java.util.Locale
 private fun dictTypeLabel(type: String): String = when (type) {
     "compound" -> "Compound"
     "pronounce" -> "Pronunciation"
+    "user" -> "Pronunciation (user)"
     "stress" -> "Stress"
     "character" -> "Characters"
     else -> type.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
 }
+
+/** The backend type to query for a given UI type. "user" is a client-side filter on "pronounce". */
+private fun backendDictType(type: String): String = if (type == "user") "pronounce" else type
+
+/** True if the type uses the pronounce dict format (5-column TSV with IPA). */
+private fun isPronounceType(type: String): Boolean = type == "pronounce" || type == "user"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DictionaryListScreen(viewModel: TgsbViewModel) {
     val context = LocalContext.current
 
-    val types by viewModel.dictTypes.collectAsState()
-    val entries by viewModel.dictionaryEntries.collectAsState()
+    val rawTypes by viewModel.dictTypes.collectAsState()
+    val rawEntries by viewModel.dictionaryEntries.collectAsState()
     val totalCount by viewModel.dictionaryTotalCount.collectAsState()
     val langs by viewModel.editorLanguages.collectAsState()
 
+    // Inject synthetic "user" type after "pronounce" if pronounce exists.
+    val types = remember(rawTypes) {
+        val result = rawTypes.toMutableList()
+        val pronounceIdx = result.indexOfFirst { it.type == "pronounce" }
+        if (pronounceIdx >= 0) {
+            val userCount = 0  // count updates when entries load
+            result.add(pronounceIdx + 1, TgsbViewModel.DictType("user", userCount))
+        }
+        result
+    }
+
     var selectedType by rememberSaveable { mutableStateOf("") }
+    val isUserType = selectedType == "user"
+    // When "user" is selected, filter pronounce entries to user-only.
+    val entries = remember(rawEntries, isUserType) {
+        if (isUserType) rawEntries.filter { it.source == "user" } else rawEntries
+    }
     var langFilter by rememberSaveable { mutableStateOf("") }
     var loadedCount by remember { mutableIntStateOf(0) }
     var showAddDialog by remember { mutableStateOf(false) }
@@ -175,7 +198,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
     LaunchedEffect(selectedType, langFilter, activeSearch) {
         if (selectedType.isNotEmpty() && langFilter.isNotEmpty()) {
             viewModel.reapplyDictOverrides(langFilter)
-            viewModel.loadDictionary(langFilter, selectedType, offset = 0, limit = 100, search = activeSearch)
+            viewModel.loadDictionary(langFilter, backendDictType(selectedType), offset = 0, limit = 100, search = activeSearch)
             loadedCount = 100
         }
     }
@@ -309,7 +332,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                     onDismissRequest = { showMoreMenu = false }
                 ) {
                     // Export all (file picker — pronunciation + character)
-                    if (selectedType == "pronounce" || selectedType == "character") {
+                    if (isPronounceType(selectedType) || selectedType == "character") {
                         DropdownMenuItem(
                             text = { Text("Export all") },
                             onClick = {
@@ -329,7 +352,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                         }
                     )
                     // Share all (share sheet — pronunciation + character)
-                    if (selectedType == "pronounce" || selectedType == "character") {
+                    if (isPronounceType(selectedType) || selectedType == "character") {
                         DropdownMenuItem(
                             text = { Text("Share all") },
                             onClick = {
@@ -349,7 +372,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                     // Import (pronunciation + character only)
                     DropdownMenuItem(
                         text = { Text("Import") },
-                        enabled = selectedType == "pronounce" || selectedType == "character",
+                        enabled = isPronounceType(selectedType) || selectedType == "character",
                         onClick = {
                             showMoreMenu = false
                             importLauncher.launch(arrayOf("*/*"))
@@ -389,7 +412,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                         }
                     )
                     // Exclude categories (pronunciation only)
-                    if (selectedType == "pronounce") {
+                    if (isPronounceType(selectedType)) {
                         DropdownMenuItem(
                             text = { Text("Exclude categories") },
                             onClick = {
@@ -447,7 +470,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                                         if (entry.category.isNotEmpty()) append(", ${entry.category}")
                                     }
                                     customActions = buildList {
-                                        if (selectedType == "pronounce" || selectedType == "character") {
+                                        if (isPronounceType(selectedType) || selectedType == "character") {
                                             add(CustomAccessibilityAction("Preview") {
                                                 viewModel.previewDictEntry(entry.fromText, entry.toText, entry.toIpa); true
                                             })
@@ -516,7 +539,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                             expanded = contextMenuEntry == entry.fromText,
                             onDismissRequest = { contextMenuEntry = null }
                         ) {
-                            if (selectedType == "pronounce" || selectedType == "character") {
+                            if (isPronounceType(selectedType) || selectedType == "character") {
                                 DropdownMenuItem(
                                     text = { Text("Preview") },
                                     onClick = {
@@ -567,7 +590,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                             OutlinedButton(
                                 onClick = {
                                     viewModel.loadDictionary(
-                                        langFilter, selectedType,
+                                        langFilter, backendDictType(selectedType),
                                         offset = loadedCount, limit = 100,
                                         append = true
                                     )
@@ -595,16 +618,16 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                 viewModel.addDictEntry(from, to, cat, fIpa, tIpa)
                 showAddDialog = false
             },
-            onPreview = if (selectedType == "pronounce" || selectedType == "character") {
+            onPreview = if (isPronounceType(selectedType) || selectedType == "character") {
                 { from, to, tIpa -> viewModel.previewDictEntry(from, to, tIpa) }
             } else null,
-            onTextToIpa = if (selectedType == "pronounce") {
+            onTextToIpa = if (isPronounceType(selectedType)) {
                 { text -> viewModel.textToIpa(text) }
             } else null,
-            onGetPhonemeKeys = if (selectedType == "pronounce") {
+            onGetPhonemeKeys = if (isPronounceType(selectedType)) {
                 { viewModel.getPhonemeKeys() }
             } else null,
-            onPreviewPhoneme = if (selectedType == "pronounce") {
+            onPreviewPhoneme = if (isPronounceType(selectedType)) {
                 { key -> viewModel.previewPhoneme(key) }
             } else null
         )
@@ -622,16 +645,16 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                 viewModel.addDictEntry(from, to, cat, fIpa, tIpa)
                 editingEntry = null
             },
-            onPreview = if (selectedType == "pronounce" || selectedType == "character") {
+            onPreview = if (isPronounceType(selectedType) || selectedType == "character") {
                 { from, to, tIpa -> viewModel.previewDictEntry(from, to, tIpa) }
             } else null,
-            onTextToIpa = if (selectedType == "pronounce") {
+            onTextToIpa = if (isPronounceType(selectedType)) {
                 { text -> viewModel.textToIpa(text) }
             } else null,
-            onGetPhonemeKeys = if (selectedType == "pronounce") {
+            onGetPhonemeKeys = if (isPronounceType(selectedType)) {
                 { viewModel.getPhonemeKeys() }
             } else null,
-            onPreviewPhoneme = if (selectedType == "pronounce") {
+            onPreviewPhoneme = if (isPronounceType(selectedType)) {
                 { key -> viewModel.previewPhoneme(key) }
             } else null
         )
