@@ -95,7 +95,8 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                     entries.filter { !it.masked }
                 }
                 val tsv = buildString {
-                    for (e in exportEntries) append("${e.fromText}\t${e.toText}\n")
+                    append("# from_text\tto_text\tfrom_ipa\tto_ipa\tcategory\n")
+                    for (e in exportEntries) append("${e.fromText}\t${e.toText}\t${e.fromIpa}\t${e.toIpa}\t${e.category}\n")
                 }
                 context.contentResolver.openOutputStream(uri)?.use {
                     it.write(tsv.toByteArray())
@@ -324,7 +325,7 @@ fun DictionaryListScreen(viewModel: TgsbViewModel) {
                         onClick = {
                             showMoreMenu = false
                             pendingExportUserOnly = true
-                            exportLauncher.launch("${selectedType}_${langFilter}_changed.tsv")
+                            exportLauncher.launch("${langFilter}-user.tsv")
                         }
                     )
                     // Share all (share sheet — pronunciation + character)

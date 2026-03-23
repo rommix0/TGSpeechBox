@@ -59,12 +59,12 @@ static bool prefixMatchCI(const std::string& text, const std::string& prefix) {
 
 // Display name for dict type combo.
 static const char* typeDisplayNames[] = {
-  "Pronunciation", "Stress", "Compound", "Character"
+  "Pronunciation", "Stress", "Compound", "Character", "User"
 };
 static const char* typeInternalNames[] = {
-  "pronounce", "stress", "compound", "character"
+  "pronounce", "stress", "compound", "character", "user"
 };
-static constexpr int kNumTypes = 4;
+static constexpr int kNumTypes = 5;
 
 // Get wstring from edit control.
 static std::wstring getDlgItemText(HWND hDlg, int id) {
@@ -100,7 +100,7 @@ std::wstring dictTsvPath(const std::wstring& packDir, const std::string& langTag
   fs::path base = fs::path(packDir) / "dict";
   std::string tag = langTag;
   // Normalize tag: en-us → en-us (keep hyphens).
-  if (dictType == "pronounce") {
+  if (dictType == "pronounce" || dictType == "user") {
     return (base / (tag + "-dict.tsv")).wstring();
   } else if (dictType == "stress") {
     return (base / (tag + "-stress.tsv")).wstring();
@@ -108,6 +108,8 @@ std::wstring dictTsvPath(const std::wstring& packDir, const std::string& langTag
     return (base / (tag + "-compounds.tsv")).wstring();
   } else if (dictType == "character") {
     return (base / (tag + "-letters.tsv")).wstring();
+  } else if (dictType == "user") {
+    return (base / (tag + "-user.tsv")).wstring();
   }
   return (base / (tag + "-dict.tsv")).wstring();
 }
@@ -170,7 +172,7 @@ bool loadDictTsv(const std::wstring& path, const std::string& dictType,
     if (cols.empty()) continue;
 
     DictEntryData e;
-    if (dictType == "pronounce") {
+    if (dictType == "pronounce" || dictType == "user") {
       e.fromText = cols.size() > 0 ? cols[0] : "";
       e.toText   = cols.size() > 1 ? cols[1] : "";
       e.fromIpa  = cols.size() > 2 ? cols[2] : "";
@@ -224,7 +226,7 @@ bool saveDictTsv(const std::wstring& path, const std::string& dictType,
   fprintf(f, "# TGSpeechBox dictionary\n");
 
   for (const auto& e : entries) {
-    if (dictType == "pronounce") {
+    if (dictType == "pronounce" || dictType == "user") {
       // Write all columns, trim trailing empty ones.
       if (!e.category.empty()) {
         fprintf(f, "%s\t%s\t%s\t%s\t%s\n",
@@ -273,7 +275,7 @@ static void setupListColumns(HWND hList, const std::string& dictType) {
     ListView_InsertColumn(hList, idx, &col);
   };
 
-  if (dictType == "pronounce") {
+  if (dictType == "pronounce" || dictType == "user") {
     addCol(L"From",     120, 0);
     addCol(L"To",       120, 1);
     addCol(L"From IPA", 100, 2);
@@ -487,7 +489,7 @@ static INT_PTR CALLBACK DictEntryDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
       SetWindowTextW(hDlg, st->isEdit ? L"Edit Dictionary Entry" : L"Add Dictionary Entry");
 
       // Adjust visibility and labels based on dict type.
-      bool isPronounce = (st->dictType == "pronounce");
+      bool isPronounce = (st->dictType == "pronounce" || st->dictType == "user");
 
       // Hide IPA buttons and fields for non-pronounce types.
       auto showCtrl = [&](int id, bool show) {
@@ -682,7 +684,7 @@ static INT_PTR CALLBACK DictEntryDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
         st->entry.fromText = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_FROM));
         st->entry.toText = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_TO));
 
-        if (st->dictType == "pronounce") {
+        if (st->dictType == "pronounce" || dictType == "user") {
           st->entry.fromIpa = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_FROM_IPA));
           st->entry.toIpa = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_TO_IPA));
           st->entry.category = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_CATEGORY));

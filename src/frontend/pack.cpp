@@ -2175,6 +2175,36 @@ bool loadPackSet(
     }
   }
 
+  // Load user pronunciation dictionary (entries created by the user).
+  // These overlay the main dict — user entries win on conflict.
+  // Check override dir first, then fall back to bundle.
+  {
+    const auto& tag = out.lang.langTag;
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path ovUser = fs::path(overrideDir) / "packs" / "dict" / (tag + "-user.tsv");
+      if (fs::exists(ovUser)) {
+        loadPronDict(ovUser.string(), out.pronDict, "user");
+        loaded = true;
+      }
+    }
+    if (!loaded) {
+      const fs::path userPath = packsRoot / "dict" / (tag + "-user.tsv");
+      if (fs::exists(userPath)) {
+        loadPronDict(userPath.string(), out.pronDict, "user");
+      }
+      // Fallback to base language (e.g., "en" for "en-us").
+      if (!loaded) {
+        const auto dash = tag.find('-');
+        if (dash != std::string::npos) {
+          const fs::path basePath = packsRoot / "dict" / (tag.substr(0, dash) + "-user.tsv");
+          if (fs::exists(basePath))
+            loadPronDict(basePath.string(), out.pronDict, "user");
+        }
+      }
+    }
+  }
+
   // Load character/letter dictionary (if one exists for this language).
   // Check override dir first, then fall back to bundle.
   {
@@ -2276,6 +2306,24 @@ void loadDictFiles(
       loadPronDict((packsRoot / "dict" / (tag + "-dict.tsv")).string(), pronDict, "main");
       if (pronDict.entries.empty() && !baseTag.empty())
         loadPronDict((packsRoot / "dict" / (baseTag + "-dict.tsv")).string(), pronDict, "main");
+    }
+  }
+  // User pronunciation dict (overlays main).
+  {
+    bool loaded = false;
+    if (!overrideDir.empty()) {
+      const fs::path p = fs::path(overrideDir) / "packs" / "dict" / (tag + "-user.tsv");
+      if (fs::exists(p)) { loadPronDict(p.string(), pronDict, "user"); loaded = true; }
+    }
+    if (!loaded) {
+      const fs::path userPath = packsRoot / "dict" / (tag + "-user.tsv");
+      if (fs::exists(userPath))
+        loadPronDict(userPath.string(), pronDict, "user");
+      if (!baseTag.empty()) {
+        const fs::path basePath = packsRoot / "dict" / (baseTag + "-user.tsv");
+        if (fs::exists(basePath))
+          loadPronDict(basePath.string(), pronDict, "user");
+      }
     }
   }
   // Letter/character dict.

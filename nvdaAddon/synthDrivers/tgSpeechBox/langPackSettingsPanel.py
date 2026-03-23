@@ -262,6 +262,17 @@ def _getPanelClass():
             )
             self.importPhonemeFileButton.Bind(wx.EVT_BUTTON, self._onImportPhonemeFileClick)
 
+            # --- User Dictionary Export/Import ---
+            self.exportUserDictButton = sHelper.addItem(
+                wx.Button(self, label=_("Export User Dictionary..."))
+            )
+            self.exportUserDictButton.Bind(wx.EVT_BUTTON, self._onExportUserDictClick)
+
+            self.importUserDictButton = sHelper.addItem(
+                wx.Button(self, label=_("Import User Dictionary..."))
+            )
+            self.importUserDictButton.Bind(wx.EVT_BUTTON, self._onImportUserDictClick)
+
             # --- Setting key/value editor ---
             sHelper.addItem(wx.StaticText(self, label=_("Edit setting:")))
 
@@ -1521,6 +1532,117 @@ def _getPanelClass():
                                 profileName = curVoice[len("profile:"):]
                                 frontend.setVoiceProfile(profileName)
                                 synth._applyVoicingTone(profileName)
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        wx.MessageBox(
+                            _("Failed to import: {}").format(str(e)),
+                            _("Import Error"),
+                            wx.OK | wx.ICON_ERROR,
+                            self,
+                        )
+            dlg.Destroy()
+            evt.Skip()
+
+        def _getUserDictPath(self):
+            """Return the path to the user dictionary TSV for the current language."""
+            import os
+            try:
+                import synthDriverHandler
+                synth = synthDriverHandler.getSynth()
+                langTag = getattr(synth, "_language", "en-us") or "en-us"
+            except Exception:
+                langTag = "en-us"
+            return os.path.join(self._packsDir, "dict", langTag + "-user.tsv")
+
+        def _onExportUserDictClick(self, evt):
+            """Export the user dictionary TSV to a user-chosen location."""
+            import os
+            import shutil
+            import wx
+
+            srcPath = self._getUserDictPath()
+            if not os.path.isfile(srcPath):
+                wx.MessageBox(
+                    _("No user dictionary found at:\n{}").format(srcPath),
+                    _("Export Error"),
+                    wx.OK | wx.ICON_WARNING,
+                    self,
+                )
+                evt.Skip()
+                return
+
+            dlg = wx.FileDialog(
+                self,
+                _("Export User Dictionary"),
+                defaultDir=os.path.expanduser("~"),
+                defaultFile=os.path.basename(srcPath),
+                wildcard="TSV files (*.tsv)|*.tsv|All files (*.*)|*.*",
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+            )
+            if dlg.ShowModal() == wx.ID_OK:
+                try:
+                    shutil.copy2(srcPath, dlg.GetPath())
+                    wx.MessageBox(
+                        _("User dictionary exported to:\n{}").format(dlg.GetPath()),
+                        _("Export Complete"),
+                        wx.OK | wx.ICON_INFORMATION,
+                        self,
+                    )
+                except Exception as e:
+                    wx.MessageBox(
+                        _("Failed to export: {}").format(str(e)),
+                        _("Export Error"),
+                        wx.OK | wx.ICON_ERROR,
+                        self,
+                    )
+            dlg.Destroy()
+            evt.Skip()
+
+        def _onImportUserDictClick(self, evt):
+            """Import a user dictionary TSV from a user-chosen location."""
+            import os
+            import shutil
+            import wx
+
+            destPath = self._getUserDictPath()
+
+            dlg = wx.FileDialog(
+                self,
+                _("Import User Dictionary"),
+                defaultDir=os.path.expanduser("~"),
+                defaultFile=os.path.basename(destPath),
+                wildcard="TSV files (*.tsv)|*.tsv|All files (*.*)|*.*",
+                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+            )
+            if dlg.ShowModal() == wx.ID_OK:
+                srcPath = dlg.GetPath()
+                result = wx.MessageBox(
+                    _("Replace the current user dictionary with:\n{}\n\n"
+                      "Existing user entries will be overwritten.\n"
+                      "The dictionary will reload automatically.").format(srcPath),
+                    _("Confirm Import"),
+                    wx.YES_NO | wx.ICON_QUESTION,
+                    self,
+                )
+                if result == wx.YES:
+                    try:
+                        os.makedirs(os.path.dirname(destPath), exist_ok=True)
+                        shutil.copy2(srcPath, destPath)
+                        wx.MessageBox(
+                            _("Imported successfully. Reloading..."),
+                            _("Import Complete"),
+                            wx.OK | wx.ICON_INFORMATION,
+                            self,
+                        )
+                        # Reload the language to pick up new dict entries
+                        try:
+                            import synthDriverHandler
+                            synth = synthDriverHandler.getSynth()
+                            frontend = getattr(synth, "_frontend", None)
+                            langTag = getattr(synth, "_language", "en-us")
+                            if frontend:
+                                frontend.setLanguage(langTag)
                         except Exception:
                             pass
                     except Exception as e:

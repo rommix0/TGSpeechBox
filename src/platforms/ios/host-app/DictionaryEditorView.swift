@@ -447,12 +447,12 @@ struct DictionaryEditorView: View {
             ? engine.dictionaryEntries.filter { $0.source == "user" }
             : engine.dictionaryEntries.filter { !$0.masked }
         if entries.isEmpty { return nil }
-        var tsv = ""
+        var tsv = "# from_text\tto_text\tfrom_ipa\tto_ipa\tcategory\n"
         for e in entries {
-            tsv += "\(e.fromText)\t\(e.toText)\n"
+            tsv += "\(e.fromText)\t\(e.toText)\t\(e.fromIpa)\t\(e.toIpa)\t\(e.category)\n"
         }
         let filename = userOnly
-            ? "\(selectedType)_\(langFilter)_changed.tsv"
+            ? "\(langFilter)-user.tsv"
             : "\(selectedType)_\(langFilter).tsv"
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(filename)
