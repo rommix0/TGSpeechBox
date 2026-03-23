@@ -250,6 +250,12 @@ def _getPanelClass():
             )
             self.saveVoiceProfileButton.Bind(wx.EVT_BUTTON, self._onSaveVoiceProfileClick)
 
+            # --- Save As (export copy to user-chosen location) ---
+            self.exportPhonemeFileButton = sHelper.addItem(
+                wx.Button(self, label=_("Save Voice Profile Sliders to YAML As..."))
+            )
+            self.exportPhonemeFileButton.Bind(wx.EVT_BUTTON, self._onExportPhonemeFileClick)
+
             # --- Setting key/value editor ---
             sHelper.addItem(wx.StaticText(self, label=_("Edit setting:")))
 
@@ -1376,6 +1382,72 @@ def _getPanelClass():
                     self,
                 )
 
+            evt.Skip()
+
+        def _onExportPhonemeFileClick(self, evt):
+            """Export phonemes.yaml to a user-chosen location via Save As dialog."""
+            import os
+            import shutil
+            import wx
+
+            # Find the phonemes.yaml inside the pack directory
+            try:
+                import synthDriverHandler
+                synth = synthDriverHandler.getSynth()
+                frontend = getattr(synth, "_frontend", None) if synth else None
+                packDir = getattr(frontend, "_packDir", None) if frontend else None
+            except Exception:
+                packDir = None
+
+            if not packDir:
+                wx.MessageBox(
+                    _("Cannot determine pack directory."),
+                    _("Export Error"),
+                    wx.OK | wx.ICON_ERROR,
+                    self,
+                )
+                evt.Skip()
+                return
+
+            srcPath = os.path.join(packDir, "packs", "phonemes.yaml")
+            if not os.path.isfile(srcPath):
+                srcPath = os.path.join(packDir, "phonemes.yaml")
+            if not os.path.isfile(srcPath):
+                wx.MessageBox(
+                    _("phonemes.yaml not found in pack directory."),
+                    _("Export Error"),
+                    wx.OK | wx.ICON_ERROR,
+                    self,
+                )
+                evt.Skip()
+                return
+
+            dlg = wx.FileDialog(
+                self,
+                _("Save Voice Profile Sliders to YAML As"),
+                defaultDir=os.path.expanduser("~"),
+                defaultFile="phonemes.yaml",
+                wildcard="YAML files (*.yaml)|*.yaml|All files (*.*)|*.*",
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+            )
+            if dlg.ShowModal() == wx.ID_OK:
+                destPath = dlg.GetPath()
+                try:
+                    shutil.copy2(srcPath, destPath)
+                    wx.MessageBox(
+                        _("Saved to:\n{}").format(destPath),
+                        _("Save Complete"),
+                        wx.OK | wx.ICON_INFORMATION,
+                        self,
+                    )
+                except Exception as e:
+                    wx.MessageBox(
+                        _("Failed to export: {}").format(str(e)),
+                        _("Export Error"),
+                        wx.OK | wx.ICON_ERROR,
+                        self,
+                    )
+            dlg.Destroy()
             evt.Skip()
 
         def _getLanguageChoices(self):
