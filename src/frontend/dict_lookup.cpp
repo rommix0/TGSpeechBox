@@ -154,7 +154,58 @@ std::string dictReplaceInText(const std::string& text, const PronDict& dict,
       // Fallback to lowercase.
       it = dict.entries.find(lowerKey);
       if (it == dict.entries.end() || it->second.masked) {
-        result += token;
+        // Token not found as a whole.  If it contains hyphens, split into
+        // hyphen-separated parts and look up each part individually so that
+        // "this-pentagon-official" still matches a dict entry for "pentagon"
+        // even when the full hyphenated string has no entry.
+        std::string core(token, lo, hi - lo);
+        if (core.find('-') != std::string::npos) {
+          DLLOG("  hyphen-split fallback for \"%s\"\n", core.c_str());
+          std::string rebuilt;
+          rebuilt.reserve(core.size() + 16);
+          size_t pos = 0;
+          while (pos < core.size()) {
+            size_t dash = core.find('-', pos);
+            if (dash == std::string::npos) dash = core.size();
+            std::string part = core.substr(pos, dash - pos);
+            if (!part.empty()) {
+              std::string partLower;
+              partLower.reserve(part.size());
+              for (char c : part)
+                partLower.push_back(static_cast<char>(
+                    std::tolower(static_cast<unsigned char>(c))));
+              std::string partExact = stripVariationSelectors(part);
+              auto pit = dict.entries.find(partExact);
+              if (pit == dict.entries.end() || pit->second.masked)
+                pit = dict.entries.find(partLower);
+              if (pit != dict.entries.end() && !pit->second.masked) {
+                if (ipaOverrides && !pit->second.toIpa.empty()) {
+                  (*ipaOverrides)[partLower] = pit->second.toIpa;
+                  rebuilt += part;
+                } else {
+                  std::string rep;
+                  for (char c : pit->second.toText)
+                    rep += (c == '-') ? ' ' : c;
+                  DLLOG("    part \"%s\" -> \"%s\"\n", part.c_str(), rep.c_str());
+                  rebuilt += rep;
+                }
+              } else {
+                rebuilt += part;
+              }
+            }
+            if (dash < core.size()) {
+              rebuilt += '-';
+              pos = dash + 1;
+            } else {
+              pos = dash;
+            }
+          }
+          result += token.substr(0, lo);
+          result += rebuilt;
+          result += token.substr(hi);
+        } else {
+          result += token;
+        }
         continue;
       }
     }
