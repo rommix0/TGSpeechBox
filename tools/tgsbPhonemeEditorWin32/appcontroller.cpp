@@ -2353,6 +2353,16 @@ LRESULT AppController::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
           }
           return result;
         };
+        // Wire up phoneme preview callback.
+        dst.previewPhoneme = [&app](const std::string& phonemeKey) {
+          if (!ensureDllDir(app)) return;
+          tgsb_editor::Node* node = app.phonemes.getPhonemeNode(phonemeKey);
+          if (!node || !node->isMap()) return;
+          std::vector<sample> samples;
+          std::string err;
+          if (app.runtime.synthPreviewPhoneme(*node, kSampleRate, samples, err))
+            playSamplesTemp(app, samples);
+        };
         tgsb_editor::ShowDictionaryEditorDialog(app.hInst, hWnd, dst);
         return 0;
       }

@@ -41,6 +41,10 @@ struct DictionaryEditorState {
   // Phoneme key list callback (for "Insert phoneme..." picker)
   std::function<std::vector<PhonemeKeyInfo>()> getPhonemeKeys;
 
+  // Preview callback: synthesize a single phoneme key and play it.
+  // Matches mobile "preview phoneme" in insert-phoneme picker (Android/iOS).
+  std::function<void(const std::string& phonemeKey)> previewPhoneme;
+
   // Working state (managed by dialog)
   std::string currentLang;
   std::string currentType;  // "pronounce", "stress", "compound", "character"
@@ -56,6 +60,7 @@ struct DictEntryDialogState {
   std::string dictType;  // controls which fields are visible
   std::function<bool(const std::wstring&, std::string&, std::string&)> convertToIpa;
   std::function<std::vector<PhonemeKeyInfo>()> getPhonemeKeys;
+  std::function<void(const std::string& phonemeKey)> previewPhoneme;
   bool isEdit = false;    // true = editing existing, false = adding new
   bool ok = false;
 };

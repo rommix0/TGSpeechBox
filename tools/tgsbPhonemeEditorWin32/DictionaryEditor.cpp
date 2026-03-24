@@ -596,8 +596,13 @@ static INT_PTR CALLBACK DictEntryDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
             // Show a simple list picker using a message-loop-driven dialog.
             // We create it dynamically with a LISTBOX.
             int sel = -1;
-            struct PickCtx { std::vector<std::wstring>* items; int* sel; };
-            PickCtx ctx = { &items, &sel };
+            struct PickCtx {
+              std::vector<std::wstring>* items;
+              int* sel;
+              std::vector<PhonemeKeyInfo>* keys;
+              std::function<void(const std::string&)>* previewPhoneme;
+            };
+            PickCtx ctx = { &items, &sel, &keys, &st->previewPhoneme };
             DialogBoxIndirectParamW(
               st->convertToIpa ? GetModuleHandleW(nullptr) : nullptr,
               // Build dialog template in memory.
@@ -622,20 +627,26 @@ static INT_PTR CALLBACK DictEntryDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
                     SetWindowTextW(hPick, L"Insert Phoneme");
                     // Create listbox.
                     HWND lb = CreateWindowExW(0, L"LISTBOX", nullptr,
-                        WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY,
+                        WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | WS_TABSTOP | LBS_NOTIFY,
                         7, 7, 260, 250, hPick, (HMENU)4000, nullptr, nullptr);
                     SendMessageW(lb, WM_SETFONT,
                         (WPARAM)SendMessageW(hPick, WM_GETFONT, 0, 0), TRUE);
                     for (const auto& s : *pc->items)
                       SendMessageW(lb, LB_ADDSTRING, 0, (LPARAM)s.c_str());
-                    // OK + Cancel buttons.
-                    auto makeBtn = [&](const wchar_t* text, int id, int x) {
+                    // Auto-select first phoneme so Tab→Preview works immediately.
+                    if (!pc->items->empty())
+                      SendMessageW(lb, LB_SETCURSEL, 0, 0);
+                    // Preview + OK + Cancel buttons.
+                    auto makeBtn = [&](const wchar_t* text, int id, int x, int w = 60) {
                       HWND b = CreateWindowExW(0, L"BUTTON", text,
-                          WS_CHILD | WS_VISIBLE | (id == IDOK ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON),
-                          x, 262, 60, 22, hPick, (HMENU)(intptr_t)id, nullptr, nullptr);
+                          WS_CHILD | WS_VISIBLE | WS_TABSTOP | (id == IDOK ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON),
+                          x, 262, w, 22, hPick, (HMENU)(intptr_t)id, nullptr, nullptr);
                       SendMessageW(b, WM_SETFONT,
                           (WPARAM)SendMessageW(hPick, WM_GETFONT, 0, 0), TRUE);
                     };
+                    // 4001 = Preview button (Alt+P)
+                    if (pc->previewPhoneme && *pc->previewPhoneme)
+                      makeBtn(L"&Preview", 4001, 7, 65);
                     makeBtn(L"OK", IDOK, 144);
                     makeBtn(L"Cancel", IDCANCEL, 210);
                     // Resize dialog to fit.
@@ -660,6 +671,16 @@ static INT_PTR CALLBACK DictEntryDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
                       return TRUE;
                     }
                     if (LOWORD(wp) == IDCANCEL) { EndDialog(hPick, IDCANCEL); return TRUE; }
+                    // Preview button (Alt+P).
+                    if (LOWORD(wp) == 4001) {
+                      if (pc->previewPhoneme && *pc->previewPhoneme) {
+                        HWND lb = GetDlgItem(hPick, 4000);
+                        int idx = (int)SendMessageW(lb, LB_GETCURSEL, 0, 0);
+                        if (idx >= 0 && idx < (int)pc->keys->size())
+                          (*pc->previewPhoneme)((*pc->keys)[idx].key);
+                      }
+                      return TRUE;
+                    }
                     break;
                 }
                 return FALSE;
@@ -684,7 +705,7 @@ static INT_PTR CALLBACK DictEntryDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPA
         st->entry.fromText = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_FROM));
         st->entry.toText = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_TO));
 
-        if (st->dictType == "pronounce" || dictType == "user") {
+        if (st->dictType == "pronounce" || st->dictType == "user") {
           st->entry.fromIpa = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_FROM_IPA));
           st->entry.toIpa = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_TO_IPA));
           st->entry.category = wideToUtf8(getDlgItemText(hDlg, IDC_DENTRY_CATEGORY));
@@ -826,6 +847,7 @@ static INT_PTR CALLBACK DictEditorDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         des.dictType = st->currentType;
         des.convertToIpa = st->convertToIpa;
         des.getPhonemeKeys = st->getPhonemeKeys;
+        des.previewPhoneme = st->previewPhoneme;
         des.isEdit = false;
 
         DialogBoxParamW(st->hInst, MAKEINTRESOURCEW(IDD_DICT_ENTRY), hDlg,
@@ -853,6 +875,7 @@ static INT_PTR CALLBACK DictEditorDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LP
         des.dictType = st->currentType;
         des.convertToIpa = st->convertToIpa;
         des.getPhonemeKeys = st->getPhonemeKeys;
+        des.previewPhoneme = st->previewPhoneme;
         des.isEdit = true;
         des.entry = st->entries[realIdx];
 
