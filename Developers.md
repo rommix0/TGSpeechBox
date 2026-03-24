@@ -1,8 +1,107 @@
 # TGSpeechBox – Developer Documentation
 
-This document covers the DSP pipeline internals, VoicingTone API, FrameEx struct, frontend architecture, and other technical implementation details.
+This document covers the full public API surface for TGSpeechBox: the DSP engine (`speechPlayer.dll`), the frontend (`nvspFrontend.dll`), platform bridge APIs, and supporting architecture.
 
-## DSP pipeline internals (speechPlayer.cpp + speechWaveGenerator.cpp)
+## Architecture overview
+
+TGSpeechBox is split into three layers:
+
+1. **DSP engine** (`speechPlayer.dll` / `libspeechPlayer.so`) — Pure C++ formant synthesizer. Takes timed frame data, produces 16-bit PCM audio. No text processing, no phoneme knowledge. MIT licensed.
+
+2. **Frontend** (`nvspFrontend.dll` / `libnvspFrontend.so`) — C++ library with a C API. Takes IPA strings + language tag, applies normalization, allophone rules, timing, pitch contouring, and emits timed frames for the DSP. Loads YAML language packs from `packs/`. MIT licensed.
+
+3. **Phonemizer** (eSpeak-NG) — Converts text to IPA. GPL-3.0 licensed. Callers link against it separately; on iOS it runs in an XPC service process to maintain a clean GPL/MIT boundary.
+
+Typical integration flow:
+```
+Text → eSpeak (text→IPA) → Frontend (IPA→frames) → DSP (frames→PCM)
+```
+
+On all platforms, the caller is responsible for feeding text to eSpeak and passing the resulting IPA to the frontend. The frontend emits frames via a callback, which the caller queues into the DSP engine.
+
+---
+
+## DSP engine API (`src/speechPlayer.h`)
+
+### Core functions
+
+```c
+speechPlayer_handle_t speechPlayer_initialize(int sampleRate);
+
+void speechPlayer_queueFrame(
+    speechPlayer_handle_t handle,
+    speechPlayer_frame_t* frame,
+    unsigned int minFrameDuration,   // minimum samples before next frame
+    unsigned int fadeDuration,       // crossfade samples
+    int userIndex,                   // passed back via getLastIndex
+    bool purgeQueue                  // true = clear queue first
+);
+
+void speechPlayer_queueFrameEx(
+    speechPlayer_handle_t handle,
+    speechPlayer_frame_t* frame,
+    const speechPlayer_frameEx_t* frameEx,  // NULL = same as queueFrame
+    unsigned int frameExSize,               // sizeof caller's frameEx struct
+    unsigned int minFrameDuration,
+    unsigned int fadeDuration,
+    int userIndex,
+    bool purgeQueue
+);
+
+int speechPlayer_synthesize(
+    speechPlayer_handle_t handle,
+    unsigned int sampleCount,
+    sample* sampleBuf               // output buffer (16-bit signed)
+);
+
+int speechPlayer_getLastIndex(speechPlayer_handle_t handle);
+
+void speechPlayer_terminate(speechPlayer_handle_t handle);
+```
+
+### Extended functions
+
+These are safe ABI extensions — old drivers that never call them get identical behavior to before.
+
+```c
+// Voicing tone: global voice quality (glottal pulse shape, spectral tilt, EQ)
+void speechPlayer_setVoicingTone(speechPlayer_handle_t handle,
+                                  const speechPlayer_voicingTone_t* tone);
+void speechPlayer_getVoicingTone(speechPlayer_handle_t handle,
+                                  speechPlayer_voicingTone_t* tone);
+
+// Output gain applied before the soft-knee limiter.
+// Default 1.0. Typical: NVDA=1.0, iOS=1.7, Android=1.6.
+void speechPlayer_setOutputGain(speechPlayer_handle_t handle, double gain);
+
+// DSP version detection (currently returns 6)
+unsigned int speechPlayer_getDspVersion(void);
+
+// Pitch-synchronous time-stretch for rate boost beyond 2x.
+// 1.0 = normal. 2.0 = skip every other glottal cycle. Clamped to 1.0–8.0.
+void speechPlayer_setTimeStretch(speechPlayer_handle_t handle, double factor);
+```
+
+### DLL exports (`speechPlayer.def`)
+
+```
+speechPlayer_initialize
+speechPlayer_queueFrame
+speechPlayer_queueFrameEx
+speechPlayer_synthesize
+speechPlayer_getLastIndex
+speechPlayer_terminate
+speechPlayer_setVoicingTone
+speechPlayer_getVoicingTone
+speechPlayer_getDspVersion
+speechPlayer_setOutputGain
+speechPlayer_setTimeStretch
+```
+
+---
+
+## DSP pipeline internals
+
 At the highest level, `speechPlayer.cpp` wires together the frame queue and the DSP generator:
 - `speechPlayer_initialize()` builds a `FrameManager` plus a `SpeechWaveGenerator` and connects them so the generator can pull the current frame data as it produces audio samples.
 - `speechPlayer_queueFrame()` pushes time-aligned frame data into the `FrameManager`, including minimum frame duration, fade time, and a user index for tracking.
@@ -20,23 +119,47 @@ The DSP pipeline lives in `speechWaveGenerator.cpp` and is executed once per out
 
 This structure keeps the time-domain synthesis logic entirely in C++: callers provide timed frame tracks, while the engine interpolates and renders them into audio.
 
-## New Speech Player exports (voicing tone control)
+---
 
-The `speechPlayer.dll` now exports additional functions for real-time control of the voice source characteristics. These allow callers to adjust the "voicing tone" — the spectral shape and character of the glottal pulse — without modifying individual frames.
+## Frame struct (`src/frame.h`)
 
-### New API functions
+The core frame has **47 parameters** and has been ABI-stable since v1:
 
-- `speechPlayer_setVoicingTone(handle, VoicingTone*)` — Apply a new voicing tone configuration.
-- `speechPlayer_getVoicingTone(handle, VoicingTone*)` — Retrieve the current voicing tone settings.
-- `speechPlayer_hasVoicingToneSupport(handle)` — Check if the DLL supports voicing tone control (for backward compatibility).
+```c
+typedef struct {
+    double voicePitch;              // fundamental frequency (Hz)
+    double vibratoPitchOffset;      // pitch offset in fraction of semitone
+    double vibratoSpeed;            // vibrato rate (Hz)
+    double voiceTurbulenceAmplitude; // voice breathiness (0–1)
+    double glottalOpenQuotient;     // fraction of cycle glottis is open (0–1)
+    double voiceAmplitude;          // voicing source amplitude (0–1)
+    double aspirationAmplitude;     // aspiration source amplitude (0–1)
 
-### VoicingTone struct parameters
+    double cf1, cf2, cf3, cf4, cf5, cf6, cfN0, cfNP; // cascade formant frequencies (Hz)
+    double cb1, cb2, cb3, cb4, cb5, cb6, cbN0, cbNP; // cascade formant bandwidths (Hz)
+    double caNP;                    // nasal pole coupling amplitude (0–1)
 
-The `VoicingTone` struct contains parameters that shape the voiced sound source. As of DSP version 6, there are **14 parameters** plus a version detection header.
+    double fricationAmplitude;      // frication noise amplitude (0–1)
+    double pf1, pf2, pf3, pf4, pf5, pf6; // parallel formant frequencies (Hz)
+    double pb1, pb2, pb3, pb4, pb5, pb6; // parallel formant bandwidths (Hz)
+    double pa1, pa2, pa3, pa4, pa5, pa6; // parallel formant amplitudes (0–1)
+    double parallelBypass;          // fraction bypassing parallel resonators (0–1)
 
-#### Version detection (v3 struct)
+    double preFormantGain;          // pre-resonator gain (0–1), 0 = silence
+    double outputGain;              // master volume (0–1)
+    double endVoicePitch;           // pitch target at end of frame (Hz)
+} speechPlayer_frame_t;
+```
 
-The v3 struct includes a header for backward compatibility:
+---
+
+## VoicingTone struct (`src/voicingTone.h`)
+
+Global voice quality parameters that shape the glottal pulse, spectral character, and vocal tract geometry. These persist across frames and are typically set once per voice profile.
+
+The struct contains **17 parameters** plus a version detection header. DSP version: **6**. Struct version: **3**.
+
+### Version detection header
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -46,65 +169,71 @@ The v3 struct includes a header for backward compatibility:
 | `dspVersion` | uint32 | DSP version (currently 6) |
 
 When the DLL receives a `VoicingTone` struct, it checks the magic number:
-- **If magic matches**: Uses the full v3 struct with all 14 parameters
+- **If magic matches**: Reads up to `structSize` bytes, applying defaults for any trailing fields not present
 - **If magic doesn't match**: Assumes legacy v1 layout (7 doubles) and applies defaults for new parameters
 
 This allows older drivers to continue working with newer DLLs, and vice versa.
 
-#### Core parameters (original 7)
+### Core parameters (V1, original 7)
 
 | Parameter | Type | Default | Range | Description |
 |-----------|------|---------|-------|-------------|
-| `voicingPeakPos` | double | 0.91 | 0.85–0.95 | Glottal pulse peak position. Lower values create a more pressed/tense voice quality; higher values sound more breathy/relaxed. |
-| `voicedPreEmphA` | double | 0.92 | 0.0–0.97 | Pre-emphasis filter coefficient. Higher values boost high frequencies before formant filtering. |
-| `voicedPreEmphMix` | double | 0.35 | 0.0–1.0 | Mix between original and pre-emphasized signal. 0.0 = no pre-emphasis, 1.0 = full pre-emphasis. |
-| `highShelfGainDb` | double | 4.0 | -12 to +12 | High-shelf EQ gain in dB. Positive values brighten the output; negative values darken it. |
-| `highShelfFcHz` | double | 2000.0 | 500–8000 | High-shelf corner frequency in Hz. Controls where the shelf boost/cut begins. |
-| `highShelfQ` | double | 0.7 | 0.3–2.0 | High-shelf Q factor. Higher values create a more resonant shelf transition. |
-| `voicedTiltDbPerOct` | double | 0.0 | -24 to +24 | Spectral tilt in dB/octave. Negative values create a brighter sound (less natural roll-off); positive values create a darker, more muffled sound. |
+| `voicingPeakPos` | double | 0.91 | 0.85–0.95 | Glottal pulse peak position. Lower = more pressed/tense; higher = more breathy/relaxed. |
+| `voicedPreEmphA` | double | 0.92 | 0.0–0.97 | Pre-emphasis filter coefficient. Higher = more high-frequency boost before formant filtering. |
+| `voicedPreEmphMix` | double | 0.35 | 0.0–1.0 | Mix between original and pre-emphasized signal. |
+| `highShelfGainDb` | double | 5.5 | -12 to +12 | High-shelf EQ gain in dB. Positive = brighter; negative = darker. |
+| `highShelfFcHz` | double | 2000.0 | 500–8000 | High-shelf corner frequency in Hz. |
+| `highShelfQ` | double | 0.7 | 0.3–2.0 | High-shelf Q factor. Higher = more resonant shelf transition. |
+| `voicedTiltDbPerOct` | double | 0.0 | -24 to +24 | Spectral tilt in dB/octave. Negative = darker (normal for speech); positive = brighter. |
 
-#### V2 parameters (DSP version 4+)
-
-| Parameter | Type | Default | Range | Description |
-|-----------|------|---------|-------|-------------|
-| `noiseGlottalModDepth` | double | 0.0 | 0.0–1.0 | Modulates noise sources (aspiration, frication) by the glottal cycle. Higher values create more "buzzy" noise that pulses with voicing. |
-| `pitchSyncF1DeltaHz` | double | 0.0 | -60 to +60 | Pitch-synchronous F1 modulation. During the glottal open phase, F1 is shifted by this amount. Can add naturalness or remove subtle clicks. |
-| `pitchSyncB1DeltaHz` | double | 0.0 | -50 to +50 | Pitch-synchronous B1 (F1 bandwidth) modulation. During the glottal open phase, B1 is widened by this amount. Works with `pitchSyncF1DeltaHz`. |
-
-#### V3 parameters (DSP version 5+)
+### V2 parameters (DSP version 4+)
 
 | Parameter | Type | Default | Range | Description |
 |-----------|------|---------|-------|-------------|
-| `speedQuotient` | double | 2.0 | 0.5–4.0 | Glottal pulse asymmetry (ratio of opening to closing time). Lower values (0.5–1.5) create softer, more female-like voices. Higher values (2.5–4.0) create sharper, more male/pressed voices. Default 2.0 matches original behavior. |
-| `aspirationTiltDbPerOct` | double | 0.0 | -12 to +12 | Spectral tilt for aspiration/breath noise in dB/octave. Negative values make breath brighter; positive values make it darker/more muffled. Independent of `voicedTiltDbPerOct`. |
-| `cascadeBwScale` | double | 0.8 | 0.2–2.0 | Global cascade formant bandwidth multiplier. Lower values (0.2–0.5) create sharper, more defined formant peaks with "Eloquence-like" clarity. Higher values (1.2–2.0) blur formants together for softer, more muffled quality. Default 0.8 provides good intelligibility. |
-| `tremorDepth` | double | 0.0 | 0.0–0.4 | Vocal tremor depth for elderly/shaky voice effect. A 5 Hz low-frequency oscillator modulates pitch (±28%), open quotient (±0.12), and amplitude (±20%) simultaneously. This creates a realistic "wavering voice" characteristic of aging or emotional tremor. Combines well with jitter/shimmer for enhanced realism. 0.0 = off, 0.3–0.4 = noticeable elderly tremor. |
+| `noiseGlottalModDepth` | double | 0.0 | 0.0–1.0 | Modulates noise sources by the glottal cycle (Klatt-style AM). |
+| `pitchSyncF1DeltaHz` | double | 0.0 | -60 to +60 | Pitch-synchronous F1 modulation during glottal open phase. |
+| `pitchSyncB1DeltaHz` | double | 0.0 | -50 to +50 | Pitch-synchronous B1 modulation during glottal open phase. |
 
-### FrameEx struct (DSP version 5+)
+### V3 parameters (DSP version 5+)
 
-DSP version 5 introduced an optional per-frame extension struct for voice quality parameters that vary during speech (e.g., Danish stød). DSP version 6 adds formant end targets and Fujisaki pitch model parameters. DSP version 7 adds per-parameter transition speed scales for boundary smoothing and equal-power amplitude crossfade mode. This keeps the original 47-parameter frame ABI stable.
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| `speedQuotient` | double | 2.0 | 0.5–4.0 | Glottal pulse asymmetry. Lower (0.5–1.5) = softer/female-like; higher (2.5–4.0) = sharper/male/pressed. |
+| `aspirationTiltDbPerOct` | double | 0.0 | -12 to +12 | Spectral tilt for aspiration noise, independent of `voicedTiltDbPerOct`. |
+| `cascadeBwScale` | double | 0.9 | 0.3–2.0 | Global cascade formant bandwidth multiplier. Lower = sharper formant peaks; higher = softer/more muffled. |
+| `tremorDepth` | double | 0.0 | 0.0–0.5 | Vocal tremor depth. A ~5.5 Hz LFO modulates amplitude for elderly/shaky voice. Stacks with jitter/shimmer. |
+
+### V4 parameters (DSP version 6+) — vocal tract shape
+
+These model structural vocal tract differences (pharynx length, nasal passages) rather than source characteristics.
+
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| `nasalBwScale` | double | 1.0 | 0.5–2.0 | Nasal resonator bandwidth multiplier. Higher = more damped nasal resonances (female character). |
+| `f4FreqScale` | double | 1.0 | 0.7–1.5 | F4 frequency multiplier. Shorter pharynx (female/child) raises F4. One of the strongest cues for perceived vocal tract size. |
+| `nasalGainScale` | double | 1.0 | 0.5–1.5 | Nasal pole coupling amplitude multiplier. Higher = more nasality. |
+
+---
+
+## FrameEx struct (DSP version 5+)
+
+Optional per-frame extension for voice quality parameters that vary during speech (e.g., Danish stod, diphthong formant sweeps, Fujisaki pitch contours). This keeps the original 47-parameter frame ABI stable.
 
 The struct is currently **23 doubles = 184 bytes**. The `speechPlayer_queueFrameEx()` function takes a `frameExSize` parameter; the DSP starts with defaults then overlays `min(frameExSize, sizeof(speechPlayer_frameEx_t))` bytes. This provides forward/backward ABI compatibility — callers with smaller structs simply don't override the trailing fields.
 
-#### New API function
-
-- `speechPlayer_queueFrameEx(handle, frame*, frameEx*, frameExSize, minDuration, fadeDuration, userIndex, purgeQueue)` — Queue a frame with optional extended parameters. The `frameExSize` parameter enables forward compatibility. If `frameEx` is NULL, behaves identically to `speechPlayer_queueFrame()`.
-
-#### FrameEx parameters
-
-##### Voice quality (DSP v5+)
+### Voice quality (DSP v5+)
 
 | Parameter | Type | Default | Range | Description |
 |-----------|------|---------|-------|-------------|
-| `creakiness` | double | 0.0 | 0.0–1.0 | Laryngealization / creaky voice. Used for Danish stød and similar phonation types. Adds pitch irregularity, amplitude reduction, and tighter glottal closure. |
-| `breathiness` | double | 0.0 | 0.0–1.0 | Additional voiced breathiness. Increases turbulence during the open glottal phase independently of `voiceTurbulenceAmplitude`. |
-| `jitter` | double | 0.0 | 0.0–1.0 | Pitch perturbation (cycle-to-cycle F0 variation). Adds random pitch wobble for more natural or pathological voice quality. |
-| `shimmer` | double | 0.0 | 0.0–1.0 | Amplitude perturbation (cycle-to-cycle intensity variation). Adds random amplitude wobble. |
-| `sharpness` | double | 0.0 | 0.0–15.0 | Glottal closure sharpness multiplier. When non-zero, multiplies the sample-rate-appropriate base sharpness (e.g., 10.0 at 44100 Hz, 3.0 at 16000 Hz). Values 0.5–2.0 are typical slider range. 0 = use default. Higher values create crisper, more "Eloquence-like" attacks. |
+| `creakiness` | double | 0.0 | 0.0–1.0 | Laryngealization / creaky voice. Adds pitch irregularity, amplitude reduction, tighter glottal closure. |
+| `breathiness` | double | 0.0 | 0.0–1.0 | Additional voiced breathiness, independent of `voiceTurbulenceAmplitude`. |
+| `jitter` | double | 0.0 | 0.0–1.0 | Pitch perturbation (cycle-to-cycle F0 variation). |
+| `shimmer` | double | 0.0 | 0.0–1.0 | Amplitude perturbation (cycle-to-cycle intensity variation). |
+| `sharpness` | double | 0.0 | 0.0–15.0 | Glottal closure sharpness multiplier. 0 = use sample-rate default. 0.5–2.0 typical slider range. |
 
-##### Formant end targets (DSP v6+)
+### Formant end targets (DSP v6+)
 
-These enable DECTalk-style within-frame formant ramping for smoother CV transitions:
+These enable within-frame formant ramping for smoother CV transitions:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -115,9 +244,9 @@ These enable DECTalk-style within-frame formant ramping for smoother CV transiti
 | `endPf2` | double | NAN | End target for parallel F2 (Hz). NAN = no ramping. |
 | `endPf3` | double | NAN | End target for parallel F3 (Hz). NAN = no ramping. |
 
-##### Fujisaki pitch model (DSP v6+)
+### Fujisaki pitch model (DSP v6+)
 
-The Fujisaki pitch model provides natural-sounding intonation with phrase-level declination and accent peaks. This is used when `legacyPitchMode: "fujisaki_style"` is set in the language pack.
+Natural-sounding intonation with phrase-level declination and accent peaks. Used when `legacyPitchMode: "fujisaki_style"` is set in the language pack. All time units are in **samples**, not milliseconds.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -131,45 +260,560 @@ The Fujisaki pitch model provides natural-sounding intonation with phrase-level 
 
 These parameters are interpolated during frame crossfades, just like the core frame parameters.
 
-##### Per-parameter transition speed scales (DSP v7+)
+### Per-parameter transition speed scales (DSP v7+)
 
-These control how fast individual formant groups reach their targets during boundary crossfades. The boundary smoothing pass sets these on tokens based on language pack settings (`boundarySmoothingF1Scale`, etc.). A scale value < 1.0 means "reach the target in that fraction of the fade time, then hold." 0.0 means no override (all formants fade at the same rate).
-
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `transF1Scale` | double | 0.0 | Transition speed for F1 group (cf1, pf1, cb1, pb1). 0.0 = no override. |
-| `transF2Scale` | double | 0.0 | Transition speed for F2 group (cf2, pf2, cb2, pb2). 0.0 = no override. |
-| `transF3Scale` | double | 0.0 | Transition speed for F3 group (cf3, pf3, cb3, pb3). 0.0 = no override. |
-| `transNasalScale` | double | 0.0 | Transition speed for nasal group (cfN0, cfNP, cbN0, cbNP, caNP). 0.0 = no override. |
-
-Example: with `transF1Scale = 0.6` and a 20ms fade, F1 reaches its target at 12ms and holds for the remaining 8ms, while F2 (at default) ramps across the full 20ms. This makes F1 "arrive first" at segment boundaries, which is perceptually important for place-of-articulation cues.
-
-##### Equal-power amplitude crossfade (DSP v7+)
+Control how fast individual formant groups reach their targets during boundary crossfades. The boundary smoothing pass sets these on tokens based on language pack settings. A scale value < 1.0 means "reach the target in that fraction of the fade time, then hold." 0.0 means no override.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `transAmplitudeMode` | double | 1.0 | Amplitude crossfade curve: 0.0 = linear (legacy), 1.0 = equal-power (sin/cos). |
+| `transF1Scale` | double | 0.0 | Transition speed for F1 group (cf1, pf1, cb1, pb1). |
+| `transF2Scale` | double | 0.0 | Transition speed for F2 group (cf2, pf2, cb2, pb2). |
+| `transF3Scale` | double | 0.0 | Transition speed for F3 group (cf3, pf3, cb3, pb3). |
+| `transNasalScale` | double | 0.0 | Transition speed for nasal group (cfN0, cfNP, cbN0, cbNP, caNP). |
 
-When the voicing source type changes between frames (e.g. voiced /n/ with `voiceAmplitude=0.9` transitioning to voiceless /h/ with `aspirationAmplitude=0.15`), linear crossfade creates an energy valley at the midpoint — total energy dips to ~58% before recovering. This sounds like a pop or click.
+Example: with `transF1Scale = 0.6` and a 20ms fade, F1 reaches its target at 12ms and holds for the remaining 8ms, while F2 ramps across the full 20ms. This makes F1 "arrive first" at segment boundaries, which is perceptually important for place-of-articulation cues.
 
-Equal-power crossfade uses `oldVal * cos(theta) + newVal * sin(theta)` where `theta = ratio * pi/2`. Since `sin^2 + cos^2 = 1`, total power stays constant throughout the transition. The DSP applies this curve only to amplitude/gain source parameters (`voiceAmplitude`, `aspirationAmplitude`, `fricationAmplitude`, `voiceTurbulenceAmplitude`, `preFormantGain`). Parallel amplitudes (`pa1`-`pa6`), `outputGain`, and `caNP` are excluded — they track formant structure, not energy sources.
+### Equal-power amplitude crossfade (DSP v7+)
 
-The frontend (`frame_emit.cpp`) detects source transitions by comparing current vs. previous frame amplitude values: if `voiceAmplitude` or `fricationAmplitude` cross a 0.05 threshold in either direction, `transAmplitudeMode` is set to 1.0. For same-source transitions (vowel-to-vowel, fricative-to-fricative), the mode stays at 0.0 and linear interpolation is used — the two curves produce nearly identical results when old and new amplitudes are similar.
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `transAmplitudeMode` | double | 0.0 | Amplitude crossfade curve: 0.0 = linear (legacy), 1.0 = equal-power (sin/cos). |
 
-The `isAmplitudeParam()` helper in `frame.cpp` identifies the five source amplitude parameters using `offsetof`, matching the pattern of the existing `isFrequencyParam()`, `isF1Param()`, etc. helpers.
+When the voicing source type changes between frames (e.g. voiced /n/ → voiceless /h/), linear crossfade creates an energy valley at the midpoint (~58%). Equal-power crossfade uses `oldVal * cos(theta) + newVal * sin(theta)` to maintain constant total energy.
 
-##### Silence transition fixes (DSP v7+)
+The DSP applies equal-power only to source amplitude parameters (`voiceAmplitude`, `aspirationAmplitude`, `fricationAmplitude`, `voiceTurbulenceAmplitude`, `preFormantGain`). Parallel amplitudes (`pa1`-`pa6`), `outputGain`, and `caNP` are excluded — they track formant structure, not energy sources.
 
-Two additional fixes in the DSP prevent pops at silence boundaries:
+The frontend (`frame_emit.cpp`) sets this automatically when it detects a voicing source change (amplitude crosses a 0.05 threshold in either direction).
 
-1. **Source amplitude zeroing** (`frame.cpp`): When transitioning from silence to a real frame (or vice versa), the "from" side now has all source amplitudes (`voiceAmplitude`, `aspirationAmplitude`, `fricationAmplitude`, `voiceTurbulenceAmplitude`) zeroed alongside `preFormantGain`. Previously, the silence path copied the target frame's amplitudes into the old frame, meaning noise/voicing hit cascade resonators at full strength from sample 1.
+### Silence transition fixes (DSP v7+)
 
-2. **Resonator reset on preFormantGain recovery** (`speechWaveGenerator.cpp`): When `smoothPreGain` rises from near-zero (< 0.005) to above 0.01, cascade and parallel resonators are reset. This clears residual IIR state from the previous phoneme that would otherwise color the first few milliseconds of the new phoneme across word-boundary gaps (e.g. /d/'s formant pattern bleeding into /h/ in "had helped"). The existing `wasSilence` flag only fires on full NULL-frame silence; this catches the subtler case of `preFormantGain=0` gaps.
+Two fixes prevent pops at silence boundaries:
 
-**ABI note:** The 5 transition fields sit at offsets 18–22 (bytes 144–183) of the FrameEx struct. Callers passing `frameExSize = 144` (the old 18-double size) will silently not set these fields, and the DSP defaults (0.0 for scales, 1.0 for amplitude mode) apply. This is why it was important to update `speechPlayer.py`, `_frontend.py`, and `tgsbRender.cpp` to the full 23-double / 184-byte struct.
+1. **Source amplitude zeroing** (`frame.cpp`): When transitioning from/to silence, the "from" side has all source amplitudes zeroed alongside `preFormantGain`. Previously, the silence path copied target amplitudes into the old frame, hitting resonators at full strength from sample 1.
 
-### Usage example (Python/ctypes, v3 struct)
+2. **Resonator reset on preFormantGain recovery** (`speechWaveGenerator.cpp`): When `smoothPreGain` rises from near-zero to above 0.01, cascade and parallel resonators are reset. This clears residual IIR state from the previous phoneme across word-boundary gaps.
+
+**ABI note:** The 5 transition fields sit at offsets 18–22 (bytes 144–183). Callers passing `frameExSize = 144` (the old 18-double size) will silently get DSP defaults (0.0 for scales, 0.0 for amplitude mode).
+
+---
+
+## Frontend C API (`src/frontend/nvspFrontend.h`)
+
+The frontend is a C-linkage API exposed from `nvspFrontend.dll` (Windows) or `libnvspFrontend.so` (Linux). It converts IPA strings into timed frame callbacks suitable for the DSP engine.
+
+### ABI versioning
+
+```c
+#define NVSP_FRONTEND_ABI_VERSION 5
+int nvspFrontend_getABIVersion(void);
+```
+
+The ABI version increments when new functions are added. Callers can check this at runtime to gate feature usage. All functions are additive — older functions continue to work unchanged.
+
+| ABI | Key additions |
+|-----|---------------|
+| 1 | Core: create/destroy, setLanguage, queueIPA |
+| 2 | FrameEx: queueIPA_Ex, setFrameExDefaults, voice profiles, voicing tone |
+| 3 | Data export: exportData |
+| 4 | Text-aware: queueIPA_ExWithText, prepareText, setPitchMode, applySettingOverrides, previewPhoneme, getAvailableLanguages |
+| 5 | Generic data query: getDataCount, queryData, setData |
+
+### Lifecycle
+
+```c
+// Create a frontend handle. packDirUtf8 should contain the "packs" folder.
+nvspFrontend_handle_t nvspFrontend_create(const char* packDirUtf8);
+
+// Destroy and free all resources.
+void nvspFrontend_destroy(nvspFrontend_handle_t handle);
+```
+
+### Language and configuration
+
+```c
+// Load and merge language packs: default.yaml → <lang>.yaml → <lang-region>.yaml
+// Returns 1 on success, 0 on failure.
+int nvspFrontend_setLanguage(nvspFrontend_handle_t handle, const char* langTagUtf8);
+
+// Set override directory checked before bundle for user-imported packs.
+// Used by iOS app group container. Pass NULL to clear.
+void nvspFrontend_setOverrideDirectory(nvspFrontend_handle_t handle,
+                                        const char* overrideDirUtf8);
+
+// Get available language tags (newline-separated, malloc'd).
+// Caller must free with nvspFrontend_freeString().
+char* nvspFrontend_getAvailableLanguages(nvspFrontend_handle_t handle);
+
+// Human-readable error message from the last failed call.
+const char* nvspFrontend_getLastError(nvspFrontend_handle_t handle);
+
+// Non-fatal warnings from pack loading (e.g., profile parse errors).
+const char* nvspFrontend_getPackWarnings(nvspFrontend_handle_t handle);
+```
+
+### IPA synthesis
+
+Three callback-based synthesis functions, from simplest to most capable:
+
+```c
+// Legacy callback (ABI v1): frame + timing
+typedef void (*nvspFrontend_FrameCallback)(
+    void* userData,
+    const nvspFrontend_Frame* frameOrNull,  // NULL = silence
+    double durationMs,
+    double fadeMs,
+    int userIndex
+);
+
+// Extended callback (ABI v2+): frame + frameEx + timing
+typedef void (*nvspFrontend_FrameExCallback)(
+    void* userData,
+    const nvspFrontend_Frame* frameOrNull,
+    const nvspFrontend_FrameEx* frameExOrNull,
+    double durationMs,
+    double fadeMs,
+    int userIndex
+);
+
+// Basic IPA → frames (ABI v1)
+int nvspFrontend_queueIPA(handle, ipaUtf8, speed, basePitch,
+                           inflection, clauseTypeUtf8, userIndexBase,
+                           FrameCallback cb, userData);
+
+// Extended IPA → frames with FrameEx (ABI v2+)
+int nvspFrontend_queueIPA_Ex(handle, ipaUtf8, speed, basePitch,
+                              inflection, clauseTypeUtf8, userIndexBase,
+                              FrameExCallback cb, userData);
+
+// Text-aware IPA → frames with dictionary lookup (ABI v4+)
+// If textUtf8 is provided, the frontend corrects stress placement
+// using loaded dictionaries (CMU, compounds, pronunciation overrides).
+int nvspFrontend_queueIPA_ExWithText(handle, textUtf8, ipaUtf8, speed,
+                                      basePitch, inflection, clauseTypeUtf8,
+                                      userIndexBase, FrameExCallback cb, userData);
+```
+
+Parameters:
+- `speed`: divisor for timing (higher = faster)
+- `basePitch`: base F0 in Hz
+- `inflection`: pitch range scaling (0.0–1.0)
+- `clauseTypeUtf8`: one of `"."` `","` `"?"` `"!"` (NULL treated as `"."`)
+- `userIndexBase`: passed through to callback for text position mapping
+
+### Voice quality defaults (ABI v2+)
+
+```c
+// Set user-level FrameEx defaults (added to per-phoneme values from YAML).
+// Typically called when user adjusts voice quality sliders.
+void nvspFrontend_setFrameExDefaults(handle,
+    double creakiness, double breathiness,
+    double jitter, double shimmer, double sharpness);
+
+// Read current defaults.
+int nvspFrontend_getFrameExDefaults(handle, nvspFrontend_FrameEx* outDefaults);
+```
+
+### Voice profiles (ABI v2+)
+
+Voice profiles apply formant scaling, voicing tone overrides, and other transformations to produce different voice qualities (female, child, etc.) from a single phoneme table.
+
+```c
+// Set profile by name (e.g., "Beth", "Bobby"). NULL or "" to clear.
+int nvspFrontend_setVoiceProfile(handle, const char* profileNameUtf8);
+
+// Get current profile name (empty string if none).
+const char* nvspFrontend_getVoiceProfile(handle);
+
+// List available profile names (newline-separated).
+const char* nvspFrontend_getVoiceProfileNames(handle);
+
+// Get the voicing tone for the current profile.
+// Returns 1 if profile has explicit voicingTone, 0 if using defaults.
+int nvspFrontend_getVoicingTone(handle, nvspFrontend_VoicingTone* outTone);
+
+// Save slider values back to phonemes.yaml for a profile.
+int nvspFrontend_saveVoiceProfileSliders(handle,
+    const char* profileNameUtf8,
+    const nvspFrontend_VoiceProfileSliders* sliders);
+```
+
+Shipped profiles: **Adam** (base male), **Beth** (female — f4FreqScale, nasalBwScale, speedQuotient adjusted), **Bobby** (child — higher formant scaling).
+
+### Pitch mode (ABI v4+)
+
+```c
+// Override pitch intonation model. Persists until next setLanguage().
+int nvspFrontend_setPitchMode(handle, const char* modeUtf8);
+
+// Override legacy pitch inflection scale (only affects "legacy" mode).
+void nvspFrontend_setLegacyPitchInflectionScale(handle, double scale);
+```
+
+Available modes:
+| Mode | Description |
+|------|-------------|
+| `"espeak_style"` | ToBI-based intonation regions (default) |
+| `"legacy"` | Older time-based pitch curve |
+| `"fujisaki_style"` | Flat base + DSP phrase/accent contours |
+| `"impulse_style"` | Multi-layer additive pitch |
+| `"klatt_style"` | Klatt 1987 hat-pattern intonation |
+
+### Text preparation (ABI v4+)
+
+```c
+// Pre-eSpeak text processing: compound word splitting + dictionary replacements.
+// Returns NULL if no transforms applied (use original text).
+// Returns malloc'd string if transforms fired. Caller frees with freeString().
+char* nvspFrontend_prepareText(handle, const char* textUtf8);
+
+// Backwards-compatible alias:
+#define nvspFrontend_splitCompounds nvspFrontend_prepareText
+
+void nvspFrontend_freeString(char* str);
+```
+
+Use case: feeds corrected text to eSpeak so each compound half is phonemized independently with correct vowel quality. Essential for speech-dispatcher integration where eSpeak is an external process.
+
+### Settings and data export (ABI v3–4)
+
+```c
+// Apply YAML snippet overrides on top of loaded language pack.
+// Dot-notation supported: "boundarySmoothing.enabled: true"
+// Must be called after setLanguage(). Returns 1 on success.
+int nvspFrontend_applySettingOverrides(handle, const char* yamlSnippetUtf8);
+
+// Export merged YAML (base file + user overrides) with comment preservation.
+// domain: NVSP_DATA_SETTINGS or NVSP_DATA_PHONEMES
+// Returns malloc'd YAML string. Caller frees with freeString().
+char* nvspFrontend_exportData(handle, int domain,
+                               const char* langTagUtf8,
+                               const char* overridesJsonUtf8);
+```
+
+### Phoneme preview (ABI v4+)
+
+```c
+// Preview a single phoneme by key, bypassing the full pipeline.
+// Looks up PhonemeDef, emits one steady-state frame to the callback.
+// No eSpeak, no allophone rules, no pitch contour.
+int nvspFrontend_previewPhoneme(handle, const char* phonemeKeyUtf8,
+                                 double pitchHz, double durationMs,
+                                 nvspFrontend_FrameExCallback cb, void* userData);
+```
+
+### Generic data query API (ABI v5+)
+
+Paginated, typed access to pack data without re-reading YAML from disk. Accepts a language tag so callers can query any language without a disruptive `setLanguage()` switch.
+
+```c
+// Data domains
+#define NVSP_DATA_SETTINGS   0   // Pack settings (~291 keys)
+#define NVSP_DATA_PHONEMES   1   // Phoneme definitions
+#define NVSP_DATA_DICTIONARY 2   // Reserved for future
+
+// Count records in a domain. Returns -1 on error.
+// For PHONEMES: "" = all base phonemes, "en-gb" = only phonemes
+// referenced as replacement targets in that language.
+int nvspFrontend_getDataCount(handle, int domain, const char* langTagUtf8);
+
+// Query a page of records as a JSON array string.
+// Each element has at least "key", "type", "value" fields.
+// Settings also include "group". Phonemes also include "class".
+// Returns malloc'd JSON. Caller frees with freeString().
+char* nvspFrontend_queryData(handle, int domain, const char* langTagUtf8,
+                              int offset, int limit);
+
+// Set a single value. If langTag matches active language, applied
+// to in-memory pack immediately (live preview).
+// Returns 1 on success, 0 on failure.
+int nvspFrontend_setData(handle, int domain, const char* langTagUtf8,
+                          const char* keyUtf8, const char* valueUtf8);
+```
+
+**queryData JSON format examples:**
+
+Settings:
+```json
+[{"key": "boundarySmoothing.enabled", "type": "bool", "value": true, "group": "boundarySmoothing"}]
+```
+
+Phonemes:
+```json
+[{"key": "ɪ.cf2", "type": "float", "value": 1750, "group": "ɪ", "class": "vowel"}]
+```
+
+### Frontend structs
+
+The frontend defines its own copies of the frame structs for ABI isolation from the DSP DLL. Field order and count match exactly.
+
+- `nvspFrontend_Frame` — 47 doubles, matches `speechPlayer_frame_t`
+- `nvspFrontend_FrameEx` — 23 doubles, matches `speechPlayer_frameEx_t`
+- `nvspFrontend_VoicingTone` — 17 doubles (no magic header — the frontend handles version negotiation internally)
+- `nvspFrontend_VoiceProfileSliders` — 13 doubles: 8 voicing tone sliders + 5 FrameEx sliders. Used by `saveVoiceProfileSliders()`.
+
+---
+
+## NVDA driver sliders
+
+The driver exposes 14 sliders for real-time voice tuning:
+
+### VoicingTone sliders (9 — global voice character)
+
+| Slider | Range | Default | Maps to |
+|--------|-------|---------|---------|
+| Voice tilt (brightness) | 0–100 | 50 | `voicedTiltDbPerOct` (-24 to +24 dB/oct) |
+| Noise glottal modulation | 0–100 | 0 | `noiseGlottalModDepth` (0.0–1.0) |
+| Pitch-sync F1 delta | 0–100 | 50 | `pitchSyncF1DeltaHz` (-60 to +60 Hz) |
+| Pitch-sync B1 delta | 0–100 | 50 | `pitchSyncB1DeltaHz` (-50 to +50 Hz) |
+| Speed quotient (voice tension) | 0–100 | 50 | `speedQuotient` (0.5–4.0) |
+| Aspiration tilt (breath color) | 0–100 | 50 | `aspirationTiltDbPerOct` (-12 to +12 dB/oct) |
+| Formant sharpness | 0–100 | 50 | `cascadeBwScale` (2.0–0.3, inverted: higher slider = sharper) |
+| Voice tremor (shakiness) | 0–100 | 0 | `tremorDepth` (0.0–0.4) |
+| Head size (pharynx length) | 0–100 | 50 | `f4FreqScale` (1.25–0.85, inverted: 0 = small/high F4, 100 = large/low F4) |
+
+### FrameEx sliders (5 — per-frame voice quality)
+
+| Slider | Range | Default | Maps to |
+|--------|-------|---------|---------|
+| Creakiness | 0–100 | 0 | `creakiness` (0.0–1.0) |
+| Breathiness | 0–100 | 0 | `breathiness` (0.0–1.0) |
+| Jitter | 0–100 | 0 | `jitter` (0.0–1.0) |
+| Shimmer | 0–100 | 0 | `shimmer` (0.0–1.0) |
+| Glottal sharpness | 0–100 | 50 | `sharpness` (0.5–2.0 multiplier) |
+
+Note: Sliders centered at 50 have meaningful positive and negative ranges. Sliders starting at 0 are effect amounts that default to "off". All slider values are stored per-voice profile.
+
+---
+
+## Frontend model (YAML packs)
+
+The frontend replaces the legacy Python IPA runtime pipeline. Language changes happen as data (YAML) rather than code.
+
+### What the frontend does
+
+Given an IPA string and a language tag, the frontend:
+- normalizes IPA using YAML rules (`packs/lang/*.yaml`)
+- tokenizes IPA (stress marks, length marks, tie bars, etc.)
+- applies allophone rules (context-dependent sound changes)
+- applies timing rules (vowels vs stops vs affricates, stress scaling, length marks)
+- applies rate compensation (minimum durations, sonorant-context protection)
+- applies boundary smoothing (coarticulation at segment boundaries)
+- applies intonation and pitch shaping (5 pitch modes)
+- emits timed frames compatible with `speechPlayer_queueFrame()`
+
+### Why YAML packs matter
+
+YAML packs are community-friendly:
+- easier to read and review than embedded code
+- allows language/dialect refinements without recompiling the DLL
+- keeps "phoneme sound definitions" separate from "language mapping rules"
+
+Pack structure:
+- `packs/phonemes.yaml` — phoneme definitions (formant values, flags, voice profiles)
+- `packs/lang/default.yaml` — global defaults
+- `packs/lang/<lang>.yaml` — language rules (e.g., `en.yaml`)
+- `packs/lang/<lang-region>.yaml` — dialect refinements (e.g., `en-us.yaml`)
+- `packs/dict/` — stress dictionaries, compound dictionaries
+
+### Language pack loading and inheritance
+
+The loader merges packs in this order:
+1. `packs/lang/default.yaml`
+2. `packs/lang/<lang>.yaml` (e.g., `en.yaml`)
+3. `packs/lang/<lang-region>.yaml` (e.g., `en-us.yaml`)
+4. optional deeper variants (e.g., `en-us-nyc.yaml`)
+
+This is how dialect differences can be expressed even when upstream IPA does not mark them clearly.
+
+### Supported languages (26+)
+
+English (US, GB, AU, CA), German, French, Spanish (ES, MX), Italian, Portuguese (PT, BR), Dutch, Polish, Russian, Ukrainian, Czech, Slovak, Hungarian, Romanian, Croatian, Bulgarian, Swedish, Danish, Finnish, Turkish, Chinese.
+
+---
+
+## Advanced multilingual tokenization
+
+The C++ frontend features a **greedy longest-match tokenizer** for robust multilingual support. Language packs can define multi-character phonemes of arbitrary length without requiring tie bars in the phoneme keys.
+
+| Language | Challenge | Solution |
+|----------|-----------|----------|
+| **Russian** | Palatalized consonants (`nʲ`, `lʲ`, `mʲ`) are single phonemic units | Greedy matching finds `nʲ` as one token |
+| **Polish** | Complex affricates and palatalization | Multi-character keys like `t͡ɕ`, `d͡ʑ` match correctly |
+| **Hungarian** | Geminate consonants, unique vowels | Proper handling of length marks and diacritics |
+| **English** | Syllabic L/R in "bottle", "butter" | Normalization splits `ə͡l` → `ə` + `l` for proper lateral quality |
+
+### Directional tie-bar flexibility
+
+- Input `n͡ʲ` matches pack key `nʲ` — extra tie bars in input are ignored
+- Input `nʲ` matches pack key `nʲ` — exact matches always work
+- Input `əl` won't match pack key `ə͡l` — respects normalization decisions
+
+The sorted phoneme key list is computed once during pack loading and stored immutably, making the tokenizer fully thread-safe.
+
+---
+
+## Dictionary system
+
+TGSpeechBox supports a 4-tier dictionary system for pronunciation control:
+
+1. **Pronunciation dictionary** — Text-to-text respellings with optional `to_ipa` field that bypasses eSpeak entirely. Space-delimited phoneme keys for IPA injection.
+2. **Stress dictionary** — CMU-style stress patterns. en-us: ~109K entries, en-gb: ~2K entries.
+3. **Compound dictionary** — Word splitting for correct stress. ~3,686 English entries.
+4. **Character dictionary** — Letter-name overrides for spelling mode.
+
+Dictionary files live in `packs/dict/`. See [Dictionary-editing.md](Dictionary-editing.md) for full documentation.
+
+The frontend's `nvspFrontend_queueIPA_ExWithText()` function enables dictionary lookup by accepting both the original text and eSpeak's IPA output, allowing stress correction and pronunciation overrides.
+
+---
+
+## Platform bridge APIs
+
+### iOS full pipeline (`src/platforms/ios/bridge/tgsb_bridge.h`)
+
+GPL-3.0 (links eSpeak). Wraps eSpeak + frontend + DSP into a simple C API callable from Swift.
+
+```c
+TgsbEngine *tgsb_create(const char *espeakDataPath,
+                          const char *packDir, int sampleRate);
+void tgsb_destroy(TgsbEngine *engine);
+
+// Configuration
+void tgsb_set_override_directory(TgsbEngine *engine, const char *overrideDir);
+int tgsb_set_language(TgsbEngine *engine, const char *espeakLang,
+                       const char *tgsbLang);
+int tgsb_set_voice(TgsbEngine *engine, const char *voiceName);
+
+// Synthesis: queue text, pull PCM in a loop until 0 returned
+void tgsb_queue_text(TgsbEngine *engine, const char *text,
+                      double speed, double pitch);
+int tgsb_pull_audio(TgsbEngine *engine, int16_t *outBuffer, int maxSamples);
+void tgsb_stop(TgsbEngine *engine);
+
+// Voice quality (11 voicing tone params + 5 FrameEx defaults)
+void tgsb_set_voicing_tone(TgsbEngine *engine,
+    double voicedTiltDbPerOct, double noiseGlottalModDepth,
+    double pitchSyncF1DeltaHz, double pitchSyncB1DeltaHz,
+    double speedQuotient, double aspirationTiltDbPerOct,
+    double cascadeBwScale, double tremorDepth,
+    double nasalBwScale, double f4FreqScale, double nasalGainScale);
+void tgsb_set_frame_ex_defaults(TgsbEngine *engine,
+    double creakiness, double breathiness,
+    double jitter, double shimmer, double sharpness);
+
+// Pitch, inflection, pause mode, sample rate
+int tgsb_set_pitch_mode(TgsbEngine *engine, const char *mode);
+void tgsb_set_legacy_pitch_inflection_scale(TgsbEngine *engine, double scale);
+void tgsb_set_inflection(TgsbEngine *engine, double inflection);
+void tgsb_set_pause_mode(TgsbEngine *engine, int mode);  // 0=off, 1=short, 2=long
+void tgsb_set_sample_rate(TgsbEngine *engine, int sampleRate);
+
+// Voice profiles
+int tgsb_set_voice_profile(TgsbEngine *engine, const char *profileName);
+char *tgsb_get_voice_profile_names(TgsbEngine *engine);  // caller free()s
+
+// Data query API (same domains as NVSP_DATA_*)
+#define TGSB_DATA_SETTINGS   0
+#define TGSB_DATA_PHONEMES   1
+#define TGSB_DATA_DICTIONARY 2
+int tgsb_get_data_count(TgsbEngine *engine, int domain, const char *langTag);
+char *tgsb_query_data(TgsbEngine *engine, int domain, const char *langTag,
+                       int offset, int limit);
+int tgsb_set_data(TgsbEngine *engine, int domain, const char *langTag,
+                   const char *key, const char *value);
+
+// Utilities
+char *tgsb_export_data(TgsbEngine *engine, int domain,
+                        const char *langTag, const char *overridesJson);
+int tgsb_preview_phoneme(TgsbEngine *engine, const char *phonemeKey,
+                          double pitchHz, double durationMs);
+char *tgsb_text_to_ipa(TgsbEngine *engine, const char *text);
+char *tgsb_get_available_languages(TgsbEngine *engine);
+void tgsb_free_string(char *str);
+```
+
+### iOS synthesis-only (`src/platforms/ios/bridge/tgsb_synth.h`)
+
+MIT licensed. Takes IPA strings, produces PCM. No eSpeak — phonemization happens in the XPC service.
+
+```c
+TgsbSynth *tgsb_synth_create(const char *packDir, int sampleRate);
+void tgsb_synth_destroy(TgsbSynth *synth);
+int tgsb_synth_set_language(TgsbSynth *synth, const char *tgsbLang);
+int tgsb_synth_set_voice(TgsbSynth *synth, const char *voiceName);
+void tgsb_synth_queue_ipa(TgsbSynth *synth, const char *ipa,
+                            double speed, double pitch);
+int tgsb_synth_pull_audio(TgsbSynth *synth, int16_t *outBuffer, int maxSamples);
+void tgsb_synth_stop(TgsbSynth *synth);
+```
+
+### iOS phonemizer XPC (`src/platforms/ios/phonemizer-ext/tgsb_phonemizer.h`)
+
+GPL-3.0. Isolates eSpeak behind a process boundary so the AU extension stays MIT.
+
+```c
+int tgsb_phonemizer_init(const char *espeakDataPath);
+void tgsb_phonemizer_terminate(void);
+int tgsb_phonemizer_set_language(const char *espeakLang);
+char *tgsb_phonemizer_phonemize(const char *text);  // caller free()s
+```
+
+### Android JNI (`src/platforms/android/jni/tgsb_jni.cpp`)
+
+Two JNI paths exist and must both be updated when adding new parameters:
+
+**TgsbTtsService** — Full pipeline (eSpeak + frontend + DSP) for system-wide TTS. Exposed via Android's `TextToSpeech` framework for TalkBack and other apps.
+
+**TgsbSpeakEngine** — IPA-only synthesis for the standalone app. Also supports text input (routes through eSpeak internally).
+
+Both paths expose: lifecycle, language, voice/profile, voicing tone (11 params as double array), FrameEx defaults, pitch mode, inflection, sample rate, pause mode, volume, data query API.
+
+### SAPI (`src/sapi/`)
+
+The SAPI5 engine is a single **statically linked** `TGSpeechSapi.dll` containing the DSP engine, frontend, and eSpeak. It implements the standard `ISpTTSEngine` COM interface. Settings are persisted in `%APPDATA%\TGSpeechSapi\settings.ini` via a companion settings app (`tools/tgsbSapiSettings/`).
+
+Standard COM exports: `DllCanUnloadNow`, `DllGetClassObject`, `DllRegisterServer`, `DllUnregisterServer`.
+
+---
+
+## Build system
+
+### CMake targets
+
+```bat
+# Default build: speechPlayer.dll + nvspFrontend.dll (MIT)
+cmake -S . -B build-win32
+cmake --build build-win32 --config Release
+
+# SAPI build: single statically-linked TGSpeechSapi.dll (GPL)
+cmake -S . -B build-sapi -DTGSB_BUILD_SAPI=ON -DESPEAK_NG_DIR=<path>
+cmake --build build-sapi --config Release
+```
+
+### Output artifacts
+
+| Target | License | Contents |
+|--------|---------|----------|
+| `speechPlayer.dll` | MIT | DSP engine only |
+| `nvspFrontend.dll` | MIT | Frontend + YAML parser |
+| `TGSpeechSapi.dll` | GPL-3.0 | DSP + frontend + eSpeak, statically linked |
+| Linux `.so` | MIT | Shared libraries for speech-dispatcher integration |
+
+### NVDA add-on packaging
+
+The add-on includes:
+- `speechPlayer.dll` (x86 and x64)
+- `nvspFrontend.dll` (x86 and x64)
+- `packs/` directory (phonemes.yaml, lang/*.yaml, dict/*.tsv)
+- Python driver (`addon/synthDrivers/tgSpeechBox/`)
+
+### GitHub Actions CI
+
+Linux x86_64 and aarch64 builds run on ubuntu-24.04 (GCC 13+ required — GCC 11 on ubuntu-22.04 fails with incomplete type errors on self-referential `Node` with `unordered_map<string, Node>`).
+
+---
+
+## Usage example (Python/ctypes)
 
 ```python
 from ctypes import Structure, c_double, c_uint32, c_void_p, POINTER, byref, sizeof
@@ -185,7 +829,7 @@ class VoicingTone(Structure):
         ("structSize", c_uint32),
         ("structVersion", c_uint32),
         ("dspVersion", c_uint32),
-        # Original parameters
+        # V1 parameters
         ("voicingPeakPos", c_double),
         ("voicedPreEmphA", c_double),
         ("voicedPreEmphMix", c_double),
@@ -202,8 +846,12 @@ class VoicingTone(Structure):
         ("aspirationTiltDbPerOct", c_double),
         ("cascadeBwScale", c_double),
         ("tremorDepth", c_double),
+        # V4 parameters — vocal tract shape
+        ("nasalBwScale", c_double),
+        ("f4FreqScale", c_double),
+        ("nasalGainScale", c_double),
     ]
-    
+
     @classmethod
     def defaults(cls):
         tone = cls()
@@ -214,7 +862,7 @@ class VoicingTone(Structure):
         tone.voicingPeakPos = 0.91
         tone.voicedPreEmphA = 0.92
         tone.voicedPreEmphMix = 0.35
-        tone.highShelfGainDb = 4.0
+        tone.highShelfGainDb = 5.5
         tone.highShelfFcHz = 2000.0
         tone.highShelfQ = 0.7
         tone.voicedTiltDbPerOct = 0.0
@@ -223,8 +871,11 @@ class VoicingTone(Structure):
         tone.pitchSyncB1DeltaHz = 0.0
         tone.speedQuotient = 2.0
         tone.aspirationTiltDbPerOct = 0.0
-        tone.cascadeBwScale = 0.8
+        tone.cascadeBwScale = 0.9
         tone.tremorDepth = 0.0
+        tone.nasalBwScale = 1.0
+        tone.f4FreqScale = 1.0
+        tone.nasalGainScale = 1.0
         return tone
 
 # Set up function prototypes
@@ -233,118 +884,95 @@ dll.speechPlayer_setVoicingTone.restype = None
 
 # Create and configure tone
 tone = VoicingTone.defaults()
-tone.voicedTiltDbPerOct = -6.0  # Brighter tilt (Eloquence-like)
-tone.speedQuotient = 1.2  # Softer, more female-like pulse
-tone.cascadeBwScale = 0.5  # Sharper formants
-tone.tremorDepth = 0.3  # Elderly tremor effect
+tone.voicedTiltDbPerOct = -6.0  # Brighter tilt
+tone.speedQuotient = 1.2        # Softer, more female-like pulse
+tone.cascadeBwScale = 0.5       # Sharper formants
+tone.f4FreqScale = 1.08         # Slightly shorter pharynx (female)
 
 # Apply to running synthesizer
 dll.speechPlayer_setVoicingTone(handle, byref(tone))
 ```
 
-### NVDA driver sliders
+---
 
-The driver exposes 12 sliders for real-time voice tuning:
+## Python DSP wrapper (`speechPlayer.py`)
 
-#### VoicingTone sliders (global voice character)
+`speechPlayer.py` is a ctypes wrapper around the DSP DLL. It provides clean Python classes (`Frame`, `FrameEx`, `VoicingTone`) and a `SpeechPlayer` class that handles:
 
-| Slider | Range | Default | Maps to |
-|--------|-------|---------|---------|
-| Voice tilt (brightness) | 0–100 | 50 | `voicedTiltDbPerOct` (-24 to +24 dB/oct) |
-| Noise glottal modulation | 0–100 | 0 | `noiseGlottalModDepth` (0.0–1.0) |
-| Pitch-sync F1 delta | 0–100 | 50 | `pitchSyncF1DeltaHz` (-60 to +60 Hz) |
-| Pitch-sync B1 delta | 0–100 | 50 | `pitchSyncB1DeltaHz` (-50 to +50 Hz) |
-| Speed quotient | 0–100 | 50 | `speedQuotient` (0.5–4.0) |
-| Formant sharpness | 0–100 | 50 | `cascadeBwScale` (2.0–0.2, inverted: higher = sharper) |
-| Tremor | 0–100 | 0 | `tremorDepth` (0.0–0.4) |
+- **Architecture detection** — automatically loads from `x86/` or `x64/` subfolder based on Python process bitness
+- **Duration conversion** — `queueFrame()` accepts milliseconds, converts to samples internally
+- **Runtime version checking** — probes for optional DLL exports (`setVoicingTone`, `queueFrameEx`, `setOutputGain`, `setTimeStretch`) and falls back gracefully on older DLLs
+- **ABI safety** — validates `Frame` struct size on init, uses `frameExSize` parameter for forward compatibility
 
-#### FrameEx sliders (per-frame voice quality)
+Key methods for version checking:
 
-| Slider | Range | Default | Maps to |
-|--------|-------|---------|---------|
-| Creakiness | 0–100 | 0 | `creakiness` (0.0–1.0) |
-| Breathiness | 0–100 | 0 | `breathiness` (0.0–1.0) |
-| Jitter | 0–100 | 0 | `jitter` (0.0–1.0) |
-| Shimmer | 0–100 | 0 | `shimmer` (0.0–1.0) |
-| Glottal sharpness | 0–100 | 50 | `sharpness` (0.5–2.0 multiplier) |
+```python
+player = SpeechPlayer(sampleRate=22050)
 
-Note: Sliders centered at 50 (tilt, pitch-sync, speed quotient, formant sharpness, glottal sharpness) have meaningful positive and negative ranges. Sliders starting at 0 (noise modulation, tremor, creakiness, breathiness, jitter, shimmer) are effect amounts that default to "off".
+# Check capabilities before using extended APIs
+player.hasVoicingToneSupport()  # True if DLL exports voicing tone functions
+player.hasFrameExSupport()       # True if DLL exports queueFrameEx
 
-All slider values are stored per-voice, so different voice profiles can have different settings.
+# These return False if the API isn't available (older DLL)
+player.setVoicingTone(tone)      # -> bool
+player.setOutputGain(1.6)        # -> bool
+player.setTimeStretch(2.0)       # -> bool
+```
 
-## The new frontend model (nvspFrontend.dll + YAML packs)
-The new frontend replaces the Python IPA runtime pipeline. It is designed so that language changes can happen as data (YAML) rather than code.
+This file lives at both `speechPlayer.py` (repo root, for standalone use) and `nvdaAddon/synthDrivers/tgSpeechBox/speechPlayer.py` (bundled with the NVDA add-on). It can be used in any Python project that needs to drive the DSP engine directly.
 
-### What the frontend does
-Given an IPA string and a language tag, the frontend:
-- normalizes IPA using YAML rules (`packs/lang/*.yaml`)
-- tokenizes IPA (stress marks, length marks, tie bars, etc.)
-- applies timing rules (vowels vs stops vs affricates, stress scaling, length marks)
-- applies intonation and pitch shaping
-- emits timed frames compatible with `speechPlayer_queueFrame()`
+Note: The NVDA add-on version imports from `logHandler` for logging. For standalone use outside NVDA, the repo-root copy can be adapted.
 
-### Why YAML packs matter
-YAML packs are intended to be community-friendly:
-- easier to read and review than embedded code,
-- allows language/dialect refinements without recompiling the DLL,
-- keeps "phoneme sound definitions" separate from "language mapping rules".
+---
 
-This also makes it easier to share improvements:
-- phoneme tuning in `phonemes.yaml`,
-- language and dialect behavior in `packs/lang/<lang>.yaml` and `packs/lang/<lang-region>.yaml`.
+## Python testing tools (`tools/`)
 
-## Advanced Multilingual Tokenization
+These tools provide a complete Python reimplementation of the frontend's pack loading and frame emission logic. They are designed for **phoneme-by-phoneme acoustic analysis**, not for full synthesis pipelines — they don't support pitch modes, dictionary loading, or text-to-IPA conversion.
 
-The C++ frontend features a **greedy longest-match tokenizer** designed for robust multilingual support. This allows language packs to define multi-character phonemes of arbitrary length without requiring tie bars in the phoneme keys.
+### `simple_yaml.py` — Lenient YAML parser
 
-### Why This Matters
+Handles unquoted IPA symbols (`ʃ`, `ɪ`, `@`) as keys, which standard YAML parsers reject. Used by all other Python tools.
 
-Different languages represent sounds in fundamentally different ways:
+```python
+from simple_yaml import load_yaml_file
+data = load_yaml_file("packs/phonemes.yaml")
+```
 
-| Language | Challenge | Solution |
-|----------|-----------|----------|
-| **Russian** | Palatalized consonants (`nʲ`, `lʲ`, `mʲ`) are single phonemic units | Greedy matching finds `nʲ` as one token, not `n` + `ʲ` |
-| **Polish** | Complex affricates and palatalization | Multi-character keys like `t͡ɕ`, `d͡ʑ` match correctly |
-| **Hungarian** | Geminate consonants, unique vowels | Proper handling of length marks and diacritics |
-| **English** | Syllabic L/R in words like "bottle", "butter" | Normalization splits `ə͡l` → `ə` + `l` for proper lateral quality |
+### `lang_pack.py` — Complete pack parser
 
-### Directional Tie-Bar Flexibility
+Auto-generated from `pack.h` + `pack.cpp` via `generate_lang_pack.py`. Provides a `PackSet` dataclass matching the C++ `PackSet` struct with all ~291 settings.
 
-The tokenizer intelligently handles IPA tie bars (◌͡◌) with **directional matching**:
+```python
+from lang_pack import load_pack_set
+pack = load_pack_set("packs", "en-us")
+print(pack.lang.coarticulation_strength)
+```
 
-- ✅ Input `n͡ʲ` matches pack key `nʲ` — extra tie bars in input are ignored
-- ✅ Input `nʲ` matches pack key `nʲ` — exact matches always work  
-- ❌ Input `əl` won't match pack key `ə͡l` — respects normalization decisions
+### `formant_trajectory.py` — Formant visualization + synthesis
 
-This means:
-- **Pack authors** can define phonemes with or without tie bars as they prefer
-- **eSpeak variations** in tie bar usage are handled gracefully
-- **Normalization rules** (like splitting syllabic L for English) are respected
+Simulates TGSpeechBox's frame manager (interpolation, fading, pitch ramping) and renders formant trajectories as plots. Can optionally output WAV audio.
 
-### Thread-Safe Design
+```
+python formant_trajectory.py --packs packs --lang en-us --text "hello" --out trajectory.png
+python formant_trajectory.py --packs packs --lang hu --ipa "həˈləʊ" --out traj.png --wav out.wav
+```
 
-The sorted phoneme key list is computed once during pack loading and stored immutably in the `PackSet` structure, making the tokenizer fully thread-safe for concurrent speech synthesis.
+### `frame_inspector.py` — Frame-level analysis
 
-### Language pack loading and inheritance
-The loader merges packs in this order:
-1. `packs/lang/default.yaml`
-2. `packs/lang/<lang>.yaml` (example: `en.yaml`)
-3. `packs/lang/<lang-region>.yaml` (example: `en-us.yaml`)
-4. optional deeper variants (example: `en-us-nyc.yaml`)
+Inspect sample-by-sample frame interpolation, compare phoneme transitions, dump parameters at specific time points, measure formant transition rates (Hz/ms). Useful for debugging coarticulation.
 
-This is how dialect differences can be expressed even when upstream IPA does not mark them clearly.
+```
+python frame_inspector.py --packs packs --lang en-us dump a
+python frame_inspector.py --packs packs --lang hu compare a i --fade 15
+python frame_inspector.py --packs packs --lang en-us settings
+```
+
+These tools enable complete acoustic analysis of any phoneme or transition using only Python and the YAML packs — no compiled DLLs or platform dependencies needed.
+
+---
 
 ## Legacy Python files (kept for reference)
-`ipa.py` and `data.py` still live alongside the repo for now, but they are no longer the runtime path for NVDA.
 
-They are retained for:
-- historical reference,
-- comparing behavior during development,
-- and as a source for generating YAML.
+`ipa.py` and `data.py` still live alongside the repo but are no longer the runtime path for NVDA. They are retained for historical reference and comparing behavior during development.
 
-If you want to tune phonemes or language rules going forward, update YAML packs instead.
-
-## Generating phonemes.yaml from Python data
-If you are migrating from the legacy data dictionary, use the conversion tool in `tools/` to regenerate `packs/phonemes.yaml`.
-
-(Exact script name may vary depending on the branch; check `tools/` for the converter.)
+If you want to tune phonemes or language rules, update YAML packs instead.

@@ -199,6 +199,11 @@ class VoicingTone(Structure):
         ("aspirationTiltDbPerOct", c_double),  # Aspiration noise tilt (default 0.0)
         ("cascadeBwScale", c_double),            # Cascade bandwidth multiplier (0.4-1.4, default 1.0)
         ("tremorDepth", c_double),               # Tremor depth for elderly/shaky voice (0-0.5)
+
+        # New v4 parameters — vocal tract shape
+        ("nasalBwScale", c_double),              # Nasal resonator bandwidth multiplier (0.5-2.0, default 1.0)
+        ("f4FreqScale", c_double),               # F4 frequency multiplier (0.7-1.5, default 1.0)
+        ("nasalGainScale", c_double),            # Nasal pole coupling amplitude multiplier (0.5-1.5, default 1.0)
     ]
     
     @classmethod
@@ -230,6 +235,11 @@ class VoicingTone(Structure):
         tone.aspirationTiltDbPerOct = 0.0
         tone.cascadeBwScale = 1.0               # No scaling (default)
         tone.tremorDepth = 0.0                  # No tremor (default)
+
+        # New v4 parameters — vocal tract shape
+        tone.nasalBwScale = 1.0                 # No scaling (default)
+        tone.f4FreqScale = 1.0                  # No scaling (default)
+        tone.nasalGainScale = 1.0               # No scaling (default)
         return tone
 
 
@@ -374,6 +384,50 @@ class SpeechPlayer(object):
         except (AttributeError, OSError):
             # Older DLL without voicing tone support - that's fine
             pass
+
+        # Output gain API (optional - may not exist in older DLLs)
+        self._hasOutputGainApi = False
+        try:
+            _setGain = getattr(self._dll, "speechPlayer_setOutputGain", None)
+            if _setGain is not None:
+                self._dll.speechPlayer_setOutputGain.argtypes = (c_void_p, c_double)
+                self._dll.speechPlayer_setOutputGain.restype = None
+                self._hasOutputGainApi = True
+        except (AttributeError, OSError):
+            pass
+
+        # Time-stretch API (optional - DSP-level rate boost via cycle skipping)
+        self._hasTimeStretchApi = False
+        try:
+            _setTS = getattr(self._dll, "speechPlayer_setTimeStretch", None)
+            if _setTS is not None:
+                self._dll.speechPlayer_setTimeStretch.argtypes = (c_void_p, c_double)
+                self._dll.speechPlayer_setTimeStretch.restype = None
+                self._hasTimeStretchApi = True
+        except (AttributeError, OSError):
+            pass
+
+    def setTimeStretch(self, factor: float) -> bool:
+        """Set DSP-level time-stretch factor for rate boost.
+
+        1.0 = normal, 2.0 = skip every other glottal cycle (2x speedup).
+        Returns True if the API is available.
+        """
+        if not self._hasTimeStretchApi:
+            return False
+        self._dll.speechPlayer_setTimeStretch(self._speechHandle, c_double(factor))
+        return True
+
+    def setOutputGain(self, gain: float) -> bool:
+        """Set output gain applied before the DSP limiter.
+
+        This ensures consistent clipping/limiting behavior across platforms.
+        Default is 1.0 (no gain). Returns True if the API is available.
+        """
+        if not self._hasOutputGainApi:
+            return False
+        self._dll.speechPlayer_setOutputGain(self._speechHandle, c_double(gain))
+        return True
 
     def queueFrame(self, frame, minFrameDuration, fadeDuration, userIndex: int = -1, purgeQueue: bool = False) -> None:
         framePtr = byref(frame) if frame else None
