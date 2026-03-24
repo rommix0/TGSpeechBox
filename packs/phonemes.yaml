@@ -7101,7 +7101,7 @@ phonemes:
     caNP: 0
     cb1: 77
     cb2: 80
-    cb3: 135
+    cb3: 155
     cb4: 300
     cb5: 350
     cb6: 1300
@@ -7109,7 +7109,7 @@ phonemes:
     cbNP: 100
     cf1: 310
     cf2: 1200
-    cf3: 1550
+    cf3: 1620
     cf4: 3300
     cf5: 3750
     cf6: 4900
@@ -7137,9 +7137,11 @@ phonemes:
     pf6: 4900
     voiceAmplitude: 0.9
   "ɻ":
-    # US retroflex R — open-jaw American quality, not dark/Scottish.
-    # F1 raised for more open mouth, F3 brightened slightly.
-    # Low F3 (~1550) = American R identity; too low = Scottish/dark.
+    # US retroflex R — bunched American quality, not curled/Scottish.
+    # F3 ~1700 = American "bunched R" identity (tongue body bunches in
+    # pharynx rather than curling to palate). Too low (<1550) = Scottish/
+    # dark; too high (>1800) = weak/Australian. Wider cb3 softens the
+    # resonance so it doesn't sound like tongue pressed to roof of mouth.
     _isLiquid: true
     _isNasal: false
     _isStop: false
@@ -7147,17 +7149,17 @@ phonemes:
     _isVowel: false
     aspirationAmplitude: 0
     caNP: 0
-    cb1: 85
+    cb1: 95
     cb2: 90
-    cb3: 160
+    cb3: 170
     cb4: 300
     cb5: 350
     cb6: 1300
     cbN0: 100
     cbNP: 100
-    cf1: 370
-    cf2: 1280
-    cf3: 1600
+    cf1: 410
+    cf2: 1300
+    cf3: 1700
     cf4: 3300
     cf5: 3750
     cf6: 4900
@@ -7173,13 +7175,13 @@ phonemes:
     parallelBypass: 0
     pb1: 80
     pb2: 100
-    pb3: 170
+    pb3: 175
     pb4: 300
     pb5: 350
     pb6: 1300
-    pf1: 310
-    pf2: 1200
-    pf3: 1600
+    pf1: 350
+    pf2: 1220
+    pf3: 1700
     pf4: 3300
     pf5: 3750
     pf6: 4900

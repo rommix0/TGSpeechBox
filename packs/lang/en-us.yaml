@@ -553,8 +553,8 @@ settings:
     # ── Fade durations (ms) ──
     # Liquid↔vowel gets extra room — /ɹ/ has the largest F3 excursion
     # in English (~1700→2500 Hz) and needs time to resolve.
-    liquidToVowelFadeMs: 22   # was 14 default — huge F3 swing needs room
-    vowelToLiquidFadeMs: 20   # was 14 default
+    liquidToVowelFadeMs: 25   # was 14 default — huge F3 swing needs room
+    vowelToLiquidFadeMs: 28   # was 14 default — R needs ~50ms F3 transition
     stopToVowelFadeMs: 20
     vowelToStopFadeMs: 22
     fricToVowelFadeMs: 18
@@ -597,7 +597,7 @@ settings:
     # to protect /ɹ/ → vowel from spiking.
     alveolarF1Scale: 0.40    # jaw — moderate
     alveolarF2Scale: 0.50    # compromise: fast enough for /s/, safe for /ɹ/
-    alveolarF3Scale: 0.65    # MUST be slow — /ɹ/ F3 jumps 700+ Hz
+    alveolarF3Scale: 0.75    # MUST be slow — /ɹ/ F3 jumps 700+ Hz (research: 50-80ms needed)
 
     # Palatal/postalveolar (/ʃ/, /ʒ/, /tʃ/, /dʒ/, /j/)
     # Tongue blade — F3 IS the place cue.  Rushing it erases /ʃ/ vs /s/.
