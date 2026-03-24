@@ -514,10 +514,10 @@ settings:
             targetHz: 540
             blend: 1.0
           - field: cf2
-            targetHz: 960
+            targetHz: 990       # was 960 — nudged 30 Hz from GOAT territory
             blend: 1.0
           - field: pf2
-            targetHz: 960
+            targetHz: 990
             blend: 1.0
           - field: cf3
             targetHz: 1900
@@ -885,34 +885,10 @@ normalization:
 
     # FORCE vowels: The vowel before R gets swallowed too quickly.
     # Some consonants (f, m, b, d, st, word-initial) cause extra shortening.
-    # Insert short ᵊ (semivowel) transition to give the vowel more presence.
-    # f + FORCE (for, four):
-    - from: "fˈoːɹ"
-      to:   "fˈoːᵊɹ"
-    - from: "fɔːɹ"
-      to:   "fɔːᵊɹ"
-    - from: "foːɹ"
-      to:   "foːᵊɹ"
-      # m + FORCE (more):
-    - from: "mˈoːɹ"
-      to:   "mˈoːᵊɹ"
-    - from: "moːɹ"
-      to:   "moːᵊɹ"
-    # b + FORCE (bore, boar):
-    - from: "bˈoːɹ"
-      to:   "bˈoːᵊɹ"
-    - from: "boːɹ"
-      to:   "boːᵊɹ"
-    # d + FORCE (door):
-    - from: "dˈoːɹ"
-      to:   "dˈoːᵊɹ"
-    - from: "doːɹ"
-      to:   "doːᵊɹ"
-    # st + FORCE (store):
-    - from: "stˈoːɹ"
-      to:   "stˈoːᵊɹ"
-    - from: "stoːɹ"
-      to:   "stoːᵊɹ"
+    # REMOVED: epenthetic ᵊ between FORCE vowel and R.
+    # Was needed when vowel→liquid transition was too abrupt (13ms F3 sweep),
+    # but vowelToLiquidFadeMs=28 + alveolarF3Scale=0.75 now gives enough
+    # transition time. The ᵊ was audible at slow rates as "f-au-or".
   classes:
     # Vowels (including schwa/r-colored and extra internal keys used by English packs).
     VOWELS: ["a", "e", "i", "o", "u", "ɐ", "ə", "ɜ", "ɝ", "ɑ", "ɒ", "ɔ", "ɛ", "æ", "ʊ", "ɪ", "ᵾ", "ᵿ", "ᴏ", "ᴐ", "ᴒ", "ã", "ẽ", "ĩ", "õ", "ũ", "ᴜ"]
