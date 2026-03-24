@@ -498,12 +498,13 @@ settings:
           pa6: 0.35
           fricationAmplitude: 0.70
 
-    # ── Pre-rhotic THOUGHT vowel closing ──────────────────────────────
+    # ── Pre-rhotic vowel closing ──────────────────────────────────────
     # American FORCE vowel (forty, four, more) is more closed "oh" than
-    # THOUGHT (dog, all, dialog).  Both map to ᴐ after en-us rules.
-    # Close the vowel before /ɹ/ to get the FORCE quality right.
+    # THOUGHT (dog, all, dialog).  eSpeak may produce either ɔ (→ᴐ) or
+    # o (→ᵒ) for FORCE words, so BOTH must be targeted here.
+    # Without this, ᵒːɻ transitions F3 from 2350→1760 (590 Hz cliff).
       - name: thought_pre_rhotic_close
-        phonemes: ["ᴐ", "ᴐː"]
+        phonemes: ["ᴐ", "ᴐː", "ᵒ", "ᵒː"]
         before: ["ɹ", "ɻ"]
         action: shift
         fieldShifts:
@@ -520,10 +521,10 @@ settings:
             targetHz: 990
             blend: 1.0
           - field: cf3
-            targetHz: 1900
+            targetHz: 2100       # was 1900 — keep FORCE "oh" quality, don't pre-color into R
             blend: 1.0
           - field: pf3
-            targetHz: 1900
+            targetHz: 2100
             blend: 1.0
 
       # ── Diphthong offglide sharpening ──────────────────────────────
@@ -553,8 +554,8 @@ settings:
     # ── Fade durations (ms) ──
     # Liquid↔vowel gets extra room — /ɹ/ has the largest F3 excursion
     # in English (~1700→2500 Hz) and needs time to resolve.
-    liquidToVowelFadeMs: 25   # was 14 default — huge F3 swing needs room
-    vowelToLiquidFadeMs: 28   # was 14 default — R needs ~50ms F3 transition
+    liquidToVowelFadeMs: 32   # was 25 — R has the largest F3 excursion; needs room
+    vowelToLiquidFadeMs: 44   # was 28 — FORCE vowel needs real steady-state before R gesture
     stopToVowelFadeMs: 20
     vowelToStopFadeMs: 22
     fricToVowelFadeMs: 18
@@ -597,7 +598,7 @@ settings:
     # to protect /ɹ/ → vowel from spiking.
     alveolarF1Scale: 0.40    # jaw — moderate
     alveolarF2Scale: 0.50    # compromise: fast enough for /s/, safe for /ɹ/
-    alveolarF3Scale: 0.75    # MUST be slow — /ɹ/ F3 jumps 700+ Hz (research: 50-80ms needed)
+    alveolarF3Scale: 0.85    # slow — /ɹ/ F3 needs ~50ms; effective now ~37ms (44*0.85)
 
     # Palatal/postalveolar (/ʃ/, /ʒ/, /tʃ/, /dʒ/, /j/)
     # Tongue blade — F3 IS the place cue.  Rushing it erases /ʃ/ vs /s/.
@@ -639,7 +640,7 @@ settings:
         triggers: ["ɹ", "ɻ"]
         vowelFilter: all
         formant: f3
-        deltaHz: -80
+        deltaHz: -50
         side: both
         cumulative: true        # V between two R's gets double dose
         unstressedScale: 0.6    # less effect on reduced vowels
@@ -841,17 +842,18 @@ settings:
   # on single-word utterances ("hi?" sounded like "hi.").
 normalization:
   preReplacements:
-    # FORCE vowels: Shorten the vowel when followed by a consonant (short, sport, report).
-    # Open FORCE (door, score, for) keeps its natural length.
-    # Must run FIRST, before tie-bar normalization and ᵊ insertion.
-    - from: "oːɹ"
-      to:   "oɹ"
-      when:
-        beforeClass: CONSONANTS
-    - from: "ɔːɹ"
-      to:   "ɔɹ"
-      when:
-        beforeClass: CONSONANTS
+    # FORCE vowels: let the timing model handle duration naturally.
+    # Previously shortened oːɹ/ɔːɹ before consonants (sport, short),
+    # but this starved "forty" of vowel time.  Boundary smoothing and
+    # rate compensation are now good enough to handle the cluster.
+    # - from: "oːɹ"
+    #   to:   "oɹ"
+    #   when:
+    #     beforeClass: CONSONANTS
+    # - from: "ɔːɹ"
+    #   to:   "ɔɹ"
+    #   when:
+    #     beforeClass: CONSONANTS
 
     # Protect PRICE/MOUTH diphthongs from broad TRAP rules (e.g. five/nine/out).
     # With tie-insensitive rule matching in the frontend, these match both 'aɪ' and 'a͡ɪ'.

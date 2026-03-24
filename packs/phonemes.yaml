@@ -7138,10 +7138,10 @@ phonemes:
     voiceAmplitude: 0.9
   "ɻ":
     # US retroflex R — bunched American quality, not curled/Scottish.
-    # F3 ~1700 = American "bunched R" identity (tongue body bunches in
-    # pharynx rather than curling to palate). Too low (<1550) = Scottish/
-    # dark; too high (>1800) = weak/Australian. Wider cb3 softens the
-    # resonance so it doesn't sound like tongue pressed to roof of mouth.
+    # F3 ~1760 = bright American "bunched R" (Hillenbrand mean 1711).
+    # Too low (<1550) = Scottish/dark; too high (>1800) = weak/Australian.
+    # cb3=150 gives sharp defined F3 peak; voiceAmplitude 0.80 matches
+    # the ~8 dB natural reduction vs adjacent vowels (Klatt 1980).
     _isLiquid: true
     _isNasal: false
     _isStop: false
@@ -7151,15 +7151,15 @@ phonemes:
     caNP: 0
     cb1: 95
     cb2: 90
-    cb3: 170
+    cb3: 150
     cb4: 300
     cb5: 350
     cb6: 1300
     cbN0: 100
     cbNP: 100
-    cf1: 385
+    cf1: 370
     cf2: 1300
-    cf3: 1700
+    cf3: 1760
     cf4: 3300
     cf5: 3750
     cf6: 4900
@@ -7181,11 +7181,11 @@ phonemes:
     pb6: 1300
     pf1: 350
     pf2: 1220
-    pf3: 1700
+    pf3: 1760
     pf4: 3300
     pf5: 3750
     pf6: 4900
-    voiceAmplitude: 0.9
+    voiceAmplitude: 0.80
   "ɽ":
     _isLiquid: false
     _isNasal: false
