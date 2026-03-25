@@ -1550,7 +1550,11 @@ def _getPanelClass():
             try:
                 import synthDriverHandler
                 synth = synthDriverHandler.getSynth()
-                langTag = getattr(synth, "_language", "en-us") or "en-us"
+                # Use _resolvedLang (actual language) — _language may be "auto"
+                langTag = getattr(synth, "_resolvedLang", None) \
+                    or getattr(synth, "_language", "en-us") or "en-us"
+                if langTag == "auto":
+                    langTag = "en-us"
             except Exception:
                 langTag = "en-us"
             return os.path.join(self._packsDir, "dict", langTag + "-user.tsv")
@@ -1617,6 +1621,42 @@ def _getPanelClass():
             )
             if dlg.ShowModal() == wx.ID_OK:
                 srcPath = dlg.GetPath()
+
+                # Validate that the file looks like a 5-column user dict,
+                # not a stress dict (2 cols) or compound dict (2 cols).
+                try:
+                    with open(srcPath, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.rstrip("\n\r")
+                            if not line or line.startswith("#"):
+                                continue
+                            ncols = len(line.split("\t"))
+                            if ncols < 3:
+                                wx.MessageBox(
+                                    _("This file does not appear to be a user pronunciation dictionary.\n\n"
+                                      "Expected 5 tab-separated columns (from_text, to_text, from_ipa, to_ipa, category) "
+                                      "but the first data row has {} column(s).\n\n"
+                                      "Make sure you are importing a user dictionary TSV, "
+                                      "not a stress or compound dictionary.").format(ncols),
+                                    _("Import Error"),
+                                    wx.OK | wx.ICON_WARNING,
+                                    self,
+                                )
+                                dlg.Destroy()
+                                evt.Skip()
+                                return
+                            break  # first data row checked
+                except Exception as e:
+                    wx.MessageBox(
+                        _("Failed to read file: {}").format(str(e)),
+                        _("Import Error"),
+                        wx.OK | wx.ICON_ERROR,
+                        self,
+                    )
+                    dlg.Destroy()
+                    evt.Skip()
+                    return
+
                 result = wx.MessageBox(
                     _("Replace the current user dictionary with:\n{}\n\n"
                       "Existing user entries will be overwritten.\n"
