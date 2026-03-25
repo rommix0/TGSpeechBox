@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - 'v-*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to name artifacts and attach to (e.g. v-300rc2)'
+        required: true
+        type: string
+
+# Use the tag name from push, or the manual input from workflow_dispatch.
+env:
+  RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
 
 jobs:
   build:
@@ -42,7 +52,7 @@ jobs:
 
       - name: Assemble release folder
         run: |
-          DIST="tgspeechbox-linux-${{ matrix.arch }}-${{ github.ref_name }}"
+          DIST="tgspeechbox-linux-${{ matrix.arch }}-${{ env.RELEASE_TAG }}"
           mkdir -p "$DIST/bin" "$DIST/lib" "$DIST/share/tgspeechbox"
 
           # Binaries
@@ -72,8 +82,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tgspeechbox-linux-${{ matrix.arch }}-${{ github.ref_name }}
-          path: tgspeechbox-linux-${{ matrix.arch }}-${{ github.ref_name }}.tar.gz
+          name: tgspeechbox-linux-${{ matrix.arch }}-${{ env.RELEASE_TAG }}
+          path: tgspeechbox-linux-${{ matrix.arch }}-${{ env.RELEASE_TAG }}.tar.gz
 
   release:
     needs: build
@@ -88,12 +98,13 @@ jobs:
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
-            tgspeechbox-linux-x86_64-${{ github.ref_name }}/tgspeechbox-linux-x86_64-${{ github.ref_name }}.tar.gz
-            tgspeechbox-linux-aarch64-${{ github.ref_name }}/tgspeechbox-linux-aarch64-${{ github.ref_name }}.tar.gz
+            tgspeechbox-linux-x86_64-${{ env.RELEASE_TAG }}/tgspeechbox-linux-x86_64-${{ env.RELEASE_TAG }}.tar.gz
+            tgspeechbox-linux-aarch64-${{ env.RELEASE_TAG }}/tgspeechbox-linux-aarch64-${{ env.RELEASE_TAG }}.tar.gz
           draft: true
           generate_release_notes: false
           body: |
-            Linux builds (x86_64 + aarch64) auto-generated from tag ${{ github.ref_name }}.
+            Linux builds (x86_64 + aarch64) auto-generated from tag ${{ env.RELEASE_TAG }}.
 
             Extract and run `./install.sh` to install, or use the `tgsp` wrapper directly.
