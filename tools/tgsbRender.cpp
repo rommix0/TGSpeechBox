@@ -130,6 +130,144 @@ struct FrameEx {
 };
 
 // ============================================================================
+// Built-in voice presets (mirrors NVDA constants.py / mobile hardcoded voices)
+//
+// These are applied as frame multipliers in the render callback when the
+// voice name matches but no YAML profile exists.  This keeps them out of
+// the YAML profile system (no double-listing, no export conflicts).
+// ============================================================================
+
+struct BuiltinVoice {
+  const char* name;
+  // Multipliers (1.0 = no change).  Absolute overrides use negative sentinel.
+  double voicePitch_mul, endVoicePitch_mul;
+  double cf1_mul, cf2_mul, cf3_mul, cf4_mul, cf5_mul, cf6_mul;
+  double cb1_mul, cb2_mul, cb3_mul, cb4_mul, cb5_mul, cb6_mul;
+  double pb1_mul, pb2_mul, pb3_mul, pb4_mul, pb5_mul, pb6_mul;
+  double pf3_mul, pf4_mul, pf5_mul, pf6_mul;
+  double pa3_mul, pa4_mul, pa5_mul, pa6_mul;
+  double fricationAmplitude_mul;
+  double parallelBypass_mul;
+  double voiceTurbulenceAmplitude_mul;
+  // Absolute overrides (NAN = don't override).
+  double voiceAmplitude_abs;
+  double aspirationAmplitude_abs;
+  double glottalOpenQuotient_abs;
+  double vibratoPitchOffset_abs;
+  double vibratoSpeed_abs;
+  double cf4_abs, cf5_abs, cf6_abs;   // cfNP_mul handled via cfNP_mul field
+  double cfNP_mul;
+  double voicedTiltDbPerOct;           // For VoicingTone override
+  bool   hasVoicedTilt;
+};
+
+static const BuiltinVoice kBuiltinVoices[] = {
+  // Adam: slightly wider cb1, boosted pa6, reduced frication
+  {"Adam",
+    1.0, 1.0,                                         // pitch
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0,                   // cf
+    1.3, 1.0, 1.0, 1.0, 1.0, 1.0,                   // cb
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0,                   // pb
+    1.0, 1.0, 1.0, 1.0,                               // pf3-6
+    1.0, 1.0, 1.0, 1.3,                               // pa3-6
+    0.85, 1.0, 1.0,                                    // fric, bypass, turbulence
+    NAN, NAN, NAN, NAN, NAN,                           // abs overrides
+    NAN, NAN, NAN, 1.0,                                // cf4/5/6 abs, cfNP_mul
+    0.0, true},                                        // voicedTilt
+
+  // Benjamin: brighter upper formants, wider cb1
+  {"Benjamin",
+    1.0, 1.0,
+    1.01, 1.02, 1.0, 1.0, 1.0, 1.0,
+    1.3, 1.0, 1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.3,
+    0.7, 1.0, 1.0,
+    NAN, NAN, NAN, NAN, NAN,
+    3770.0, 4100.0, 5000.0, 0.9,
+    0.0, true},
+
+  // Caleb: whisper (no voicing, full aspiration)
+  {"Caleb",
+    1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0,
+    0.0, 1.0, NAN, NAN, NAN,                          // voiceAmp=0, aspirAmp=1
+    NAN, NAN, NAN, 1.0,
+    0.0, true},
+
+  // David: deep voice — lower pitch, narrower formants
+  {"David",
+    0.75, 0.75,
+    0.90, 0.93, 0.95, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0,
+    NAN, NAN, NAN, NAN, NAN,
+    NAN, NAN, NAN, 1.0,
+    0.0, true},
+
+  // Robert: bright, crisp, synthetic — pressed glottis, narrow bandwidths, negative tilt
+  {"Robert",
+    1.10, 1.10,
+    1.02, 1.06, 1.08, 1.08, 1.10, 1.05,             // cf
+    0.65, 0.68, 0.72, 0.75, 0.78, 0.80,             // cb
+    0.72, 0.75, 0.78, 0.80, 0.82, 0.85,             // pb
+    1.06, 1.08, 1.10, 1.00,                           // pf3-6
+    1.08, 1.15, 1.20, 1.25,                           // pa3-6
+    0.75, 0.70, 0.20,                                  // fric, bypass, turbulence
+    NAN, NAN, 0.30, 0.0, 0.0,                         // glottalOQ=0.30, vibrato off
+    NAN, NAN, NAN, 1.0,
+    -6.0, true},
+};
+static const int kBuiltinVoiceCount = sizeof(kBuiltinVoices) / sizeof(kBuiltinVoices[0]);
+
+static const BuiltinVoice* findBuiltinVoice(const std::string& name) {
+  for (int i = 0; i < kBuiltinVoiceCount; ++i) {
+    // Case-insensitive compare
+    std::string a = name, b = kBuiltinVoices[i].name;
+    for (auto& c : a) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (auto& c : b) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (a == b) return &kBuiltinVoices[i];
+  }
+  return nullptr;
+}
+
+// Apply built-in voice multipliers to a frame (in-place).
+static void applyBuiltinVoice(speechPlayer_frame_t& f, const BuiltinVoice& v) {
+  f.voicePitch       *= v.voicePitch_mul;
+  f.endVoicePitch    *= v.endVoicePitch_mul;
+  f.cf1 *= v.cf1_mul;  f.cf2 *= v.cf2_mul;  f.cf3 *= v.cf3_mul;
+  f.cf4 *= v.cf4_mul;  f.cf5 *= v.cf5_mul;  f.cf6 *= v.cf6_mul;
+  f.cb1 *= v.cb1_mul;  f.cb2 *= v.cb2_mul;  f.cb3 *= v.cb3_mul;
+  f.cb4 *= v.cb4_mul;  f.cb5 *= v.cb5_mul;  f.cb6 *= v.cb6_mul;
+  f.pa3 *= v.pa3_mul;  f.pa4 *= v.pa4_mul;  f.pa5 *= v.pa5_mul;  f.pa6 *= v.pa6_mul;
+  f.pb1 *= v.pb1_mul;  f.pb2 *= v.pb2_mul;  f.pb3 *= v.pb3_mul;
+  f.pb4 *= v.pb4_mul;  f.pb5 *= v.pb5_mul;  f.pb6 *= v.pb6_mul;
+  f.pf3 *= v.pf3_mul;  f.pf4 *= v.pf4_mul;  f.pf5 *= v.pf5_mul;  f.pf6 *= v.pf6_mul;
+  f.fricationAmplitude     *= v.fricationAmplitude_mul;
+  f.parallelBypass         *= v.parallelBypass_mul;
+  f.voiceTurbulenceAmplitude *= v.voiceTurbulenceAmplitude_mul;
+  f.cfNP *= v.cfNP_mul;
+  // Absolute overrides
+  if (!std::isnan(v.voiceAmplitude_abs))      f.voiceAmplitude = v.voiceAmplitude_abs;
+  if (!std::isnan(v.aspirationAmplitude_abs)) f.aspirationAmplitude = v.aspirationAmplitude_abs;
+  if (!std::isnan(v.glottalOpenQuotient_abs)) f.glottalOpenQuotient = v.glottalOpenQuotient_abs;
+  if (!std::isnan(v.vibratoPitchOffset_abs))  f.vibratoPitchOffset = v.vibratoPitchOffset_abs;
+  if (!std::isnan(v.vibratoSpeed_abs))        f.vibratoSpeed = v.vibratoSpeed_abs;
+  if (!std::isnan(v.cf4_abs)) f.cf4 = v.cf4_abs;
+  if (!std::isnan(v.cf5_abs)) f.cf5 = v.cf5_abs;
+  if (!std::isnan(v.cf6_abs)) f.cf6 = v.cf6_abs;
+}
+
+// ============================================================================
 // Options
 // ============================================================================
 
@@ -475,6 +613,7 @@ struct CallbackCtx {
   double volume = 1.0;
   FrameEx userFrameEx{};      // User-level defaults from CLI (additive)
   bool hasUserFrameEx = false;
+  const BuiltinVoice* builtinVoice = nullptr;  // Non-null when using a hardcoded voice
 };
 
 static void onFrontendFrameEx(
@@ -503,6 +642,11 @@ static void onFrontendFrameEx(
     speechPlayer_frame_t f{};
     std::memcpy(&f, frameOrNull, sizeof(f));
     f.outputGain *= ctx->volume;
+
+    // Apply built-in voice preset multipliers (Adam, Benjamin, etc.)
+    if (ctx->builtinVoice) {
+      applyBuiltinVoice(f, *ctx->builtinVoice);
+    }
 
     // Use FrameEx if we have per-phoneme values OR user CLI overrides
     if (frameExOrNull || ctx->hasUserFrameEx) {
@@ -590,9 +734,15 @@ int main(int argc, char** argv) {
       return 1;
     }
     
+    // List built-in voices first
+    std::cerr << "Built-in voices:\n";
+    for (int i = 0; i < kBuiltinVoiceCount; ++i) {
+      std::cerr << "  " << kBuiltinVoices[i].name << "\n";
+    }
+
     const char* names = nvspFrontend_getVoiceProfileNames(fe);
     if (names && *names) {
-      std::cerr << "Available voice profiles:\n";
+      std::cerr << "\nYAML voice profiles:\n";
       std::string nameStr = names;
       std::string::size_type pos = 0, prev = 0;
       while ((pos = nameStr.find('\n', prev)) != std::string::npos) {
@@ -681,14 +831,16 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // Set voice profile if specified
+  // Set voice profile if specified.
+  // First try YAML profiles (Beth, Bobby, user-defined).
+  // If no YAML profile matches, check built-in hardcoded voices (Adam, Benjamin, etc.).
+  const BuiltinVoice* activeBuiltin = nullptr;
   if (!opt.voiceProfile.empty()) {
-    if (!nvspFrontend_setVoiceProfile(fe, opt.voiceProfile.c_str())) {
-      std::cerr << "nvspFrontend_setVoiceProfile failed (voice='" << opt.voiceProfile << "')\n";
-      const char* err = nvspFrontend_getLastError(fe);
-      if (err && *err) std::cerr << "  " << err << "\n";
-      // Continue anyway - fall back to default voice
-    }
+    // Try YAML profile first
+    nvspFrontend_setVoiceProfile(fe, opt.voiceProfile.c_str());
+
+    // Check if a built-in voice matches (these aren't in YAML)
+    activeBuiltin = findBuiltinVoice(opt.voiceProfile);
   }
 
   // Apply VoicingTone: first try to load from YAML via frontend, then apply CLI overrides
@@ -735,6 +887,11 @@ int main(int argc, char** argv) {
       tone.tremorDepth = yamlTone.tremorDepth;
     }
     
+    // Apply built-in voice voicedTilt (between YAML and CLI so CLI can still override)
+    if (activeBuiltin && activeBuiltin->hasVoicedTilt) {
+      tone.voicedTiltDbPerOct = activeBuiltin->voicedTiltDbPerOct;
+    }
+
     // Apply CLI overrides (only if non-default)
     if (hasVoicingToneEffect(opt)) {
       VoicingToneV3 cliTone = buildVoicingTone(opt);
@@ -768,6 +925,7 @@ int main(int argc, char** argv) {
   cbCtx.volume = opt.volume;
   cbCtx.userFrameEx = userFrameEx;
   cbCtx.hasUserFrameEx = hasUserFrameEx;
+  cbCtx.builtinVoice = activeBuiltin;
 
   double speed = ssipRateToSpeed(opt.rate);
   if (opt.rateBoost) speed *= 2.0;
