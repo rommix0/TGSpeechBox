@@ -139,14 +139,17 @@ configure_speech_dispatcher() {
     read -r -p "Set TGSpeechBox as the default synthesizer? [y/N] " set_default
     case "$set_default" in
         [yY]|[yY][eE][sS])
-            # Comment out any existing DefaultModule line and add ours
-            if grep -q '^DefaultModule' "$sd_conf_file" 2>/dev/null; then
-                sed -i 's/^DefaultModule/# DefaultModule/' "$sd_conf_file"
+            # Set DefaultModule to tgsb (skip if already set)
+            if grep -q '^DefaultModule tgsb$' "$sd_conf_file" 2>/dev/null; then
+                echo "DefaultModule already set to tgsb."
+            else
+                # Comment out any existing DefaultModule line and add ours
+                if grep -q '^DefaultModule' "$sd_conf_file" 2>/dev/null; then
+                    sed -i 's/^DefaultModule/# DefaultModule/' "$sd_conf_file"
+                fi
+                echo 'DefaultModule tgsb' >> "$sd_conf_file"
+                echo "Set DefaultModule to tgsb."
             fi
-            {
-                echo 'DefaultModule tgsb'
-            } >> "$sd_conf_file"
-            echo "Set DefaultModule to tgsb."
             ;;
         *)
             echo "Skipped. You can set it manually later:"
