@@ -1675,14 +1675,13 @@ def _getPanelClass():
                             wx.OK | wx.ICON_INFORMATION,
                             self,
                         )
-                        # Reload the language to pick up new dict entries
+                        # Reload the language to pick up new dict entries.
+                        # Go through synth._set_language so "auto" is resolved
+                        # and voice profile / eSpeak config are preserved.
                         try:
                             import synthDriverHandler
                             synth = synthDriverHandler.getSynth()
-                            frontend = getattr(synth, "_frontend", None)
-                            langTag = getattr(synth, "_language", "en-us")
-                            if frontend:
-                                frontend.setLanguage(langTag)
+                            synth._set_language(synth._language)
                         except Exception:
                             pass
                     except Exception as e:
