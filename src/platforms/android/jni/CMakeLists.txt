@@ -32,6 +32,9 @@ target_link_libraries(tgspeechbox_jni PRIVATE
     m       # math
 )
 
+# 16 KB page size support (required for Android 15+ devices like Pixel 9)
+target_link_options(tgspeechbox_jni PRIVATE "-Wl,-z,max-page-size=16384")
+
 # Strip debug symbols from release builds to minimize .so size
 if(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" OR CMAKE_BUILD_TYPE STREQUAL "Release")
     target_link_options(tgspeechbox_jni PRIVATE -s)
