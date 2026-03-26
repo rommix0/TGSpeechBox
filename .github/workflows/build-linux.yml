@@ -22,8 +22,8 @@ jobs:
         include:
           - arch: x86_64
             cross: ""
-            pkg: ""
-            cxx: "g++-13"
+            pkg: "g++-12"
+            cxx: "g++-12"
           - arch: aarch64
             cross: "aarch64-linux-gnu-"
             pkg: "g++-12-aarch64-linux-gnu"
@@ -34,10 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GCC 13 and cross-compiler
+      - name: Install GCC 12
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-13 ${{ matrix.pkg }}
+          sudo apt-get install -y ${{ matrix.pkg }}
 
       - name: Build shared libraries + tgsbRender
         run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }} CXX="${{ matrix.cxx }}"
