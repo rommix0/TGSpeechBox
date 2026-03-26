@@ -1059,6 +1059,28 @@ std::string prepareTextForEspeak(
     result = std::move(norm);
   }
 
+  // -0.5. Split hyphens between alphanumeric+letter tokens.
+  // "M5-series" → "M5 series", "F-16" → "F 16", "COVID-19" → "COVID 19".
+  // eSpeak treats hyphenated compounds as single prosodic units, which can
+  // cause resyllabification of unrelated words in the same utterance.
+  {
+    std::string dehyph;
+    dehyph.reserve(result.size());
+    for (size_t i = 0; i < result.size(); ++i) {
+      if (result[i] == '-' && i > 0 && i + 1 < result.size()) {
+        bool leftAlnum = std::isalnum(static_cast<unsigned char>(result[i - 1]));
+        bool rightAlpha = std::isalpha(static_cast<unsigned char>(result[i + 1]))
+                       || std::isdigit(static_cast<unsigned char>(result[i + 1]));
+        if (leftAlnum && rightAlpha) {
+          dehyph += ' ';
+          continue;
+        }
+      }
+      dehyph += result[i];
+    }
+    result = std::move(dehyph);
+  }
+
   // 0. Pronunciation dictionary replacement (highest priority).
   // Words with toIpa set are left in place; their overrides are collected
   // in ipaOverrides for downstream splicing in runTextParser.
