@@ -542,6 +542,12 @@ std::u32string normalizeIpaText(const PackSet& pack, const std::string& ipaUtf8)
   replaceAll(t, U"\u200D", U"");
   replaceAll(t, U"\u200C", U"");
 
+  // Strip IPA syllable boundary dots (U+002E).
+  // eSpeak inserts these as syllable markers. They're informational, not
+  // phonemic, and cause false word splits when hyphens trigger resyllabification
+  // (e.g. "M5-series" makes eSpeak split "powerful" across a dot boundary).
+  replaceAll(t, U".", U"");
+
   // Strip tags like (en), [bg], {xx}.
   removeDelimitedTags(t, U'(', U')');
   removeDelimitedTags(t, U'[', U']');

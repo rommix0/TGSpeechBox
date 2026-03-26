@@ -164,6 +164,24 @@ std::string stripInvisible(std::string_view s) {
       case 0x061C:  // ARABIC LETTER MARK
       case 0x180E:  // MONGOLIAN VOWEL SEPARATOR
         continue;
+      // Normalize Unicode space variants to ASCII space.
+      // iOS clock uses U+202F between time and AM/PM; web content uses
+      // various typographic spaces that break word tokenization.
+      case 0x00A0:  // NO-BREAK SPACE
+      case 0x2002:  // EN SPACE
+      case 0x2003:  // EM SPACE
+      case 0x2004:  // THREE-PER-EM SPACE
+      case 0x2005:  // FOUR-PER-EM SPACE
+      case 0x2006:  // SIX-PER-EM SPACE
+      case 0x2007:  // FIGURE SPACE
+      case 0x2008:  // PUNCTUATION SPACE
+      case 0x2009:  // THIN SPACE
+      case 0x200A:  // HAIR SPACE
+      case 0x202F:  // NARROW NO-BREAK SPACE
+      case 0x205F:  // MEDIUM MATHEMATICAL SPACE
+      case 0x3000:  // IDEOGRAPHIC SPACE
+        out.push_back(' ');
+        continue;
       default:
         if (c >= 0x200E && c <= 0x200F) continue;  // LRM, RLM
         if (c >= 0x202A && c <= 0x202E) continue;  // bidi embeddings
