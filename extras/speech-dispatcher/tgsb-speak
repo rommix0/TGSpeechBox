@@ -7,7 +7,7 @@
 # Usage (from tgsb-generic.conf):
 #   tgsb-speak "$DATA" $LANGUAGE $VOICE $RATE $PITCH $VOLUME
 #
-# Requires: espeak-ng, tgsbRender, aplay in PATH.
+# Requires: espeak-ng, tgsbRender, and aplay or paplay in PATH.
 # Install tgsbRender to /usr/local/bin or adjust PATH.
 
 set -e
@@ -21,6 +21,16 @@ VOLUME="${6:-1.0}"
 PACKDIR="${TGSB_PACKDIR:-/usr/share/tgspeechbox}"
 SAMPLERATE="${TGSB_SAMPLERATE:-16000}"
 RATE_BOOST="${TGSB_RATE_BOOST:-0}"   # set to 1 to enable rate boost
+
+# Detect audio player: prefer paplay (PulseAudio/PipeWire native), fall back to aplay (ALSA)
+if command -v paplay >/dev/null 2>&1; then
+  PLAY_CMD="paplay --raw --rate=$SAMPLERATE --channels=1 --format=s16le"
+elif command -v aplay >/dev/null 2>&1; then
+  PLAY_CMD="aplay -q -r $SAMPLERATE -f S16_LE -t raw -"
+else
+  echo "Error: neither paplay nor aplay found in PATH" >&2
+  exit 1
+fi
 
 # Pre-eSpeak text normalization: dict replacements, compound splitting, etc.
 # This runs the frontend's prepareText on the raw text before eSpeak sees it.
@@ -92,5 +102,5 @@ split_clauses "$TEXT" | while IFS= read -r clause; do
         --volume "$VOLUME" \
         --samplerate "$SAMPLERATE" \
         $BOOST_FLAG \
-    | aplay -q -r "$SAMPLERATE" -f S16_LE -t raw -
+    | $PLAY_CMD
 done
