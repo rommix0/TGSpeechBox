@@ -103,6 +103,13 @@ normalization:
       - p
       - t
 
+  skipReplacements:
+    # Spanish does not have a /t͡s/ affricate — "ts" sequences (e.g. whatsapp,
+    # ibmtts) are separate /t/ + /s/ and the /s/ must remain free for
+    # dialect-specific replacement (s→s_es or s→s_mx).
+    - from: "ts"
+      to: "t͡s"
+
   replacements:
     # Pronounciation-level normalization rules:
     # Palatal nasal: some tables emit ñ as nʲ (or n͡ʲ). Map it to /ɲ/ so it doesn't collapse to plain /n/.
