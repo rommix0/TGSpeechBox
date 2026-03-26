@@ -131,11 +131,27 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
     }
 
     private func initializeBackend() {
-        guard let bundle = Bundle(for: TGSBAudioUnit.self).resourcePath else { return }
         let fm = FileManager.default
 
-        let espeakDataPath = bundle + "/espeak-ng-data"
-        let packDir = bundle + "/packs"
+        // Look for resources in the containing app's bundle first (shared),
+        // then fall back to the extension's own bundle (macOS or standalone).
+        let extBundle = Bundle(for: TGSBAudioUnit.self).resourcePath ?? ""
+        let hostBundle: String = {
+            // On iOS, .appex lives inside Host.app/PlugIns/ — go up two levels.
+            let appex = Bundle(for: TGSBAudioUnit.self).bundleURL
+            let host = appex.deletingLastPathComponent().deletingLastPathComponent()
+            return host.path
+        }()
+
+        let espeakDataPath: String
+        let packDir: String
+        if fm.fileExists(atPath: hostBundle + "/espeak-ng-data") {
+            espeakDataPath = hostBundle + "/espeak-ng-data"
+            packDir = hostBundle + "/packs"
+        } else {
+            espeakDataPath = extBundle + "/espeak-ng-data"
+            packDir = extBundle + "/packs"
+        }
         guard fm.fileExists(atPath: espeakDataPath),
               fm.fileExists(atPath: packDir) else { return }
         engine = tgsb_create(espeakDataPath, packDir, Int32(dspRate))
