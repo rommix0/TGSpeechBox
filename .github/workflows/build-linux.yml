@@ -23,9 +23,11 @@ jobs:
           - arch: x86_64
             cross: ""
             pkg: ""
+            cxx: "g++-13"
           - arch: aarch64
             cross: "aarch64-linux-gnu-"
-            pkg: "g++-13-aarch64-linux-gnu"
+            pkg: "g++-12-aarch64-linux-gnu"
+            cxx: "aarch64-linux-gnu-g++-12"
 
     runs-on: ubuntu-22.04
 
@@ -38,10 +40,10 @@ jobs:
           sudo apt-get install -y g++-13 ${{ matrix.pkg }}
 
       - name: Build shared libraries + tgsbRender
-        run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }} CXX="${{ matrix.cross }}g++-13"
+        run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }} CXX="${{ matrix.cxx }}"
 
       - name: Build static tgsbRender
-        run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }} CXX="${{ matrix.cross }}g++-13" STATIC=1
+        run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }} CXX="${{ matrix.cxx }}" STATIC=1
 
       - name: Strip binaries
         run: |
