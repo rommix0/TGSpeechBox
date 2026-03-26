@@ -41,6 +41,18 @@ if [ -f "$EXTRAS_SD/tgsb-speak" ]; then
     chmod +x "$PREFIX/bin/tgsb-speak"
 fi
 
+# Symlink into /usr/bin if installing to /usr/local — systemd services
+# (like speech-dispatcher via socket activation) often only have /usr/bin
+# in their PATH, not /usr/local/bin.
+if [ "$PREFIX" = "/usr/local" ] && [ -d /usr/bin ]; then
+    for cmd in tgsbRender tgsp tgsb-speak tgsb nvsp; do
+        if [ -f "$PREFIX/bin/$cmd" ] || [ -L "$PREFIX/bin/$cmd" ]; then
+            ln -sf "$PREFIX/bin/$cmd" "/usr/bin/$cmd"
+        fi
+    done
+    echo "Symlinked binaries into /usr/bin for systemd PATH compatibility."
+fi
+
 echo ""
 echo "Installation complete!"
 echo ""
