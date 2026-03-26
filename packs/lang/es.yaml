@@ -218,10 +218,10 @@ normalization:
     - from: "ɾp"
       to: "ɾᵊp"
     - from: "ɾs"
-      to: "ɾᵊs_es"
+      to: "ɾᵊs"
     # Todo: I don't know why this doesn't work. Proper r with micro schwa for words like "archivo"
     - from: "ɾt͡ʃ"
-      to: "ɾᵊt͡ʃ_es"
+      to: "ɾᵊt͡ʃ"
     - from: "ɾt"
       to: "ɾᵊt"
     # Approximant/stop + ɾ clusters (e.g. "madre" = ðɾ, "abrir" = βɾ)
