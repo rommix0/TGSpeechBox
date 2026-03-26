@@ -25,24 +25,23 @@ jobs:
             pkg: ""
           - arch: aarch64
             cross: "aarch64-linux-gnu-"
-            pkg: "g++-aarch64-linux-gnu"
+            pkg: "g++-13-aarch64-linux-gnu"
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install cross-compiler
-        if: matrix.pkg != ''
+      - name: Install GCC 13 and cross-compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y ${{ matrix.pkg }}
+          sudo apt-get install -y g++-13 ${{ matrix.pkg }}
 
       - name: Build shared libraries + tgsbRender
-        run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }}
+        run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }} CXX="${{ matrix.cross }}g++-13"
 
       - name: Build static tgsbRender
-        run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }} STATIC=1
+        run: make -f Makefile.linux CROSS_COMPILE=${{ matrix.cross }} CXX="${{ matrix.cross }}g++-13" STATIC=1
 
       - name: Strip binaries
         run: |
