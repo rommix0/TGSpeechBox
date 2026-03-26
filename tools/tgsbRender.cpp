@@ -855,8 +855,8 @@ int main(int argc, char** argv) {
     tone.voicingPeakPos = 0.91;
     tone.voicedPreEmphA = 0.92;
     tone.voicedPreEmphMix = 0.35;
-    tone.highShelfGainDb = 2.0;
-    tone.highShelfFcHz = 2800.0;
+    tone.highShelfGainDb = 4.0;
+    tone.highShelfFcHz = 2000.0;
     tone.highShelfQ = 0.7;
     tone.voicedTiltDbPerOct = 0.0;
     tone.noiseGlottalModDepth = 0.0;

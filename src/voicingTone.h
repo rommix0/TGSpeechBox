@@ -359,7 +359,7 @@ typedef struct {
     0.91,   /* voicingPeakPos */ \
     0.92,   /* voicedPreEmphA */ \
     0.35,   /* voicedPreEmphMix */ \
-    5.5,    /* highShelfGainDb */ \
+    4.0,    /* highShelfGainDb — matches NVDA; 5.5 was too bright on iOS/Android */ \
     2000.0, /* highShelfFcHz */ \
     0.7,    /* highShelfQ */ \
     0.0,    /* voicedTiltDbPerOct (no tilt by default) */ \
