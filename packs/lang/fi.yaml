@@ -6,6 +6,7 @@
 # - Fixed initial stress
 # - Syllable-timed rhythm
 # - Pure vowels, vowel harmony
+# - 8 monophthong vowels: /ɑ æ e i o ø u y/
 
 settings:
   # === STRESS & RHYTHM ===
@@ -38,6 +39,53 @@ settings:
   # === SMOOTHING ===
   boundarySmoothingEnabled: true
 
+  # === RATE COMPENSATION ===
+  # Finnish consonants are always fully released, even in clusters.
+  # Default stopMs=4 is too short — /p/ vanishes in clusters like "mp" (suurempi).
+  # Also raise voicedConsonantMs — catch-all that covers /h/ and other gaps.
+  rateCompensation:
+    enabled: true
+    minimumDurations:
+      vowelMs: 28
+      fricativeMs: 18
+      stopMs: 10
+      nasalMs: 18
+      liquidMs: 15
+      affricateMs: 14
+      semivowelMs: 30
+      tapMs: 4
+      trillMs: 16
+      voicedConsonantMs: 14
+    wordFinalBonusMs: 6
+    floorSpeedScale: 0.0
+    clusterProportionGuard: true
+    clusterMaxRatioShift: 0.4
+
+  # === PROMINENCE ===
+  # Finnish is syllable-timed with fixed initial stress. Unstressed syllables
+  # should NOT be crushed like in English — every vowel is pure and full.
+  # This protects clusters like "rempi" in "suurempi" from collapsing at speed.
+  prominence:
+    enabled: true
+    secondaryStressLevel: 0.55
+    longVowelWeight: 0.7
+    longVowelMode: "max"
+    wordInitialBoost: 0.0
+    wordFinalReduction: 0.0
+    # Duration realization — keep Finnish relatively flat
+    primaryStressWeight: 1.25
+    secondaryStressWeight: 1.12
+    # Critical: don't crush unstressed vowels (Finnish has no vowel reduction)
+    durationReducedCeiling: 0.92
+    durationProminentFloorMs: 35
+    durationPrimaryFloorMs: 45
+    # Give all real vowels a base prominence so they never get starved
+    fullVowelFloor: 0.3
+    # No amplitude reduction — Finnish unstressed vowels are NOT quieter
+    amplitudeBoostDb: 0.0
+    amplitudeReductionDb: 0.0
+    pitchFromProminence: false
+
   # === SINGLE WORD TUNING ===
   singleWordTuningEnabled: true
   singleWordFinalHoldMs: 45
@@ -47,19 +95,49 @@ settings:
 
 normalization:
   preReplacements:
-    # Finnish /a/ comes through from eSpeak as plain 'a', which in our global phoneme table
-    # is a bit too front. Route it to the Hungarian-style open back vowel for a clearer 'ah'.
+    # === FINNISH /a/ ===
+    # Finnish /a/ = /ɑ/ (open back UNROUNDED). eSpeak may output a, ɑ, or ɒ.
+    # Previous mapping used Hungarian ᴒ (rounded) — wrong vowel quality.
+    # Now routes to dedicated ɑ_fi (F1=690, F2=1060).
     - from: "a"
-      to:   "ᴒ"
+      to: "ɑ_fi"
     - from: "ɑ"
-      to:   "ᴒ"
+      to: "ɑ_fi"
     - from: "ɒ"
-      to:   "ᴒ"
+      to: "ɑ_fi"
 
     # eSpeak fi often uses ɪ where Finnish speakers expect a cleaner /i/.
     - from: "ɪ"
-      to:   "i"
+      to: "i"
 
-    # Finnish /e/ should be a pure mid front vowel
+    # Finnish /e/ is close-mid, not open-mid. eSpeak outputs ɛ.
     - from: "ɛ"
-      to:   "e"
+      to: "e"
+
+  replacements:
+    # === FINNISH CONSONANT VARIANTS ===
+    # Finnish /s/ is retracted (produced further back than English /s/).
+    # Acoustically between /s/ and /ʃ/ — softer, less hissy.
+    - from: s
+      to: s_fi
+    # Finnish /h/ is always clearly pronounced, even in clusters (tähti, lehti, kahvi).
+    # Base /h/ is tuned for English where it's often weak or dropped.
+    - from: h
+      to: h_fi
+
+    # === FINNISH VOWEL VARIANTS ===
+    # Finnish has 8 pure monophthong vowels with a well-spread vowel space.
+    # Base phonemes are tuned for English and too centralized for Finnish.
+    # Source: Iivonen (2005), Suomi et al. (2008).
+    - from: e
+      to: e_fi
+    - from: i
+      to: i_hu
+    - from: o
+      to: o_fi
+    - from: u
+      to: u_fi
+    - from: "ø"
+      to: "ø_fi"
+    - from: "æ"
+      to: "æ_fi"

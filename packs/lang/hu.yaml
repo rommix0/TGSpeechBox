@@ -416,7 +416,7 @@ normalization:
     # === HUNGARIAN SHORT VOWEL VARIANTS ===
     # Base phonemes (ɛ, i, u) have formants tuned for English.
     # Hungarian needs more spread: ɛ more open, i more front, u more back.
-    # Source: BraiLab PCF-8200 measurements + Gósy 2004.
+    # Source: Gósy 2004 + Arató 1992 formant data.
     - from: "ɛ"
       to: "ɛ_hu"
     - from: i

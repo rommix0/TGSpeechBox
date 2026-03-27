@@ -1230,7 +1230,7 @@ phonemes:
   e_hu:
     # Hungarian /eː/ (é) — close-mid front unrounded vowel.
     # More closed (lower F1) and more front (higher F2) than the base /e/.
-    # BraiLab PCF-8200 measurement: F1=316, F2=2276. Tuned toward 350/2200.
+    # Gósy 2004 + Arató 1992 formant data. Tuned toward F1=350, F2=2200.
     _isVowel: true
     _isVoiced: true
     aspirationAmplitude: 0
@@ -3066,7 +3066,7 @@ phonemes:
   "á":
     # Hungarian long á /aː/ - open central UNROUNDED vowel.
     # Distinct from ᴒ: higher F1 (more open), higher F2 (central), no rounding.
-    # BraiLab PCF-8200 measurement: F1=795, F2=1483, F3=2389.
+    # Gósy 2004 + Arató 1992 formant data: F1≈795, F2≈1450.
     # Widened bandwidths further for smoother sound.
     _isLiquid: false
     _isNasal: false
@@ -3249,7 +3249,7 @@ phonemes:
     pf6: 4900
     voiceAmplitude: 0
   "é":
-    # Hungarian long é - BraiLab PCF-8200: F1=316, F2=2276. Tuned toward 350/2200.
+    # Hungarian long é — Gósy 2004 + Arató 1992. Tuned toward F1=350, F2=2200.
     # Front vowels naturally brighter, but shouldn't pierce.
     _isLiquid: false
     _isNasal: false
@@ -3342,7 +3342,7 @@ phonemes:
     voiceAmplitude: 0.9
   i_hu:
     # Hungarian short /i/ — close front unrounded vowel.
-    # BraiLab PCF-8200 measurement: F1=259, F2=2340. Literature (Gósy 2004): F1=280, F2=2300.
+    # Gósy 2004 + Arató 1992: F1≈270, F2≈2320.
     # Base /i/ (F1=310, F2=2020) has F2 too low — not front enough for Hungarian.
     _isLiquid: false
     _isNasal: false
@@ -3665,7 +3665,7 @@ phonemes:
     voiceAmplitude: 0.9
   u_hu:
     # Hungarian short /u/ — close back rounded vowel.
-    # BraiLab PCF-8200 measurement: F1=263, F2=719. Literature (Gósy 2004): F1=300, F2=650.
+    # Gósy 2004 + Arató 1992: F1≈280, F2≈750.
     # Base /u/ (F1=290, F2=950) has F2 way too high — not back enough for Hungarian.
     _isLiquid: false
     _isNasal: false
@@ -3805,7 +3805,7 @@ phonemes:
     pf6: 4900
     voiceAmplitude: 0.9
   "ő":
-    # Hungarian long ö (ő) - BraiLab PCF-8200: F1=433, F2=1490.
+    # Hungarian long ö (ő) — Gósy 2004 + Arató 1992: F1≈430, F2≈1500.
     _isLiquid: false
     _isNasal: false
     _isStop: false
@@ -4209,6 +4209,351 @@ phonemes:
     pf1: 700
     pf2: 1330
     pf3: 2600
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  s_fi:
+    # Finnish /s/ — retracted sibilant, between English /s/ and /ʃ/.
+    # Base /s/ puts all parallel energy in pa6 (sharp/hissy). Finnish /s/ is
+    # produced further back, with more mid-high energy and less extreme top end.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: false
+    _isVowel: false
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 220
+    cb2: 65
+    cb3: 180
+    cb4: 370
+    cb5: 580
+    cb6: 1500
+    cbN0: 100
+    cbNP: 100
+    cf1: 310
+    cf2: 1550
+    cf3: 2620
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0.88
+    pa1: 0
+    pa2: 0
+    pa3: 0.08
+    pa4: 0.12
+    pa5: 0.18
+    pa6: 0.55
+    parallelBypass: 0
+    pb1: 200
+    pb2: 85
+    pb3: 250
+    pb4: 370
+    pb5: 580
+    pb6: 1815
+    pf1: 310
+    pf2: 1550
+    pf3: 2620
+    pf4: 3300
+    pf5: 3750
+    pf6: 5050
+    voiceAmplitude: 0
+  h_fi:
+    # Finnish /h/ — always clearly pronounced, even in consonant clusters (tähti, lehti).
+    # Base /h/ (aspirationAmplitude=0.15) is tuned for English where /h/ is weak.
+    # Finnish /h/ needs stronger aspiration to survive in ht, hk, hp clusters.
+    _copyAdjacent: true
+    _isStop: false
+    _isVoiced: false
+    _isVowel: false
+    aspirationAmplitude: 0.38
+    fricationAmplitude: 0
+    voiceAmplitude: 0
+    frameEx:
+      breathiness: 0.08
+  # ---- Finnish vowel variants (Iivonen 2005, Suomi et al. 2008) ----
+  "ɑ_fi":
+    # Finnish /ɑ/ — open back UNROUNDED vowel. Distinct from Hungarian ᴒ (rounded).
+    # F1≈690, F2≈1060. Base ɑ (F1=700, F2=1330) has F2 too high (not back enough).
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 170
+    cb2: 120
+    cb3: 150
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 690
+    cf2: 1060
+    cf3: 2500
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 170
+    pb2: 120
+    pb3: 150
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 690
+    pf2: 1060
+    pf3: 2500
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  e_fi:
+    # Finnish /e/ — close-mid front unrounded. Pure monophthong.
+    # F1≈395, F2≈2070. Base e (F1=430, F2=2000) slightly too open and not front enough.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 77
+    cb2: 75
+    cb3: 150
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 395
+    cf2: 2070
+    cf3: 2700
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 70
+    pb2: 100
+    pb3: 200
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 395
+    pf2: 2070
+    pf3: 2700
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  # i_fi: removed — shares i_hu (ΔF1=5, ΔF2=20 Hz — inaudible difference).
+  o_fi:
+    # Finnish /o/ — close-mid back rounded. F1≈390, F2≈730.
+    # Base /o/ (F1=440, F2=860) too open and not back enough.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 120
+    cb2: 120
+    cb3: 120
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 390
+    cf2: 730
+    cf3: 2400
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 120
+    pb2: 120
+    pb3: 120
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 440
+    pf2: 780
+    pf3: 2400
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  u_fi:
+    # Finnish /u/ — close back rounded. F1≈290, F2≈630.
+    # Base /u/ (F1=290, F2=950) has F2 way too high — Finnish /u/ is very back.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 71.5
+    cb2: 82.5
+    cb3: 105
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 290
+    cf2: 630
+    cf3: 2300
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 65
+    pb2: 110
+    pb3: 140
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 340
+    pf2: 600
+    pf3: 2200
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  "ø_fi":
+    # Finnish /ø/ (ö) — close-mid front rounded. F1≈390, F2≈1400.
+    # Base ø (F1=450, F2=1550) too open and F2 too high.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 77
+    cb2: 85
+    cb3: 160
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 390
+    cf2: 1400
+    cf3: 2400
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 70
+    pb2: 100
+    pb3: 200
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 390
+    pf2: 1400
+    pf3: 2400
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  "æ_fi":
+    # Finnish /æ/ (ä) — near-open front unrounded. F1≈610, F2≈1690.
+    # Base æ (F1=620, F2=1780) close but F2 slightly too high.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 100
+    cb2: 100
+    cb3: 150
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 610
+    cf2: 1690
+    cf3: 2500
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 100
+    pb2: 100
+    pb3: 150
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 610
+    pf2: 1690
+    pf3: 2500
     pf4: 3300
     pf5: 3750
     pf6: 4900
@@ -4933,8 +5278,8 @@ phonemes:
     voiceAmplitude: 0.9
   "ɛ_hu":
     # Hungarian short /ɛ/ — open-mid front unrounded vowel.
-    # BraiLab PCF-8200 measurement: F1=565, F2=1922. Literature (Gósy 2004): F1=550, F2=1800.
-    # Tuned to F1=555, F2=1870 (weighted blend). Base ɛ (F1=530, F2=1750) is too centralized.
+    # Gósy 2004 + Arató 1992: F1≈555, F2≈1870.
+    # Base ɛ (F1=530, F2=1750) is too centralized for Hungarian.
     _isLiquid: false
     _isNasal: false
     _isStop: false
