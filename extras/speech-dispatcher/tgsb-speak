@@ -12,6 +12,18 @@
 
 set -e
 
+# Parse --stdout flag first, then shift it out of positional args.
+STDOUT_MODE=0
+_args=""
+for _a in "$@"; do
+  if [ "$_a" = "--stdout" ]; then
+    STDOUT_MODE=1
+  else
+    _args="$_args \"$_a\""
+  fi
+done
+eval set -- $_args
+
 TEXT="$1"
 LANG="${2:-en}"
 VOICE="${3:-default}"
@@ -23,40 +35,23 @@ SAMPLERATE="${TGSB_SAMPLERATE:-16000}"
 RATE_BOOST="${TGSB_RATE_BOOST:-0}"   # set to 1 to enable rate boost
 
 # ── Audio session environment ──────────────────────────────────────────
-# sd_generic spawns us as a subprocess of speech-dispatcher, which may
-# run as a systemd user service or socket-activated daemon. In that
-# context, PulseAudio/PipeWire environment variables are often missing,
-# so paplay/aplay can't reach the user's audio session.
-#
-# Try to inherit the desktop user's audio environment.
-if [ -z "$XDG_RUNTIME_DIR" ]; then
-  # Find the UID of the user running speech-dispatcher (or fall back to UID 1000)
-  _uid="${UID:-$(id -u 2>/dev/null || echo 1000)}"
-  if [ -d "/run/user/$_uid" ]; then
-    export XDG_RUNTIME_DIR="/run/user/$_uid"
-  fi
-fi
-
-if [ -z "$PULSE_SERVER" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
-  # PipeWire's PulseAudio socket
-  if [ -e "$XDG_RUNTIME_DIR/pipewire-0" ]; then
-    export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
-  elif [ -e "$XDG_RUNTIME_DIR/pulse/native" ]; then
-    export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
-  fi
-fi
-
-# Audio output mode:
-# --stdout: write raw PCM to stdout (for sd_generic $PLAY_COMMAND piping)
-# default: play audio directly via paplay/aplay
-STDOUT_MODE=0
-for arg in "$@"; do
-  if [ "$arg" = "--stdout" ]; then
-    STDOUT_MODE=1
-  fi
-done
-
+# When not in --stdout mode, sd_generic's subprocess may lack audio
+# session variables. Try to inherit the desktop user's environment.
 if [ "$STDOUT_MODE" = 0 ]; then
+  if [ -z "$XDG_RUNTIME_DIR" ]; then
+    _uid="${UID:-$(id -u 2>/dev/null || echo 1000)}"
+    if [ -d "/run/user/$_uid" ]; then
+      export XDG_RUNTIME_DIR="/run/user/$_uid"
+    fi
+  fi
+  if [ -z "$PULSE_SERVER" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
+    if [ -e "$XDG_RUNTIME_DIR/pipewire-0" ]; then
+      export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
+    elif [ -e "$XDG_RUNTIME_DIR/pulse/native" ]; then
+      export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
+    fi
+  fi
+
   # Direct playback: prefer paplay (PulseAudio/PipeWire native), fall back to aplay (ALSA)
   if command -v paplay >/dev/null 2>&1; then
     PLAY_CMD="paplay --raw --rate=$SAMPLERATE --channels=1 --format=s16le"
