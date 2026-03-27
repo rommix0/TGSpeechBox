@@ -30,6 +30,8 @@ settings:
   # Word-boundary clusters need small gaps to stay intelligible
   stopClosureWordBoundaryClusterGapMs: 16
   stopClosureWordBoundaryClusterFadeMs: 3
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
 
   # === TRILLS ===
   # Russian has both /r/ and /rʲ/ (palatalized trill)

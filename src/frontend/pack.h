@@ -526,6 +526,7 @@ struct LanguagePack {
   // If true, allow inserting short closure gaps before stops even after nasals.
   // This helps keep stops audible in nasal+stop clusters (e.g. Hungarian "pont" -> n+t).
   // Default false to avoid "clicks" in languages where this sounds unnatural.
+  // Consider using stopClosureNasalToStopGapMs instead for finer control.
   bool stopClosureAfterNasalsEnabled = false;
 
   // Stop closure timing (ms at speed=1.0; divided by current speed).
@@ -535,6 +536,14 @@ struct LanguagePack {
   double stopClosureVowelFadeMs = 10.0;
   double stopClosureClusterGapMs = 22.0;
   double stopClosureClusterFadeMs = 4.0;
+
+  // Dedicated nasal→stop closure gap (ms at speed=1.0; divided by current speed).
+  // When > 0, inserts a short closure gap before stops that follow nasals,
+  // regardless of stopClosureAfterNasalsEnabled. This protects clusters like
+  // /mp/ (suurempi), /nt/ (parenthèse), /nk/ (pankki) from being swallowed
+  // at speed. Shorter than the general cluster gap to avoid clicks.
+  double stopClosureNasalToStopGapMs = 0.0;
+  double stopClosureNasalToStopFadeMs = 2.0;
 
   // Optional: if >0, override cluster gap timing specifically at word boundaries
   // (when the stop/affricate is at word start).

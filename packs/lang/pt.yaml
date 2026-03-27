@@ -8,6 +8,10 @@ settings:
   # Portuguese IPA from eSpeak rarely includes ː, so this mainly affects our own rules.
   lengthenedScale: 1.15
 
+  # Nasal+stop clusters (campo, tanto, banco) — protect stop from being swallowed at speed
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
+
   # Smooth vowel-to-vowel transitions inside diphthongs ("ei", "ui", "au", ...).
   # This relies on the frontend option you added.
   segmentBoundarySkipVowelToVowel: true

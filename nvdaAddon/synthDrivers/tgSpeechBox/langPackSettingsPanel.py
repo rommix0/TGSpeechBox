@@ -677,6 +677,8 @@ def _getPanelClass():
                 "stopClosureClusterGapMs",
                 "stopClosureClusterGapsEnabled",
                 "stopClosureMode",
+                "stopClosureNasalToStopFadeMs",
+                "stopClosureNasalToStopGapMs",
                 "stopClosureVowelFadeMs",
                 "stopClosureVowelGapMs",
                 "stopClosureWordBoundaryClusterFadeMs",

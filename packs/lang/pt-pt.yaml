@@ -11,3 +11,7 @@ settings:
 
   # European Portuguese tends to be faster/more clipped than Brazilian
   lengthenedScale: 1.10
+
+  # Nasal+stop clusters — protect stop from being swallowed at speed
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2

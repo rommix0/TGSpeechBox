@@ -25,6 +25,8 @@ settings:
   stopClosureClusterFadeMs: 3
   stopClosureVowelGapMs: 26
   stopClosureVowelFadeMs: 4
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
 
   # === TRILLS ===
   # Bulgarian has a trilled /r/

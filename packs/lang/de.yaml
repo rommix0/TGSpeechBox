@@ -31,6 +31,8 @@ settings:
   stopClosureVowelFadeMs: 6
   stopClosureClusterGapMs: 18
   stopClosureClusterFadeMs: 5
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
 
   # German glottal stop before vowel-initial words (Knacklaut)
   # This is what makes German sound "choppy" to English ears

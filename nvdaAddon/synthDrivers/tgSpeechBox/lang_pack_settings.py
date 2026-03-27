@@ -324,6 +324,8 @@ _LANG_PACK_SPECS = (
     ("stopClosureMode", "stopClosureMode", "enum", "vowel-and-cluster", LangPackSettingsMixin._STOP_CLOSURE_MODES),
     ("stopClosureClusterGapsEnabled", "stopClosureClusterGapsEnabled", "bool", False, None),
     ("stopClosureAfterNasalsEnabled", "stopClosureAfterNasalsEnabled", "bool", False, None),
+    ("stopClosureNasalToStopGapMs", "stopClosureNasalToStopGapMs", "float", 0.0, None),
+    ("stopClosureNasalToStopFadeMs", "stopClosureNasalToStopFadeMs", "float", 2.0, None),
     ("autoTieDiphthongs", "autoTieDiphthongs", "bool", False, None),
     ("autoDiphthongOffglideToSemivowel", "autoDiphthongOffglideToSemivowel", "bool", False, None),
     ("segmentBoundarySkipVowelToVowel", "segmentBoundarySkipVowelToVowel", "bool", False, None),

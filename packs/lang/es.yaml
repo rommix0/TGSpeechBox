@@ -14,7 +14,9 @@ settings:
   stopClosureClusterFadeMs: 5
   stopClosureWordBoundaryClusterGapMs: 36
   stopClosureWordBoundaryClusterFadeMs: 5
-  
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
+
   segmentBoundaryGapMs: 20
   segmentBoundaryFadeMs: 6
 

@@ -9,6 +9,8 @@ settings:
   stopClosureClusterFadeMs: 5.0
   stopClosureWordBoundaryClusterGapMs: 12.0
   stopClosureWordBoundaryClusterFadeMs: 3.0
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
   lengthenedScale: 2.44
 
   # Single-word utterance smoothing (key echo / word-by-word navigation)

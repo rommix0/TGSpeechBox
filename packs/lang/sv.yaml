@@ -34,6 +34,8 @@ settings:
   stopClosureVowelFadeMs: 6
   stopClosureClusterGapMs: 18
   stopClosureClusterFadeMs: 5
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
 
   # Smooth transitions for retroflex consonants
   boundarySmoothingEnabled: true

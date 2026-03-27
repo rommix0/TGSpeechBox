@@ -31,6 +31,12 @@ settings:
   lengthContrastGeminateReleaseScale: 0.85
   lengthContrastPreGeminateVowelScale: 0.80
 
+  # === NASAL+STOP CLUSTER PROTECTION ===
+  # Finnish stops are always fully released in nasal+stop clusters (mp, nt, nk).
+  # Insert a short closure gap to create acoustic separation.
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
+
   # === TRILLS ===
   # Finnish has a trilled /r/
   trillModulationMs: 50

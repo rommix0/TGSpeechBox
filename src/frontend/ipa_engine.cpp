@@ -177,10 +177,15 @@ static void calculateTimes(std::vector<Token>& tokens, const PackSet& pack, doub
         double baseDur = lang.stopClosureClusterGapMs * closureScale;
         double baseFade = lang.stopClosureClusterFadeMs;
 
-        if (t.wordStart && lang.stopClosureWordBoundaryClusterGapMs > 0.0) {
+        // Dedicated nasal→stop gap: use shorter timing to avoid clicks
+        // while still protecting the stop burst from being swallowed.
+        if (t.nasalToStopGap && lang.stopClosureNasalToStopGapMs > 0.0) {
+          baseDur = lang.stopClosureNasalToStopGapMs * closureScale;
+          baseFade = lang.stopClosureNasalToStopFadeMs;
+        } else if (t.wordStart && lang.stopClosureWordBoundaryClusterGapMs > 0.0) {
           baseDur = lang.stopClosureWordBoundaryClusterGapMs * closureScale;
         }
-        if (t.wordStart && lang.stopClosureWordBoundaryClusterFadeMs > 0.0) {
+        if (!t.nasalToStopGap && t.wordStart && lang.stopClosureWordBoundaryClusterFadeMs > 0.0) {
           baseFade = lang.stopClosureWordBoundaryClusterFadeMs;
         }
 

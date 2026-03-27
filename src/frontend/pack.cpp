@@ -556,6 +556,8 @@ getNum("primaryStressDiv", lp.primaryStressDiv);
   getNum("stopClosureClusterFadeMs", lp.stopClosureClusterFadeMs);
   getNum("stopClosureWordBoundaryClusterGapMs", lp.stopClosureWordBoundaryClusterGapMs);
   getNum("stopClosureWordBoundaryClusterFadeMs", lp.stopClosureWordBoundaryClusterFadeMs);
+  getNum("stopClosureNasalToStopGapMs", lp.stopClosureNasalToStopGapMs);
+  getNum("stopClosureNasalToStopFadeMs", lp.stopClosureNasalToStopFadeMs);
 
   // Segment boundary timing (ms at speed=1.0; divided by current speed).
   getNum("segmentBoundaryGapMs", lp.segmentBoundaryGapMs);

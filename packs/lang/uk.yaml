@@ -28,6 +28,8 @@ settings:
   # Word-boundary clusters
   stopClosureWordBoundaryClusterGapMs: 16
   stopClosureWordBoundaryClusterFadeMs: 3
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
 
   # === GEMINATES ===
   # Ukrainian has geminates from consonant assimilation

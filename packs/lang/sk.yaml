@@ -4,6 +4,10 @@ settings:
   primaryStressDiv: 1.25
   secondaryStressDiv: 1.07
 
+  # Nasal+stop clusters — protect stop from being swallowed at speed
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
+
   # Trill modulation (rolled R). Applied only when the phoneme has _isTrill: true.
   trillModulationMs: 50
   trillModulationFadeMs: 2

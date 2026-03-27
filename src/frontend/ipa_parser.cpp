@@ -538,6 +538,7 @@ bool parseToTokens(const PackSet& pack, const std::u32string& text, std::vector<
     if (stress == 0 && (tokenIsStop(t) || tokenIsAfricate(t))) {
       bool needGap = false;
       bool clusterGap = false;
+      bool nasalToStopGap = false;
 
       if (lang.stopClosureMode == "always") {
         needGap = true;
@@ -558,6 +559,14 @@ bool parseToTokens(const PackSet& pack, const std::u32string& text, std::vector<
             needGap = true;
             clusterGap = true;
           }
+          // Dedicated nasal→stop gap: when the general cluster gap skips nasals
+          // but the language has stopClosureNasalToStopGapMs > 0, insert a
+          // shorter dedicated gap to protect the stop burst.
+          if (!needGap && prevIsNasal && lang.stopClosureNasalToStopGapMs > 0.0) {
+            needGap = true;
+            clusterGap = true;
+            nasalToStopGap = true;
+          }
         }
       } else {
         // none
@@ -568,6 +577,7 @@ bool parseToTokens(const PackSet& pack, const std::u32string& text, std::vector<
         gap.silence = true;
         gap.preStopGap = true;
         gap.clusterGap = clusterGap;
+        gap.nasalToStopGap = nasalToStopGap;
         // Preserve word boundary information for timing tweaks.
         // The gap is inserted *before* the stop/affricate token `t`.
         gap.wordStart = t.wordStart;

@@ -265,6 +265,8 @@ class LanguagePack:
     stop_closure_vowel_fade_ms: float = 10.0
     stop_closure_cluster_gap_ms: float = 22.0
     stop_closure_cluster_fade_ms: float = 4.0
+    stop_closure_nasal_to_stop_gap_ms: float = 0.0
+    stop_closure_nasal_to_stop_fade_ms: float = 2.0
     stop_closure_word_boundary_cluster_gap_ms: float = 0.0
     stop_closure_word_boundary_cluster_fade_ms: float = 0.0
     segment_boundary_gap_ms: float = 0.0
@@ -486,7 +488,7 @@ class LanguagePack:
     rate_comp_trill_floor_ms: float = 12.0
     rate_comp_voiced_consonant_floor_ms: float = 10.0
     rate_comp_word_final_bonus_ms: float = 5.0
-    rate_comp_floor_speed_scale: float = 0.0
+    rate_comp_floor_speed_scale: float = 0.5
     rate_comp_cluster_proportion_guard: bool = True
     rate_comp_cluster_max_ratio_shift: float = 0.4
     rate_comp_sonorant_context_bonus_ms: float = 8.0
@@ -811,6 +813,8 @@ def _merge_settings(lp: LanguagePack, s: dict):
     lp.stop_closure_cluster_fade_ms = gn("stopClosureClusterFadeMs", lp.stop_closure_cluster_fade_ms)
     lp.stop_closure_word_boundary_cluster_gap_ms = gn("stopClosureWordBoundaryClusterGapMs", lp.stop_closure_word_boundary_cluster_gap_ms)
     lp.stop_closure_word_boundary_cluster_fade_ms = gn("stopClosureWordBoundaryClusterFadeMs", lp.stop_closure_word_boundary_cluster_fade_ms)
+    lp.stop_closure_nasal_to_stop_gap_ms = gn("stopClosureNasalToStopGapMs", lp.stop_closure_nasal_to_stop_gap_ms)
+    lp.stop_closure_nasal_to_stop_fade_ms = gn("stopClosureNasalToStopFadeMs", lp.stop_closure_nasal_to_stop_fade_ms)
     lp.segment_boundary_gap_ms = gn("segmentBoundaryGapMs", lp.segment_boundary_gap_ms)
     lp.segment_boundary_fade_ms = gn("segmentBoundaryFadeMs", lp.segment_boundary_fade_ms)
     lp.segment_boundary_skip_vowel_to_vowel = gb("segmentBoundarySkipVowelToVowel", lp.segment_boundary_skip_vowel_to_vowel)

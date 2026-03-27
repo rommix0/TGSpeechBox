@@ -30,6 +30,8 @@ settings:
   clauseFinalFadeMs: 8
 
   stopClosureAfterNasalsEnabled: true
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
 
   # ── Core processing passes ─────────────────────────────────────
   coarticulationEnabled: true

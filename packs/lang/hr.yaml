@@ -10,6 +10,10 @@ settings:
   # Make it a bit more audible than the global default.
   lengthenedScale: 1.15
 
+  # Nasal+stop clusters — protect stop from being swallowed at speed
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
+
 normalization:
   replacements:
     # Map IPA palatalization marker ʲ to internal key (U+E001) to avoid engine bug.

@@ -71,6 +71,7 @@ struct Token {
   bool silence = false;
   bool preStopGap = false;
   bool clusterGap = false;
+  bool nasalToStopGap = false;  // Dedicated nasal→stop closure gap
   bool postStopAspiration = false;
   bool vowelHiatusGap = false;
   bool voicedClosure = false;  // Voice bar: maintain low-amplitude voicing during closure

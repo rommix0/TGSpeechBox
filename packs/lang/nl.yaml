@@ -31,6 +31,8 @@ settings:
   stopClosureVowelFadeMs: 7
   stopClosureClusterGapMs: 16
   stopClosureClusterFadeMs: 5
+  stopClosureNasalToStopGapMs: 10
+  stopClosureNasalToStopFadeMs: 2
 
   # Smooth transitions
   boundarySmoothingEnabled: true
