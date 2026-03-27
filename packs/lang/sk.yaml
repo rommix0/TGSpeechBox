@@ -37,3 +37,18 @@ normalization:
 
     - from: "ʝ"
       to: "j"
+
+    # === SLOVAK VOWEL TUNING ===
+    # Slovak has 6 short + 5 long vowels. Base phonemes too centralized.
+    - from: i
+      to: i_hu
+    - from: u
+      to: u_fi
+    - from: o
+      to: o_fi
+    - from: e
+      to: e_fi
+    - from: a
+      to: a_open
+    - from: "æ"
+      to: "æ_fi"

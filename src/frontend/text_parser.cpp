@@ -851,6 +851,16 @@ std::string runTextParser(
           size_t skip = 1;
           const size_t excess = ipaChunks.size() - textWords.size();
 
+          // Empty-key text words (punctuation like "(", ")") — eSpeak
+          // produces no IPA for them. Don't consume any IPA chunks.
+          const std::string twKey = asciiLower(stripPunct(textWords[tw]));
+          if (twKey.empty()) {
+            skip = 0;
+            TPLOG("    no-dict skip=0 (empty-key punctuation) -> ipaIdx=%zu\n", ipaIdx);
+            ipaIdx += skip;
+            continue;
+          }
+
           // Is this text word purely numeric?  Numbers expand to multiple
           // IPA words ("100" → "one hundred" = 2 chunks), so we prefer
           // consuming MORE chunks to avoid misaligning subsequent words.
@@ -872,8 +882,13 @@ std::string runTextParser(
 
               const size_t probeNuclei = probeIt->second.size();
               // Text words between current (tw) and the anchor each consume
-              // at least 1 IPA chunk.
-              const size_t textGap = probe - tw - 1;
+              // at least 1 IPA chunk — but skip empty-key words (punctuation
+              // like "(" / ")") since eSpeak produces no IPA for them.
+              size_t textGap = 0;
+              for (size_t g = tw + 1; g < probe; ++g) {
+                const std::string gKey = asciiLower(stripPunct(textWords[g]));
+                if (!gKey.empty()) ++textGap;
+              }
 
               for (size_t s = 1; s <= excess + 1; ++s) {
                 const size_t candidateIdx = ipaIdx + s + textGap;

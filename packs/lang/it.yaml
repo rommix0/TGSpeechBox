@@ -26,3 +26,23 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+normalization:
+  replacements:
+    # === ITALIAN VOWEL TUNING ===
+    # Italian has 7 pure vowels. Base phonemes too centralized.
+    # Reuse existing language phonemes where targets overlap.
+    - from: i
+      to: i_hu
+    - from: u
+      to: u_fi
+    - from: o
+      to: o_fi
+    - from: e
+      to: e_fi
+    - from: "ɔ"
+      to: "ɔ_fr"
+    # Italian /a/ is open central — brighter than Slavic /a/.
+    # Base ɑ (700/1330) fits well. a_open (720/1200) is too back.
+    - from: a
+      to: "ɑ"
+
