@@ -1021,6 +1021,8 @@ static std::vector<std::string> knownLanguageSettingKeys() {
     "stopClosureAfterNasalsEnabled",
     "stopClosureClusterFadeMs",
     "stopClosureClusterGapMs",
+    "stopClosureNasalToStopFadeMs",
+    "stopClosureNasalToStopGapMs",
     "stopClosureClusterGapsEnabled",
     "stopClosureMode",
     "stopClosureVowelFadeMs",

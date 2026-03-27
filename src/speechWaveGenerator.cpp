@@ -129,13 +129,20 @@ private:
     double smoothCascadeDuck;      // current smoothed duck value (1.0 = no duck)
     double cascadeDuckAlpha;       // per-sample smoothing coefficient
 
-    // Peak limiter: catches amplitude spikes before they reach the OS audio system.
-    // Fast attack (~0.1ms) catches transients, slow release (~50ms) recovers smoothly.
-    // This prevents Windows/PulseAudio volume ducking on stop bursts mid-sentence.
+    // Lookahead peak limiter: catches amplitude spikes before they reach the
+    // OS audio system. Lookahead lets the limiter see peaks BEFORE they arrive,
+    // preventing pitch-synchronous pumping (issue #71). Hold time bridges
+    // inter-pulse troughs so gain stays constant across pitch cycles.
     double limiterGain;        // current gain reduction (1.0 = no reduction)
     double limiterAttackAlpha; // per-sample attack coefficient
     double limiterReleaseAlpha;// per-sample release coefficient
     double limiterThreshold;   // signal level above which limiting kicks in
+    int    limiterHoldCounter; // samples remaining in hold period
+    int    limiterHoldSamples; // hold duration in samples (~5ms)
+    static constexpr int kLimiterLookaheadMax = 220; // max ~10ms at 22050
+    double limiterDelayBuf[kLimiterLookaheadMax];
+    int    limiterDelayLen;    // actual lookahead length in samples
+    int    limiterDelayIdx;    // write position in circular buffer
 
     // Source-tract coupling: one-pole tilt filter modulated by F1.
     double stcTiltState;       // IIR state for the coupling lowpass
@@ -219,21 +226,33 @@ public:
         const double shelfMixMs = 4.0;
         shelfMixAlpha = 1.0 - exp(-1.0 / (sampleRate * (shelfMixMs * 0.001)));
 
-        // Peak limiter: catches transient spikes from stop bursts.
-        // Attack: 2ms — tracks multi-cycle envelope, not individual pitch
-        // peaks.  The old 0.1ms attack caused pitch-rate gain pumping on
-        // high-pitched diphthong sweeps (harmonics crossing formant peaks
-        // one at a time → per-period amplitude spikes → limiter shimmer).
-        // Stop burst transients are 3-5ms wide, so 2ms still catches them.
-        // Release: 50ms (smooth recovery).
-        // Threshold: 4.0 — gives more headroom so the limiter stays out
-        // of steady voiced segments.  Hard clip at ±32767 with 6000x
-        // scaling means absolute max is ~5.46, so 4.0 still has margin.
-        const double limiterAttackMs = 2.0;
-        const double limiterReleaseMs = 50.0;
+        // Lookahead peak limiter (issue #71): prevents pitch-synchronous
+        // gain pumping that caused clicks at specific speech rates.
+        // Lookahead: 5ms — the limiter sees peaks before they arrive,
+        //   so gain reduction is symmetric around the peak (no asymmetric
+        //   attack transient that deepens the post-peak trough).
+        // Hold: 5ms — bridges inter-pulse troughs (zero crossings) so
+        //   the limiter doesn't release between pitch pulses and re-attack
+        //   on the next one. Covers one full pitch period at 200Hz.
+        // Attack: 1ms — faster than old 2ms because lookahead removes the
+        //   need for slow attack. 1ms catches burst transients within the
+        //   lookahead window.
+        // Release: 40ms — slightly faster than old 50ms because hold
+        //   already prevents premature release.
+        const double limiterAttackMs = 1.0;
+        const double limiterReleaseMs = 40.0;
+        const double limiterLookaheadMs = 5.0;
+        const double limiterHoldMs = 5.0;
         limiterAttackAlpha = 1.0 - exp(-1.0 / (sampleRate * (limiterAttackMs * 0.001)));
         limiterReleaseAlpha = 1.0 - exp(-1.0 / (sampleRate * (limiterReleaseMs * 0.001)));
         limiterThreshold = 4.0;
+        limiterHoldCounter = 0;
+        limiterHoldSamples = (int)(limiterHoldMs * sampleRate * 0.001);
+        limiterDelayLen = (int)(limiterLookaheadMs * sampleRate * 0.001);
+        if (limiterDelayLen > kLimiterLookaheadMax) limiterDelayLen = kLimiterLookaheadMax;
+        if (limiterDelayLen < 1) limiterDelayLen = 1;
+        limiterDelayIdx = 0;
+        memset(limiterDelayBuf, 0, sizeof(limiterDelayBuf));
 
         // Cascade duck smoother: ~3ms time constant.
         // Fast enough to engage during a burst (~6ms hold), slow enough
@@ -363,6 +382,9 @@ public:
                     shelfMix = 1.0;
                     smoothCascadeDuck = 1.0;  // Reset duck (no ducking)
                     limiterGain = 1.0;  // Reset limiter (no gain reduction)
+                    limiterHoldCounter = 0;
+                    limiterDelayIdx = 0;
+                    memset(limiterDelayBuf, 0, sizeof(limiterDelayBuf));
                     stcTiltState = 0.0;  // Reset source-tract coupling filter
                     stcSmoothPole = 0.0;
                     stcSmoothBwOff = 0.0;
@@ -642,12 +664,10 @@ public:
                 // limiter can protect against clipping at all gain levels.
                 bright *= outputGain;
 
-                // Soft-knee peak limiter: prevents amplitude spikes from
-                // clipping while avoiding the audible pumping artifacts of a
-                // hard-knee design.  A knee region (kneeWidth dB) straddles
-                // the threshold — below the knee, no compression; above the
-                // knee, full ∞:1 limiting; inside the knee, compression
-                // ratio ramps smoothly from 1:1 to ∞:1.
+                // Lookahead soft-knee peak limiter (issue #71).
+                // Lookahead lets the limiter see peaks before they arrive,
+                // preventing pitch-synchronous gain pumping. Hold bridges
+                // inter-pulse troughs so gain stays constant across pitch cycles.
                 //
                 // Threshold scales with outputGain so normal speech passes
                 // through cleanly at any platform gain level (issue #50).
@@ -656,38 +676,47 @@ public:
                     double effThreshold = (limiterThreshold * outputGain < kClipLevel)
                                         ? limiterThreshold * outputGain
                                         : kClipLevel;
-                    double absBright = fabs(bright);
-
-                    // Knee width in linear amplitude (±kneeHalf around threshold).
-                    // 1.0 is roughly 6 dB — wide enough to be transparent on
-                    // voiced vowels, narrow enough to still catch sharp bursts.
                     constexpr double kneeHalf = 1.0;
                     double kneeLo = effThreshold - kneeHalf;
                     double kneeHi = effThreshold + kneeHalf;
 
+                    // Push current sample into delay line, retrieve delayed sample.
+                    double delayed = limiterDelayBuf[limiterDelayIdx];
+                    limiterDelayBuf[limiterDelayIdx] = bright;
+                    limiterDelayIdx = (limiterDelayIdx + 1) % limiterDelayLen;
+
+                    // Scan lookahead window for peak magnitude.
+                    double peakAhead = 0.0;
+                    for (int li = 0; li < limiterDelayLen; ++li) {
+                        double mag = fabs(limiterDelayBuf[li]);
+                        if (mag > peakAhead) peakAhead = mag;
+                    }
+
+                    // Soft-knee gain from lookahead peak.
                     double targetGain;
-                    if (absBright <= kneeLo || absBright < 1e-12) {
-                        // Below knee: no compression
+                    if (peakAhead <= kneeLo || peakAhead < 1e-12) {
                         targetGain = 1.0;
-                    } else if (absBright >= kneeHi) {
-                        // Above knee: full limiting (hold at threshold)
-                        targetGain = effThreshold / absBright;
+                    } else if (peakAhead >= kneeHi) {
+                        targetGain = effThreshold / peakAhead;
                     } else {
-                        // Inside knee: quadratic blend from 1:1 to ∞:1.
-                        // t goes 0→1 across the knee region.
-                        double t = (absBright - kneeLo) / (kneeHi - kneeLo);
-                        // Interpolate between no-reduction (1.0) and
-                        // full-limiting gain (effThreshold / absBright).
-                        double fullGain = effThreshold / absBright;
+                        double t = (peakAhead - kneeLo) / (kneeHi - kneeLo);
+                        double fullGain = effThreshold / peakAhead;
                         targetGain = 1.0 + t * t * (fullGain - 1.0);
                     }
 
+                    // Attack / hold / release.
                     if (targetGain < limiterGain) {
                         limiterGain += limiterAttackAlpha * (targetGain - limiterGain);
+                        limiterHoldCounter = limiterHoldSamples;
+                    } else if (limiterHoldCounter > 0) {
+                        limiterHoldCounter--;
+                        // Hold: maintain current gain, don't release yet.
                     } else {
                         limiterGain += limiterReleaseAlpha * (targetGain - limiterGain);
                     }
-                    bright *= limiterGain;
+
+                    // Apply gain to delayed signal.
+                    bright = delayed * limiterGain;
                 }
 
                 // Store for fade-out tail on interrupt
