@@ -970,11 +970,16 @@ normalization:
     # eSpeak systematically produces ɑːɡ for dog, fog, frog, dialog,
     # catalogue, epilogue, etc.  All should be /ɔɡ/ in American English
     # (rounded "aw" quality, not flat "ah").
+    # WORD-FINAL ONLY: mid-word ɑːɡ (progress, toggle, goggle) stays LOT.
     # Must run BEFORE the ɔ→ᴐ rule below so the output gets transformed.
     - from: "ɑːɡ"
       to:   "ɔːɡ"
+      when:
+        atWordEnd: true
     - from: "ɑɡ"
       to:   "ɔɡ"
+      when:
+        atWordEnd: true
 
     # US THOUGHT vowel: make /ɔ(ː)/ more open so it doesn't drift toward an "owe" quality.
     - from: "ɔː"
