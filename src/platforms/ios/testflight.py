@@ -236,7 +236,19 @@ def upload(export_path, platform_name):
         f" --apiKey {KEY_ID}"
         f" --apiIssuer {ISSUER_ID}"
     )
-    run(cmd, f"Uploading to App Store Connect")
+    result = subprocess.run(
+        cmd, shell=True, cwd=SCRIPT_DIR,
+        capture_output=True, text=True
+    )
+    combined = (result.stdout + "\n" + result.stderr).strip()
+    # altool returns exit code 0 even on failure — check output for errors.
+    if "UPLOAD FAILED" in combined or "Failed to upload" in combined:
+        print(f"  ERROR: {platform_name} upload failed!")
+        for line in combined.split("\n")[-15:]:
+            print(f"    {line}")
+        if "train version" in combined.lower() and "closed" in combined.lower():
+            print(f"\n  *** The version train is closed. Bump MARKETING_VERSION in project.yml. ***")
+        sys.exit(1)
     print(f"  {platform_name} uploaded successfully!")
 
 
