@@ -413,6 +413,17 @@ normalization:
     #   to: ""
 
   replacements:
+    # === HUNGARIAN SHORT VOWEL VARIANTS ===
+    # Base phonemes (ɛ, i, u) have formants tuned for English.
+    # Hungarian needs more spread: ɛ more open, i more front, u more back.
+    # Source: BraiLab PCF-8200 measurements + Gósy 2004.
+    - from: "ɛ"
+      to: "ɛ_hu"
+    - from: i
+      to: i_hu
+    - from: u
+      to: u_hu
+
     # === CLUSTER CLARITY ===
     # Insert micro-schwa in difficult clusters for audibility.
     # "megszülettek" has ɡs cluster that merges without help.
@@ -421,8 +432,9 @@ normalization:
 
     # === COMPOUND WORD HELP ===
     # Final "jel" in compounds — add secondary stress for audibility.
-    - from: "jɛl"
-      to: "jˌɛl"
+    # Uses ɛ_hu since ɛ→ɛ_hu replacement runs above.
+    - from: "jɛ_hul"
+      to: "jˌɛ_hul"
       when:
         atWordEnd: true
 

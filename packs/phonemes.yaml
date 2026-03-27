@@ -1230,7 +1230,7 @@ phonemes:
   e_hu:
     # Hungarian /eː/ (é) — close-mid front unrounded vowel.
     # More closed (lower F1) and more front (higher F2) than the base /e/.
-    # Targets from Gósy/Siptar (2015) and Gill et al. (2021), male estimates.
+    # BraiLab PCF-8200 measurement: F1=316, F2=2276. Tuned toward 350/2200.
     _isVowel: true
     _isVoiced: true
     aspirationAmplitude: 0
@@ -1243,8 +1243,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 400
-    cf2: 2100
+    cf1: 350
+    cf2: 2200
     cf3: 2700
     cf4: 3300
     cf5: 3750
@@ -1265,8 +1265,8 @@ phonemes:
     pb4: 250
     pb5: 200
     pb6: 1000
-    pf1: 400
-    pf2: 1900
+    pf1: 350
+    pf2: 2000
     pf3: 2600
     pf4: 3300
     pf5: 3750
@@ -3066,7 +3066,7 @@ phonemes:
   "á":
     # Hungarian long á /aː/ - open central UNROUNDED vowel.
     # Distinct from ᴒ: higher F1 (more open), higher F2 (central), no rounding.
-    # Amplitude reduced from 0.85 — was perceptually far too loud.
+    # BraiLab PCF-8200 measurement: F1=795, F2=1483, F3=2389.
     # Widened bandwidths further for smoother sound.
     _isLiquid: false
     _isNasal: false
@@ -3083,8 +3083,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 790
-    cf2: 1400
+    cf1: 795
+    cf2: 1450
     cf3: 2750
     cf4: 3300
     cf5: 3750
@@ -3105,8 +3105,8 @@ phonemes:
     pb4: 250
     pb5: 200
     pb6: 1000
-    pf1: 790
-    pf2: 1400
+    pf1: 795
+    pf2: 1450
     pf3: 2800
     pf4: 3300
     pf5: 3750
@@ -3249,7 +3249,7 @@ phonemes:
     pf6: 4900
     voiceAmplitude: 0
   "é":
-    # Hungarian long é - widened bandwidths further to reduce sharpness.
+    # Hungarian long é - BraiLab PCF-8200: F1=316, F2=2276. Tuned toward 350/2200.
     # Front vowels naturally brighter, but shouldn't pierce.
     _isLiquid: false
     _isNasal: false
@@ -3266,8 +3266,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 380
-    cf2: 2100
+    cf1: 350
+    cf2: 2200
     cf3: 2950
     cf4: 3300
     cf5: 3750
@@ -3288,8 +3288,8 @@ phonemes:
     pb4: 250
     pb5: 200
     pb6: 1000
-    pf1: 400
-    pf2: 2200
+    pf1: 370
+    pf2: 2300
     pf3: 2950
     pf4: 3300
     pf5: 3750
@@ -3311,8 +3311,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 290
-    cf2: 2150
+    cf1: 270
+    cf2: 2300
     cf3: 2960
     cf4: 3300
     cf5: 3750
@@ -3333,8 +3333,56 @@ phonemes:
     pb4: 250
     pb5: 200
     pb6: 1000
-    pf1: 310
-    pf2: 2020
+    pf1: 290
+    pf2: 2170
+    pf3: 2960
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  i_hu:
+    # Hungarian short /i/ — close front unrounded vowel.
+    # BraiLab PCF-8200 measurement: F1=259, F2=2340. Literature (Gósy 2004): F1=280, F2=2300.
+    # Base /i/ (F1=310, F2=2020) has F2 too low — not front enough for Hungarian.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 49.5
+    cb2: 150
+    cb3: 300
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 275
+    cf2: 2320
+    cf3: 2960
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 45
+    pb2: 200
+    pb3: 400
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 275
+    pf2: 2320
     pf3: 2960
     pf4: 3300
     pf5: 3750
@@ -3401,8 +3449,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 430
-    cf2: 800
+    cf1: 420
+    cf2: 840
     cf3: 2300
     cf4: 3300
     cf5: 3750
@@ -3423,8 +3471,8 @@ phonemes:
     pb4: 250
     pb5: 200
     pb6: 1000
-    pf1: 480
-    pf2: 850
+    pf1: 470
+    pf2: 890
     pf3: 2300
     pf4: 3300
     pf5: 3750
@@ -3586,8 +3634,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 270
-    cf2: 850
+    cf1: 265
+    cf2: 760
     cf3: 2280
     cf4: 3300
     cf5: 3750
@@ -3608,8 +3656,56 @@ phonemes:
     pb4: 250
     pb5: 200
     pb6: 1000
-    pf1: 350
-    pf2: 900
+    pf1: 345
+    pf2: 810
+    pf3: 2200
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  u_hu:
+    # Hungarian short /u/ — close back rounded vowel.
+    # BraiLab PCF-8200 measurement: F1=263, F2=719. Literature (Gósy 2004): F1=300, F2=650.
+    # Base /u/ (F1=290, F2=950) has F2 way too high — not back enough for Hungarian.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 71.5
+    cb2: 82.5
+    cb3: 105
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 280
+    cf2: 750
+    cf3: 2280
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 65
+    pb2: 110
+    pb3: 140
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 340
+    pf2: 700
     pf3: 2200
     pf4: 3300
     pf5: 3750
@@ -3709,7 +3805,7 @@ phonemes:
     pf6: 4900
     voiceAmplitude: 0.9
   "ő":
-    # Hungarian long ö (ő) - consistent F2 for palatal transitions
+    # Hungarian long ö (ő) - BraiLab PCF-8200: F1=433, F2=1490.
     _isLiquid: false
     _isNasal: false
     _isStop: false
@@ -3725,8 +3821,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 400
-    cf2: 1550
+    cf1: 430
+    cf2: 1500
     cf3: 2500
     cf4: 3300
     cf5: 3750
@@ -3747,8 +3843,8 @@ phonemes:
     pb4: 250
     pb5: 200
     pb6: 1000
-    pf1: 450
-    pf2: 1550
+    pf1: 480
+    pf2: 1500
     pf3: 2500
     pf4: 3300
     pf5: 3750
@@ -3861,8 +3957,8 @@ phonemes:
     cb6: 1000
     cbN0: 100
     cbNP: 100
-    cf1: 250
-    cf2: 1700
+    cf1: 255
+    cf2: 1740
     cf3: 2150
     cf4: 3300
     cf5: 3750
@@ -3883,8 +3979,8 @@ phonemes:
     pb4: 250
     pb5: 200
     pb6: 1000
-    pf1: 270
-    pf2: 1750
+    pf1: 275
+    pf2: 1790
     pf3: 2150
     pf4: 3300
     pf5: 3750
@@ -4831,6 +4927,54 @@ phonemes:
     pf1: 530
     pf2: 1750
     pf3: 2500
+    pf4: 3300
+    pf5: 3750
+    pf6: 4900
+    voiceAmplitude: 0.9
+  "ɛ_hu":
+    # Hungarian short /ɛ/ — open-mid front unrounded vowel.
+    # BraiLab PCF-8200 measurement: F1=565, F2=1922. Literature (Gósy 2004): F1=550, F2=1800.
+    # Tuned to F1=555, F2=1870 (weighted blend). Base ɛ (F1=530, F2=1750) is too centralized.
+    _isLiquid: false
+    _isNasal: false
+    _isStop: false
+    _isVoiced: true
+    _isVowel: true
+    aspirationAmplitude: 0
+    caNP: 0
+    cb1: 90
+    cb2: 110
+    cb3: 170
+    cb4: 250
+    cb5: 200
+    cb6: 1000
+    cbN0: 100
+    cbNP: 100
+    cf1: 555
+    cf2: 1870
+    cf3: 2550
+    cf4: 3300
+    cf5: 3750
+    cf6: 4900
+    cfN0: 250
+    cfNP: 200
+    fricationAmplitude: 0
+    pa1: 0
+    pa2: 0
+    pa3: 0
+    pa4: 0
+    pa5: 0
+    pa6: 0
+    parallelBypass: 0
+    pb1: 90
+    pb2: 110
+    pb3: 170
+    pb4: 250
+    pb5: 200
+    pb6: 1000
+    pf1: 555
+    pf2: 1870
+    pf3: 2550
     pf4: 3300
     pf5: 3750
     pf6: 4900
