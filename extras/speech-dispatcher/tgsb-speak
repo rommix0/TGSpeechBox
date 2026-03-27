@@ -30,7 +30,14 @@ VOICE="${3:-default}"
 RATE="${4:-0}"
 PITCH="${5:-50}"
 VOLUME="${6:-1.0}"
-PACKDIR="${TGSB_PACKDIR:-/usr/share/tgspeechbox}"
+# Auto-detect pack directory: /usr/local/share (default install) or /usr/share
+if [ -n "$TGSB_PACKDIR" ]; then
+  PACKDIR="$TGSB_PACKDIR"
+elif [ -d "/usr/local/share/tgspeechbox/packs" ]; then
+  PACKDIR="/usr/local/share/tgspeechbox"
+else
+  PACKDIR="/usr/share/tgspeechbox"
+fi
 SAMPLERATE="${TGSB_SAMPLERATE:-16000}"
 RATE_BOOST="${TGSB_RATE_BOOST:-0}"   # set to 1 to enable rate boost
 
