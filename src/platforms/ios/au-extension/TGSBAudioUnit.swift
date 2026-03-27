@@ -655,8 +655,15 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
     // MARK: - Helpers
 
     private func extractPlainText(from ssml: String) -> String {
-        var text = ssml.replacingOccurrences(of: "<[^>]+>", with: " ",
-                                              options: .regularExpression)
+        // Convert SSML <break> tags to commas so the clause splitter
+        // generates pauses. VoiceOver inserts these between semantic
+        // groups (e.g. "Utility Categories table, Row 1 of 12, selected").
+        var text = ssml.replacingOccurrences(
+            of: #"<break\b[^>]*/?\s*>"#, with: ". ",
+            options: .regularExpression)
+        // Strip remaining SSML tags.
+        text = text.replacingOccurrences(of: "<[^>]+>", with: " ",
+                                          options: .regularExpression)
         text = text.replacingOccurrences(of: "&apos;", with: "'")
         text = text.replacingOccurrences(of: "&quot;", with: "\"")
         text = text.replacingOccurrences(of: "&amp;",  with: "&")
