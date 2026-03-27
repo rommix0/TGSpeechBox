@@ -21,3 +21,27 @@ normalization:
     # Safety fallback: if an upstream voice emits alveolar r, route to uvular ʁ.
     - from: "r"
       to: "ʁ"
+
+    # === FRENCH VOWEL VARIANTS ===
+    # Base phonemes are tuned for English — too centralized for French.
+    # Reuse Finnish/Hungarian phonemes where targets overlap (< 50 Hz total delta).
+    # Source: Calliope (1989), Gendrot & Adda-Decker (2005).
+    #
+    # /i/: French 270/2300, i_hu 275/2320 — Δ5/20, share with Hungarian
+    - from: i
+      to: i_hu
+    # /u/: French 300/650, u_fi 290/630 — Δ10/20, share with Finnish
+    - from: u
+      to: u_fi
+    # /o/: French 370/700, o_fi 390/730 — Δ20/30, share with Finnish
+    - from: o
+      to: o_fi
+    # /e/: French 370/2100, e_fi 395/2070 — Δ25/30, share with Finnish
+    - from: e
+      to: e_fi
+    # /ɔ/: French 530/900, base 420/840 — needs own (F1 off by 110)
+    - from: "ɔ"
+      to: "ɔ_fr"
+    # /ø/: French 370/1500, ø_fi 390/1400 — F2 off by 100, needs own
+    - from: "ø"
+      to: "ø_fr"
