@@ -46,14 +46,26 @@ if [ -z "$PULSE_SERVER" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
   fi
 fi
 
-# Detect audio player: prefer paplay (PulseAudio/PipeWire native), fall back to aplay (ALSA)
-if command -v paplay >/dev/null 2>&1; then
-  PLAY_CMD="paplay --raw --rate=$SAMPLERATE --channels=1 --format=s16le"
-elif command -v aplay >/dev/null 2>&1; then
-  PLAY_CMD="aplay -q -r $SAMPLERATE -f S16_LE -t raw -"
-else
-  echo "Error: neither paplay nor aplay found in PATH" >&2
-  exit 1
+# Audio output mode:
+# --stdout: write raw PCM to stdout (for sd_generic $PLAY_COMMAND piping)
+# default: play audio directly via paplay/aplay
+STDOUT_MODE=0
+for arg in "$@"; do
+  if [ "$arg" = "--stdout" ]; then
+    STDOUT_MODE=1
+  fi
+done
+
+if [ "$STDOUT_MODE" = 0 ]; then
+  # Direct playback: prefer paplay (PulseAudio/PipeWire native), fall back to aplay (ALSA)
+  if command -v paplay >/dev/null 2>&1; then
+    PLAY_CMD="paplay --raw --rate=$SAMPLERATE --channels=1 --format=s16le"
+  elif command -v aplay >/dev/null 2>&1; then
+    PLAY_CMD="aplay -q -r $SAMPLERATE -f S16_LE -t raw -"
+  else
+    echo "Error: neither paplay nor aplay found in PATH" >&2
+    exit 1
+  fi
 fi
 
 # Pre-eSpeak text normalization: dict replacements, compound splitting, etc.
@@ -113,18 +125,36 @@ split_clauses "$TEXT" | while IFS= read -r clause; do
 
   ctype=$(detect_clause "$clause")
 
-  printf '%s' "$clause" \
-    | espeak-ng -q -v "$LANG" --ipa=1 --stdin \
-    | tgsbRender \
-        --packdir "$PACKDIR" \
-        --lang "$LANG" \
-        --voice "$VOICE" \
-        --text "$clause" \
-        --clause "$ctype" \
-        --rate "$RATE" \
-        --pitch "$PITCH" \
-        --volume "$VOLUME" \
-        --samplerate "$SAMPLERATE" \
-        $BOOST_FLAG \
-    | $PLAY_CMD
+  if [ "$STDOUT_MODE" = 1 ]; then
+    # Output raw PCM to stdout — sd_generic pipes this to $PLAY_COMMAND
+    printf '%s' "$clause" \
+      | espeak-ng -q -v "$LANG" --ipa=1 --stdin \
+      | tgsbRender \
+          --packdir "$PACKDIR" \
+          --lang "$LANG" \
+          --voice "$VOICE" \
+          --text "$clause" \
+          --clause "$ctype" \
+          --rate "$RATE" \
+          --pitch "$PITCH" \
+          --volume "$VOLUME" \
+          --samplerate "$SAMPLERATE" \
+          $BOOST_FLAG
+  else
+    # Direct playback via paplay/aplay
+    printf '%s' "$clause" \
+      | espeak-ng -q -v "$LANG" --ipa=1 --stdin \
+      | tgsbRender \
+          --packdir "$PACKDIR" \
+          --lang "$LANG" \
+          --voice "$VOICE" \
+          --text "$clause" \
+          --clause "$ctype" \
+          --rate "$RATE" \
+          --pitch "$PITCH" \
+          --volume "$VOLUME" \
+          --samplerate "$SAMPLERATE" \
+          $BOOST_FLAG \
+      | $PLAY_CMD
+  fi
 done
