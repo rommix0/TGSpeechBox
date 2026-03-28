@@ -17,7 +17,7 @@ STATIC ?= 0
 
 CXXFLAGS = -std=c++17 -O2 -Wall -fPIC
 LDFLAGS_SHARED = -shared
-LIBS = -lpthread -lm
+LIBS = -lpthread -lm -ldl
 
 # Directories
 SRCDIR = src

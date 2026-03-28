@@ -49,6 +49,8 @@ Licensed under the MIT License. See LICENSE for details.
 #if defined(_WIN32)
   #include <fcntl.h>
   #include <io.h>
+#else
+  #include <dlfcn.h>  // dlopen/dlsym for runtime espeak-ng loading
 #endif
 
 namespace {
@@ -268,6 +270,156 @@ static void applyBuiltinVoice(speechPlayer_frame_t& f, const BuiltinVoice& v) {
 }
 
 // ============================================================================
+// Emoji padding (port from tgsb_bridge.cpp — pads emoji with spaces for eSpeak)
+// ============================================================================
+
+static std::string padEmojiWithSpaces(const char *text) {
+  std::string out;
+  out.reserve(std::strlen(text) * 2);
+  const unsigned char *p = (const unsigned char *)text;
+  while (*p) {
+    // 4-byte UTF-8: emoji in U+1F000..U+1FFFF (F0 9F xx xx)
+    if (p[0] == 0xF0 && p[1] >= 0x9F && p[1] <= 0x9F &&
+        (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+      if (!out.empty() && out.back() != ' ') out += ' ';
+      out += (char)p[0]; out += (char)p[1];
+      out += (char)p[2]; out += (char)p[3];
+      p += 4;
+      while (p[0] == 0xEF && p[1] == 0xB8 && (p[2] == 0x8E || p[2] == 0x8F)) {
+        out += (char)p[0]; out += (char)p[1]; out += (char)p[2];
+        p += 3;
+      }
+      if (*p && *p != ' ') out += ' ';
+      continue;
+    }
+    // 3-byte UTF-8: U+2600..U+27BF (E2 98 80..E2 9E BF)
+    if (p[0] == 0xE2 && p[1] >= 0x98 && p[1] <= 0x9E &&
+        (p[2] & 0xC0) == 0x80) {
+      if (!out.empty() && out.back() != ' ') out += ' ';
+      out += (char)p[0]; out += (char)p[1]; out += (char)p[2];
+      p += 3;
+      while (p[0] == 0xEF && p[1] == 0xB8 && (p[2] == 0x8E || p[2] == 0x8F)) {
+        out += (char)p[0]; out += (char)p[1]; out += (char)p[2];
+        p += 3;
+      }
+      if (*p && *p != ' ') out += ' ';
+      continue;
+    }
+    out += (char)*p++;
+  }
+  return out;
+}
+
+// ============================================================================
+// eSpeak-NG runtime loading via dlopen (Linux) / LoadLibrary (Windows)
+//
+// We load libespeak-ng at runtime rather than link-time so that:
+//   - No build dependency on libespeak-ng-dev (CI stays simple)
+//   - No cross-compilation headaches for aarch64
+//   - tgsbRender still works without espeak (IPA-from-stdin mode)
+// ============================================================================
+
+#if !defined(_WIN32)
+
+// Minimal espeak types — stable across all espeak-ng versions.
+// We only need 4 functions for phonemization (no audio synthesis).
+enum { ESPEAK_AUDIO_OUTPUT_SYNCH = 0x02 };
+enum { ESPEAK_CHARS_UTF8 = 1 };
+enum { ESPEAK_INITIALIZE_DONT_EXIT = 0x8000 };
+enum { ESPEAK_EE_OK = 0 };
+
+struct espeak_VOICE_local {
+  const char *name;
+  const char *languages;
+  const char *identifier;
+  unsigned char gender;
+  unsigned char age;
+  unsigned char variant;
+  unsigned char xx1;
+  int score;
+  void *spare;
+};
+
+// Function pointer types
+typedef int  (*fn_espeak_Initialize)(int, int, const char*, int);
+typedef int  (*fn_espeak_SetVoiceByProperties)(espeak_VOICE_local*);
+typedef const char* (*fn_espeak_TextToPhonemes)(const void**, int, int);
+typedef int  (*fn_espeak_Terminate)(void);
+
+struct EspeakLib {
+  void* handle = nullptr;
+  fn_espeak_Initialize       Initialize = nullptr;
+  fn_espeak_SetVoiceByProperties SetVoiceByProperties = nullptr;
+  fn_espeak_TextToPhonemes   TextToPhonemes = nullptr;
+  fn_espeak_Terminate        Terminate = nullptr;
+
+  bool load(const char* espeakDataPath) {
+    // Try versioned name first, then unversioned
+    handle = dlopen("libespeak-ng.so.1", RTLD_LAZY);
+    if (!handle) handle = dlopen("libespeak-ng.so", RTLD_LAZY);
+    if (!handle) {
+      std::cerr << "--espeak: cannot load libespeak-ng.so: " << dlerror() << "\n";
+      return false;
+    }
+
+    Initialize = (fn_espeak_Initialize)dlsym(handle, "espeak_Initialize");
+    SetVoiceByProperties = (fn_espeak_SetVoiceByProperties)dlsym(handle, "espeak_SetVoiceByProperties");
+    TextToPhonemes = (fn_espeak_TextToPhonemes)dlsym(handle, "espeak_TextToPhonemes");
+    Terminate = (fn_espeak_Terminate)dlsym(handle, "espeak_Terminate");
+
+    if (!Initialize || !SetVoiceByProperties || !TextToPhonemes || !Terminate) {
+      std::cerr << "--espeak: missing espeak-ng symbols in library\n";
+      dlclose(handle);
+      handle = nullptr;
+      return false;
+    }
+
+    // Initialize espeak for phonemization only (synchronous, no audio)
+    int sr = Initialize(ESPEAK_AUDIO_OUTPUT_SYNCH, 0,
+                        (espeakDataPath && espeakDataPath[0]) ? espeakDataPath : nullptr,
+                        ESPEAK_INITIALIZE_DONT_EXIT);
+    if (sr <= 0) {
+      std::cerr << "--espeak: espeak_Initialize failed\n";
+      dlclose(handle);
+      handle = nullptr;
+      return false;
+    }
+
+    return true;
+  }
+
+  bool setVoice(const char* lang) {
+    if (!SetVoiceByProperties) return false;
+    espeak_VOICE_local spec{};
+    spec.languages = lang;
+    return SetVoiceByProperties(&spec) == ESPEAK_EE_OK;
+  }
+
+  std::string phonemize(const char* text) {
+    if (!TextToPhonemes) return {};
+    std::string combined;
+    const void *ptr = text;
+    while (ptr && *(const char*)ptr) {
+      const char *ipa = TextToPhonemes(&ptr, ESPEAK_CHARS_UTF8, 0x02 /*IPA*/);
+      if (!ipa || !*ipa) continue;
+      if (!combined.empty()) combined += ' ';
+      combined += ipa;
+    }
+    return combined;
+  }
+
+  void close() {
+    if (handle) {
+      if (Terminate) Terminate();
+      dlclose(handle);
+      handle = nullptr;
+    }
+  }
+};
+
+#endif // !_WIN32
+
+// ============================================================================
 // Options
 // ============================================================================
 
@@ -326,6 +478,8 @@ struct Options {
   bool listVoices = false;        // --list-voices: print available voice profiles and exit
   bool rateBoost = false;         // --rate-boost: double speed, DSP time-stretch handles excess
   bool prepareTextMode = false;   // --prepare-text: output normalized text to stdout and exit
+  bool espeakMode = false;        // --espeak: in-process espeak (text from --text, no stdin IPA)
+  std::string espeakDataPath = "";  // --espeak-data: path to espeak-ng-data (empty = system default)
 };
 
 // ============================================================================
@@ -375,6 +529,12 @@ static void printHelp(const char* argv0) {
     << "\n"
     << "Rate boost:\n"
     << "  --rate-boost          Double effective speed with DSP time-stretch\n"
+    << "\n"
+    << "In-process eSpeak (eliminates pipe chain shimmer):\n"
+    << "  --espeak              Phonemize text from --text using system espeak-ng\n"
+    << "                        instead of reading IPA from stdin. Requires\n"
+    << "                        libespeak-ng.so on the system (Linux only).\n"
+    << "  --espeak-data <path>  Path to espeak-ng-data (default: system default)\n"
     << "\n"
     << "Text normalization:\n"
     << "  --prepare-text        Read text from stdin, apply dict/compound\n"
@@ -495,6 +655,11 @@ static Options parseArgs(int argc, char** argv) {
     if (a == "--inflection") { parseDoubleArg("--inflection", opt.inflection); continue; }
     if (a == "--rate-boost") { opt.rateBoost = true; continue; }
     if (a == "--prepare-text") { opt.prepareTextMode = true; continue; }
+    if (a == "--espeak") { opt.espeakMode = true; continue; }
+    if (a == "--espeak-data") {
+      if (const char* v = requireValue("--espeak-data")) opt.espeakDataPath = v;
+      continue;
+    }
 
     // VoicingTone parameters
     if (a == "--voicing-peak-pos") { parseIntArg(a.c_str(), opt.voicingPeakPos); continue; }
@@ -801,9 +966,17 @@ int main(int argc, char** argv) {
   _setmode(_fileno(stdout), _O_BINARY);
 #endif
 
-  const std::string ipa = readAllStdin();
-  if (ipa.empty()) {
-    return 0;
+  // In --espeak mode, text comes from --text argument (no stdin).
+  // Otherwise, read IPA from stdin as before.
+  std::string ipa;
+  if (opt.espeakMode) {
+    if (opt.text.empty()) {
+      std::cerr << "--espeak requires --text <text>\n";
+      return 2;
+    }
+  } else {
+    ipa = readAllStdin();
+    if (ipa.empty()) return 0;
   }
 
   // Initialize speechPlayer with the requested sample rate
@@ -939,66 +1112,61 @@ int main(int argc, char** argv) {
   const double basePitchHz = sliderPitchToBaseHz(opt.pitch);
   const double inflection = opt.inflection;
 
-  // Detect clause type from original text or explicit override.
-  // When --clause is given, use it directly.  When --text is given,
-  // do a quote-aware backward scan (same idea as the SAPI fix).
-  // This overrides the per-IPA-chunk forward scan below, since IPA
-  // typically doesn't contain sentence-ending punctuation.
-  char textClauseType = 0;  // 0 = not set, use per-chunk scan
-  if (!opt.clauseOverride.empty()) {
-    textClauseType = opt.clauseOverride[0];
-  } else if (!opt.text.empty()) {
-    for (auto it = opt.text.rbegin(); it != opt.text.rend(); ++it) {
-      char c = *it;
-      if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
-      // Skip closing quotes/brackets (ASCII)
-      if (c == '"' || c == '\'' || c == ')' || c == ']') continue;
-      // Skip UTF-8 continuation/lead bytes for smart quotes, ellipsis, etc.
-      // U+2026 (…) backwards: A6 80 E2 — check for the lead byte.
-      if ((unsigned char)c == 0xA6) {
-        auto it2 = it; ++it2;
-        if (it2 != opt.text.rend() && (unsigned char)*it2 == 0x80) {
-          auto it3 = it2; ++it3;
-          if (it3 != opt.text.rend() && (unsigned char)*it3 == 0xE2) {
-            textClauseType = '.';
-            break;
-          }
-        }
-      }
-      if ((unsigned char)c >= 0x80) continue;
-      if (c == '.' || c == '?' || c == '!' || c == ',') {
-        textClauseType = c;
-        break;
-      }
-      break;  // non-whitespace, non-quote, non-punct — give up
+  // ========================================================================
+  // --espeak mode: in-process text-to-IPA via libespeak-ng.so (Linux only).
+  // Adapted from tgsb_bridge.cpp — same clause splitting as iOS/Android.
+  // Eliminates the espeak CLI → pipe → tgsbRender pipe chain.
+  // ========================================================================
+#if !defined(_WIN32)
+  if (opt.espeakMode) {
+    EspeakLib espeak;
+    if (!espeak.load(opt.espeakDataPath.empty() ? nullptr : opt.espeakDataPath.c_str())) {
+      nvspFrontend_destroy(fe);
+      speechPlayer_terminate(player);
+      return 1;
     }
-    if (!textClauseType) textClauseType = '.';
-  }
 
-  // Split IPA input at clause boundaries and queue each clause with its
-  // detected clause type.  Without this, the entire input gets a single
-  // falling-intonation contour regardless of punctuation.
-  {
-    const char* p = ipa.c_str();
-    bool anyFailed = false;
+    // Map our language tag to an espeak voice.
+    // eSpeak uses bare tags like "en-us", "de", "fr" — same as ours.
+    if (!espeak.setVoice(opt.language.c_str())) {
+      std::cerr << "--espeak: failed to set voice for '" << opt.language << "'\n";
+      espeak.close();
+      nvspFrontend_destroy(fe);
+      speechPlayer_terminate(player);
+      return 1;
+    }
 
+    // Clause-splitting loop (same algorithm as tgsb_bridge.cpp / tgsb_jni.cpp).
+    // Split text at sentence boundaries, feed each clause to espeak individually,
+    // tag with correct clause type for prosody.
+    const char *p = opt.text.c_str();
     while (*p) {
       // Skip leading whitespace
       while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
       if (!*p) break;
 
-      const char* clauseStart = p;
-      char clauseType = '.';  // default: declarative
+      const char *clauseStart = p;
+      char clauseType = '.';
 
-      // Scan forward to find next clause boundary in the IPA
       while (*p) {
         char c = *p;
-        if (c == '.' || c == '?' || c == '!' || c == ',') {
+        if (c == '?' || c == '!') {
           clauseType = c;
           p++;
           break;
         }
-        // U+2026 ellipsis (UTF-8: E2 80 A6) — treat as period
+        // comma/period between digits = thousands separator / decimal
+        if (c == ',' || c == '.') {
+          bool prevDigit = (p > clauseStart) &&
+              (unsigned char)(*(p - 1) - '0') <= 9;
+          bool nextDigit = *(p + 1) &&
+              (unsigned char)(*(p + 1) - '0') <= 9;
+          if (prevDigit && nextDigit) { p++; continue; }
+          clauseType = c;
+          p++;
+          break;
+        }
+        // U+2026 ellipsis (UTF-8: E2 80 A6)
         if ((unsigned char)c == 0xE2 &&
             (unsigned char)*(p+1) == 0x80 &&
             (unsigned char)*(p+2) == 0xA6) {
@@ -1006,13 +1174,12 @@ int main(int argc, char** argv) {
           p += 3;
           break;
         }
-        // Colon/semicolon only split when followed by whitespace
-        // (avoids splitting times like "5:44" or ratios like "3:1")
+        // colon/semicolon only split when followed by whitespace
         if (c == ';' || c == ':') {
           char next = *(p + 1);
           if (next == ' ' || next == '\t' || next == '\r' ||
               next == '\n' || next == '\0') {
-            clauseType = ',';  // treat as continuation
+            clauseType = ',';
             p++;
             break;
           }
@@ -1020,10 +1187,113 @@ int main(int argc, char** argv) {
         p++;
       }
 
-      // When text or --clause was provided, override the IPA-based scan.
+      size_t len = (size_t)(p - clauseStart);
+      if (len == 0) continue;
+
+      std::string clause(clauseStart, len);
+
+      // Text normalization: compound splitting, date ordinals, etc.
+      char *prepared = nvspFrontend_prepareText(fe, clause.c_str());
+      if (prepared) {
+        clause = prepared;
+        nvspFrontend_freeString(prepared);
+      }
+
+      // Pad emoji with spaces so eSpeak treats them as separate words
+      std::string padded = padEmojiWithSpaces(clause.c_str());
+      if (padded.size() != clause.size()) clause = std::move(padded);
+
+      // In-process phonemization: text → IPA
+      std::string clauseIpa = espeak.phonemize(clause.c_str());
+      if (clauseIpa.empty()) continue;
+
+      char clauseStr[2] = { clauseType, '\0' };
+      int ok = nvspFrontend_queueIPA_ExWithText(
+        fe, clause.c_str(), clauseIpa.c_str(),
+        speed, basePitchHz, inflection, clauseStr,
+        0, &onFrontendFrameEx, &cbCtx
+      );
+      if (!ok) {
+        std::cerr << "nvspFrontend_queueIPA failed for clause\n";
+        const char* err = nvspFrontend_getLastError(fe);
+        if (err && *err) std::cerr << "  " << err << "\n";
+      }
+    }
+
+    espeak.close();
+  } else
+#endif // !_WIN32
+  {
+    // Original path: read IPA from stdin, split at clause boundaries.
+
+    // Detect clause type from original text or explicit override.
+    char textClauseType = 0;
+    if (!opt.clauseOverride.empty()) {
+      textClauseType = opt.clauseOverride[0];
+    } else if (!opt.text.empty()) {
+      for (auto it = opt.text.rbegin(); it != opt.text.rend(); ++it) {
+        char c = *it;
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+        if (c == '"' || c == '\'' || c == ')' || c == ']') continue;
+        if ((unsigned char)c == 0xA6) {
+          auto it2 = it; ++it2;
+          if (it2 != opt.text.rend() && (unsigned char)*it2 == 0x80) {
+            auto it3 = it2; ++it3;
+            if (it3 != opt.text.rend() && (unsigned char)*it3 == 0xE2) {
+              textClauseType = '.';
+              break;
+            }
+          }
+        }
+        if ((unsigned char)c >= 0x80) continue;
+        if (c == '.' || c == '?' || c == '!' || c == ',') {
+          textClauseType = c;
+          break;
+        }
+        break;
+      }
+      if (!textClauseType) textClauseType = '.';
+    }
+
+    const char* ip = ipa.c_str();
+    bool anyFailed = false;
+
+    while (*ip) {
+      while (*ip == ' ' || *ip == '\t' || *ip == '\r' || *ip == '\n') ip++;
+      if (!*ip) break;
+
+      const char* clauseStart = ip;
+      char clauseType = '.';
+
+      while (*ip) {
+        char c = *ip;
+        if (c == '.' || c == '?' || c == '!' || c == ',') {
+          clauseType = c;
+          ip++;
+          break;
+        }
+        if ((unsigned char)c == 0xE2 &&
+            (unsigned char)*(ip+1) == 0x80 &&
+            (unsigned char)*(ip+2) == 0xA6) {
+          clauseType = '.';
+          ip += 3;
+          break;
+        }
+        if (c == ';' || c == ':') {
+          char next = *(ip + 1);
+          if (next == ' ' || next == '\t' || next == '\r' ||
+              next == '\n' || next == '\0') {
+            clauseType = ',';
+            ip++;
+            break;
+          }
+        }
+        ip++;
+      }
+
       if (textClauseType) clauseType = textClauseType;
 
-      size_t len = static_cast<size_t>(p - clauseStart);
+      size_t len = static_cast<size_t>(ip - clauseStart);
       if (len == 0) continue;
 
       std::string clause(clauseStart, len);
@@ -1032,28 +1302,15 @@ int main(int argc, char** argv) {
       int queueOk;
       if (!opt.text.empty()) {
         queueOk = nvspFrontend_queueIPA_ExWithText(
-          fe,
-          opt.text.c_str(),
-          clause.c_str(),
-          speed,
-          basePitchHz,
-          inflection,
-          clauseStr,
-          /*userIndexBase=*/0,
-          &onFrontendFrameEx,
-          &cbCtx
+          fe, opt.text.c_str(), clause.c_str(),
+          speed, basePitchHz, inflection, clauseStr,
+          0, &onFrontendFrameEx, &cbCtx
         );
       } else {
         queueOk = nvspFrontend_queueIPA_Ex(
-          fe,
-          clause.c_str(),
-          speed,
-          basePitchHz,
-          inflection,
-          clauseStr,
-          /*userIndexBase=*/0,
-          &onFrontendFrameEx,
-          &cbCtx
+          fe, clause.c_str(),
+          speed, basePitchHz, inflection, clauseStr,
+          0, &onFrontendFrameEx, &cbCtx
         );
       }
 
@@ -1067,7 +1324,6 @@ int main(int argc, char** argv) {
 
     if (anyFailed && ipa.find_first_not_of(" \t\r\n") != std::string::npos) {
       // At least one clause failed, but others may have succeeded.
-      // Only bail if the entire input was a single failed clause.
     }
   }
 
