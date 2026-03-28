@@ -118,12 +118,9 @@ else
     dep_ok=false
 fi
 
-# python3 (needed for clause splitting in tgsb-speak)
+# python3 (optional — no longer required for tgsb-speak)
 if command -v python3 >/dev/null 2>&1; then
-    echo "  [OK] python3 (for clause-aware speech)"
-else
-    echo "  [WARNING] python3 not found — tgsb-speak clause splitting won't work"
-    echo "            Speech will still work but without intonation contours."
+    echo "  [OK] python3"
 fi
 
 echo ""
@@ -154,12 +151,20 @@ if command -v espeak-ng >/dev/null 2>&1 && command -v tgsbRender >/dev/null 2>&1
         echo "         Try: ldd $PREFIX/bin/tgsbRender"
     fi
 
-    test_pipeline=$(echo 'hello' | espeak-ng -q -v en-us --ipa=1 --stdin 2>/dev/null | tgsbRender --packdir "$PREFIX/share/tgspeechbox" --lang en-us 2>/dev/null | wc -c)
-    if [ "$test_pipeline" -gt 1000 ] 2>/dev/null; then
-        echo "  [OK] Full pipeline works (espeak-ng → tgsbRender: $test_pipeline bytes)"
+    # Test in-process espeak mode (preferred — no pipe chain)
+    test_espeak=$(tgsbRender --espeak --text 'hello' --packdir "$PREFIX/share/tgspeechbox" --lang en-us 2>/dev/null | wc -c)
+    if [ "$test_espeak" -gt 1000 ] 2>/dev/null; then
+        echo "  [OK] In-process espeak works (tgsbRender --espeak: $test_espeak bytes)"
     else
-        echo "  [FAIL] Full pipeline produced no audio"
-        echo "         Check espeak-ng installation and language data."
+        echo "  [INFO] In-process espeak not available — using pipe fallback"
+        # Test pipe chain fallback
+        test_pipeline=$(echo 'hello' | espeak-ng -q -v en-us --ipa=1 --stdin 2>/dev/null | tgsbRender --packdir "$PREFIX/share/tgspeechbox" --lang en-us 2>/dev/null | wc -c)
+        if [ "$test_pipeline" -gt 1000 ] 2>/dev/null; then
+            echo "  [OK] Pipe fallback works (espeak-ng → tgsbRender: $test_pipeline bytes)"
+        else
+            echo "  [FAIL] Neither in-process nor pipe mode produced audio"
+            echo "         Check espeak-ng installation and language data."
+        fi
     fi
 else
     echo "  Skipped (missing espeak-ng or tgsbRender)."
