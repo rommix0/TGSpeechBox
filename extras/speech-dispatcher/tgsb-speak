@@ -38,7 +38,7 @@ elif [ -d "/usr/local/share/tgspeechbox/packs" ]; then
 else
   PACKDIR="/usr/share/tgspeechbox"
 fi
-SAMPLERATE="${TGSB_SAMPLERATE:-16000}"
+SAMPLERATE="${TGSB_SAMPLERATE:-22050}"
 RATE_BOOST="${TGSB_RATE_BOOST:-0}"   # set to 1 to enable rate boost
 
 # ── Audio session environment ──────────────────────────────────────────
