@@ -78,14 +78,9 @@ if [ "$RATE_BOOST" = "1" ]; then
   BOOST_FLAG="--rate-boost"
 fi
 
-# Pre-eSpeak text normalization: dict replacements, compound splitting, etc.
-# Needed for the pipe-chain fallback; harmless (idempotent) for --espeak mode.
-PREPARED=$(printf '%s' "$TEXT" | tgsbRender --prepare-text --packdir "$PACKDIR" --lang "$LANG" 2>/dev/null) || true
-if [ -n "$PREPARED" ]; then
-  TEXT="$PREPARED"
-fi
-
 # ── Primary: in-process espeak mode (single binary, no pipes) ─────────
+# Note: --espeak mode runs prepareText internally, so we skip the separate
+# --prepare-text pre-pass to avoid spawning tgsbRender twice per utterance.
 # tgsbRender --espeak calls libespeak-ng.so directly via dlopen.
 # This eliminates the espeak CLI → pipe → tgsbRender chain that caused
 # audio shimmer/discontinuities through Speech Dispatcher.
@@ -104,6 +99,10 @@ render_espeak() {
 
 # ── Fallback: pipe chain (for systems where dlopen fails) ────────────
 render_pipe() {
+  # Pre-normalize text (only needed for pipe path; --espeak does this internally)
+  _PT=$(printf '%s' "$TEXT" | tgsbRender --prepare-text --packdir "$PACKDIR" --lang "$LANG" 2>/dev/null) || true
+  [ -n "$_PT" ] && TEXT="$_PT"
+
   printf '%s' "$TEXT" \
     | espeak-ng -q -v "$LANG" --ipa=1 --stdin \
     | tgsbRender \
