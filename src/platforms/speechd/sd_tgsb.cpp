@@ -587,13 +587,8 @@ int main(int argc, char** argv) {
 
   // Apply built-in voice
   const BuiltinVoice* activeVoice = findBuiltinVoice(voiceName.c_str());
-  if (activeVoice && activeVoice->hasVoicedTilt) {
-    speechPlayer_voicingTone_t vt = speechPlayer_getDefaultVoicingTone();
-    // Access the voicedTiltDbPerOct field (offset 6 doubles into the struct)
-    double* fields = (double*)((uint8_t*)&vt + 4 * sizeof(uint32_t));
-    fields[6] = activeVoice->voicedTiltDbPerOct;
-    speechPlayer_setVoicingTone(player, &vt);
-  }
+  // Note: built-in voice voicedTilt is applied per-frame in applyBuiltinVoice().
+  // No need to poke the voicingTone struct directly (was using unsafe pointer arithmetic).
 
   sd_send("299 OK LOADED SUCCESSFULLY");
 
@@ -663,19 +658,21 @@ int main(int argc, char** argv) {
         if (key == "RATE") ssipRate = atoi(val.c_str());
         else if (key == "PITCH") ssipPitch = atoi(val.c_str());
         else if (key == "VOLUME") ssipVolume = 1.0 + atoi(val.c_str()) / 100.0;
-        else if (key == "VOICE") {
+        else if (key == "VOICE" || key == "voice" ||
+                 key == "synthesis_voice") {
+          // SD sends voice=male1 (generic) and synthesis_voice=Adam (specific).
+          // Ignore generic SSIP voice types.
+          if (val == "male1" || val == "male2" || val == "male3" ||
+              val == "female1" || val == "female2" || val == "female3" ||
+              val == "child_male" || val == "child_female" || val == "NULL")
+            return;
           voiceName = val;
           activeVoice = findBuiltinVoice(val.c_str());
-          if (!activeVoice)
-            nvspFrontend_setVoiceProfile(fe, val.c_str());
-          else
+          // Built-in voices are frame multipliers, not YAML profiles
+          if (activeVoice)
             nvspFrontend_setVoiceProfile(fe, "");
-          if (activeVoice && activeVoice->hasVoicedTilt) {
-            speechPlayer_voicingTone_t vt = speechPlayer_getDefaultVoicingTone();
-            double* fields = (double*)((uint8_t*)&vt + 4 * sizeof(uint32_t));
-            fields[6] = activeVoice->voicedTiltDbPerOct;
-            speechPlayer_setVoicingTone(player, &vt);
-          }
+          else if (!val.empty())
+            nvspFrontend_setVoiceProfile(fe, val.c_str());
         }
         else if (key == "LANGUAGE" || key == "language") {
           // SD sends "c", "C", or "NULL" for unset language — keep default
