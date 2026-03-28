@@ -898,6 +898,11 @@ normalization:
     # Consonants (used for notBeforeClass checks, e.g. FORCE vowel lengthening).
     CONSONANTS: ["b", "c", "d", "f", "g", "h", "j", "k", "l", "m", "n", "p", "q", "r", "s", "t", "v", "w", "x", "z", "ŋ", "ɡ", "ɣ", "ɫ", "ɲ", "ɹ", "ɻ", "ɾ", "ʃ", "ʒ", "ʔ", "θ", "ð", "ç", "β", "t͡ʃ", "d͡ʒ", "t͡s", "d͡z"]
 
+    # Characters that follow ɡ in non -og words — blocks LOT→THOUGHT shift.
+    # ɹ: progress, ɡɹ.  l: toggling, ɡl.  ə: toggle/goggle, ɡəl.
+    # n: cognitive/prognosis, ɡn.
+    OG_LOT_AFTER: ["ɹ", "l", "ə", "n"]
+
   replacements:
     # eSpeak (classic) en-us has a dictionary entry for "Microsoft" that produces
     # an "-soft" syllable with /ɑː/ ("microsaft"). "soft" by itself is /sɔft/.
@@ -967,19 +972,24 @@ normalization:
       to:   "ᵒ"
 
     # -og/-ogue words: GenAm uses THOUGHT /ɔ/, not LOT /ɑ/.
-    # eSpeak systematically produces ɑːɡ for dog, fog, frog, dialog,
-    # catalogue, epilogue, etc.  All should be /ɔɡ/ in American English
-    # (rounded "aw" quality, not flat "ah").
-    # WORD-FINAL ONLY: mid-word ɑːɡ (progress, toggle, goggle) stays LOT.
+    # eSpeak produces ɑːɡ for dog, fog, frog, dialog, catalogue, etc.
+    # All should be /ɔɡ/ in American English ("aw" quality, not "ah").
+    #
+    # Strategy: shift ɑːɡ→ɔːɡ everywhere EXCEPT when followed by
+    # characters from OG_LOT_AFTER (ɹ, l, ə, n) which indicate non-og
+    # roots: progress (ɡɹ), toggle/goggle (ɡəl/ɡl), cognitive (ɡn).
+    # This catches word-final (frog), plurals (frogs/ɡz), past tense
+    # (dogged/ɡd), -oggy (froggy/ɡi), -oggo (doggo/ɡo), -ogma
+    # (dogma/ɡm), -ogger (blogger/ɡɚ) — all in two rules.
     # Must run BEFORE the ɔ→ᴐ rule below so the output gets transformed.
     - from: "ɑːɡ"
       to:   "ɔːɡ"
       when:
-        atWordEnd: true
+        notBeforeClass: "OG_LOT_AFTER"
     - from: "ɑɡ"
       to:   "ɔɡ"
       when:
-        atWordEnd: true
+        notBeforeClass: "OG_LOT_AFTER"
 
     # US THOUGHT vowel: make /ɔ(ː)/ more open so it doesn't drift toward an "owe" quality.
     - from: "ɔː"
