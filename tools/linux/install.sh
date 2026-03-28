@@ -210,19 +210,29 @@ configure_speech_dispatcher() {
     echo "  Found config: $sd_conf_file"
     echo "  Modules dir:  $sd_modules_dir"
 
-    # --- Install the generic module config ---
+    # --- Install module binary and config ---
     mkdir -p "$sd_modules_dir"
 
-    local src_conf="$PREFIX/share/tgspeechbox/extras/speech-dispatcher/tgsb-generic.conf"
-    local dst_conf="$sd_modules_dir/tgsb-generic.conf"
-
-    if [ ! -f "$src_conf" ]; then
-        echo "  Error: tgsb-generic.conf not found at $src_conf"
-        return 1
+    # Prefer native module (sd_tgsb) over sd_generic if binary is available
+    local use_native=false
+    local sd_modules_bin="/usr/lib/speech-dispatcher-modules"
+    if [ -f "$SCRIPT_DIR/bin/sd_tgsb" ] && [ -d "$sd_modules_bin" ]; then
+        cp "$SCRIPT_DIR/bin/sd_tgsb" "$sd_modules_bin/sd_tgsb"
+        chmod +x "$sd_modules_bin/sd_tgsb"
+        echo "  Installed native module: $sd_modules_bin/sd_tgsb"
+        use_native=true
     fi
 
-    cp "$src_conf" "$dst_conf"
-    echo "  Installed module config: $dst_conf"
+    # Install both config files (native + generic fallback)
+    local src_conf="$PREFIX/share/tgspeechbox/extras/speech-dispatcher/tgsb-generic.conf"
+    local src_native="$PREFIX/share/tgspeechbox/extras/speech-dispatcher/tgsb-native.conf"
+    if [ -f "$src_native" ]; then
+        cp "$src_native" "$sd_modules_dir/tgsb-native.conf"
+    fi
+    if [ -f "$src_conf" ]; then
+        cp "$src_conf" "$sd_modules_dir/tgsb-generic.conf"
+    fi
+    echo "  Installed module config: $sd_modules_dir/"
 
     # --- Ensure espeak-ng module is enabled ---
     # Many distros ship speechd.conf with all AddModule lines commented out.
@@ -249,12 +259,22 @@ configure_speech_dispatcher() {
 
     # Check if tgsb module is already configured
     if grep -q '^AddModule "tgsb"' "$sd_conf_file" 2>/dev/null; then
-        echo "  TGSpeechBox module already present."
+        # Update existing entry to use native module if available
+        if [ "$use_native" = true ]; then
+            sed -i 's|^AddModule "tgsb" "sd_generic" "tgsb-generic.conf"|AddModule "tgsb" "sd_tgsb" "tgsb-native.conf"|' "$sd_conf_file"
+            echo "  TGSpeechBox module upgraded to native."
+        else
+            echo "  TGSpeechBox module already present."
+        fi
     else
         {
             echo ""
             echo "# --- TGSpeechBox (added by install.sh) ---"
-            echo 'AddModule "tgsb" "sd_generic" "tgsb-generic.conf"'
+            if [ "$use_native" = true ]; then
+                echo 'AddModule "tgsb" "sd_tgsb" "tgsb-native.conf"'
+            else
+                echo 'AddModule "tgsb" "sd_generic" "tgsb-generic.conf"'
+            fi
         } >> "$sd_conf_file"
         echo "  Added TGSpeechBox module."
     fi

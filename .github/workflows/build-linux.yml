@@ -50,6 +50,7 @@ jobs:
           ${{ matrix.cross }}strip build/libtgspeechbox.so
           ${{ matrix.cross }}strip build/libtgsbFrontend.so
           ${{ matrix.cross }}strip build/tgsbRender
+          ${{ matrix.cross }}strip build/sd_tgsb
 
       - name: Assemble release folder
         run: |
@@ -60,7 +61,9 @@ jobs:
           cp build/libtgspeechbox.so "$DIST/lib/"
           cp build/libtgsbFrontend.so "$DIST/lib/"
           cp build/tgsbRender "$DIST/bin/"
+          cp build/sd_tgsb "$DIST/bin/"
           chmod +x "$DIST/bin/tgsbRender"
+          chmod +x "$DIST/bin/sd_tgsb"
 
           # Wrapper + installer
           cp tools/linux/tgsp "$DIST/bin/"
