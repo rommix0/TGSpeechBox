@@ -130,6 +130,18 @@ settings:
   microprosodyVoicedF0LowerEnabled: true
   microprosodyVoicedF0LowerHz: -5
 
+  dictSuffixes:
+    - "chen"  # diminutive
+    - "lein"  # diminutive
+    - "ern"   # dative plural
+    - "es"    # genitive
+    - "en"    # plural/various
+    - "er"    # plural/comparative
+    - "em"    # dative
+    - "e"     # plural/dative
+    - "n"     # dative plural
+    - "s"     # genitive
+
 normalization:
   preReplacements:
     # ── eSpeak IPA rendering bug: ʊR → "??" ────────────────────

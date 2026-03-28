@@ -57,6 +57,15 @@ settings:
   trajectoryLimit:
     enabled: false
     applyAcrossWordBoundary: false
+
+  dictSuffixes:
+    - "erne"  # definite plural (common)
+    - "ene"   # definite plural
+    - "er"    # plural indefinite
+    - "en"    # definite common
+    - "et"    # definite neuter
+    - "s"     # genitive
+
 normalization:
   preReplacements:
     # Danish stød: eSpeak outputs both ASCII '?' and IPA 'ʔ' inconsistently.

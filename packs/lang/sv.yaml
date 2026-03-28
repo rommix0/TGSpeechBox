@@ -54,6 +54,18 @@ settings:
   microprosodyVoicedF0LowerEnabled: true
   microprosodyVoicedF0LowerHz: -6
 
+  dictSuffixes:
+    - "orna"  # definite plural (3rd declension)
+    - "erna"  # definite plural (5th declension)
+    - "arna"  # definite plural (2nd declension)
+    - "na"    # definite plural
+    - "ar"    # plural indefinite
+    - "er"    # plural indefinite
+    - "or"    # plural indefinite
+    - "en"    # definite common
+    - "et"    # definite neuter
+    - "s"     # genitive
+
 normalization:
   preReplacements:
     # Swedish sj-sound - eSpeak sometimes outputs "sx"

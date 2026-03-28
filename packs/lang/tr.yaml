@@ -379,6 +379,30 @@ settings:
   legacyPitchMode: espeak_style
   legacyPitchInflectionScale: 0.56
 
+  dictSuffixes:
+    - "lar"   # plural (back)
+    - "ler"   # plural (front)
+    - "dan"   # ablative (back, voiced)
+    - "den"   # ablative (front, voiced)
+    - "tan"   # ablative (back, voiceless)
+    - "ten"   # ablative (front, voiceless)
+    - "da"    # locative (back, voiced)
+    - "de"    # locative (front, voiced)
+    - "ta"    # locative (back, voiceless)
+    - "te"    # locative (front, voiceless)
+    - "la"    # instrumental (back)
+    - "le"    # instrumental (front)
+    - "ın"    # genitive (back unrounded)
+    - "in"    # genitive (front unrounded)
+    - "un"    # genitive (back rounded)
+    - "ün"    # genitive (front rounded)
+    - "ı"     # accusative (back unrounded)
+    - "i"     # accusative (front unrounded)
+    - "u"     # accusative (back rounded)
+    - "ü"     # accusative (front rounded)
+    - "a"     # dative (back)
+    - "e"     # dative (front)
+
 normalization:
   preReplacements:
     # ── Long vowels FIRST (before short vowel rules catch them) ──

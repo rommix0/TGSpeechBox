@@ -46,6 +46,19 @@ settings:
   singleWordFinalHoldMs: 40
   singleWordFinalFadeMs: 16
 
+  dictSuffixes:
+    - "ами"   # instrumental plural
+    - "ами"   # instrumental plural
+    - "ов"    # genitive plural
+    - "ах"    # prepositional plural
+    - "ам"    # dative plural
+    - "ом"    # instrumental singular
+    - "ы"     # nominative plural
+    - "а"     # genitive singular
+    - "у"     # dative/prepositional
+    - "е"     # prepositional singular
+    - "и"     # plural/genitive
+
 normalization:
   preReplacements:
     # Map IPA palatalization marker ʲ to internal key (U+E001) to avoid engine bug.

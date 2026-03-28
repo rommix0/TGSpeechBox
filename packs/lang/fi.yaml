@@ -99,6 +99,27 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  dictSuffixes:
+    - "ssä"   # inessive (front)
+    - "ssa"   # inessive (back)
+    - "stä"   # elative (front)
+    - "sta"   # elative (back)
+    - "lle"   # allative
+    - "ltä"   # ablative (front)
+    - "lta"   # ablative (back)
+    - "llä"   # adessive (front)
+    - "lla"   # adessive (back)
+    - "kin"   # enclitic "also"
+    - "ksi"   # translative
+    - "nä"    # essive (front)
+    - "na"    # essive (back)
+    - "en"    # genitive plural
+    - "in"    # comitative
+    - "n"     # genitive
+    - "t"     # plural nominative
+    - "a"     # partitive (back)
+    - "ä"     # partitive (front)
+
 normalization:
   preReplacements:
     # === FINNISH /a/ ===

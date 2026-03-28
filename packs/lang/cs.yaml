@@ -15,6 +15,22 @@ settings:
   # Czech vowel length (short vs long) is phonemic.
   lengthenedScale: 1.4
 
+  dictSuffixes:
+    - "ách"   # locative plural
+    - "ami"   # instrumental plural
+    - "ové"   # animate plural
+    - "ech"   # locative plural
+    - "ům"    # dative plural
+    - "ům"    # dative plural
+    - "ovi"   # dative singular
+    - "em"    # instrumental
+    - "ů"     # genitive plural
+    - "y"     # accusative/plural
+    - "e"     # locative/vocative
+    - "i"     # plural/locative
+    - "a"     # genitive
+    - "u"     # dative/locative
+
 normalization:
   replacements:
     # Czech "ř" (voiced /r̝/ and voiceless /r̝̊/) isn't modeled directly.

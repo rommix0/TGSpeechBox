@@ -97,6 +97,20 @@ settings:
     clusterProportionGuard: true
     clusterMaxRatioShift: 0.4
 
+  dictSuffixes:
+    - "ach"   # locative plural
+    - "ami"   # instrumental plural
+    - "ów"    # genitive plural
+    - "om"    # dative plural
+    - "owi"   # dative singular
+    - "em"    # instrumental singular
+    - "ie"    # locative singular
+    - "y"     # various cases
+    - "a"     # genitive singular
+    - "u"     # dative/locative
+    - "i"     # plural/genitive
+    - "e"     # locative/vocative
+
 normalization:
   preReplacements:
     # Map IPA palatalization marker ʲ to internal key (U+E001) to avoid engine bug.

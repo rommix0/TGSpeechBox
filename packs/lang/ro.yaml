@@ -19,6 +19,17 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  dictSuffixes:
+    - "ului"  # genitive/dative definite masculine
+    - "lor"   # genitive/dative plural
+    - "lui"   # masculine genitive/dative
+    - "ul"    # masculine definite
+    - "ei"    # feminine genitive/dative
+    - "le"    # neuter definite
+    - "a"     # feminine definite
+    - "i"     # plural
+    - "e"     # plural
+
 normalization:
   # eSpeak (classic) Romanian IPA frequently uses plain two-character sequences
   # for affricates (ts/tʃ/dʒ) rather than tie-bar forms. We map them to the

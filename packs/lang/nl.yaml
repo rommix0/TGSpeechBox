@@ -50,6 +50,14 @@ settings:
   # Enable microprosody
   microprosodyEnabled: true
 
+  dictSuffixes:
+    - "tje"   # diminutive
+    - "je"    # diminutive
+    - "'s"    # genitive
+    - "en"    # plural
+    - "er"    # comparative
+    - "s"     # plural/genitive
+
 normalization:
   preReplacements:
     # Dutch labiodental approximant ʋ - very characteristic

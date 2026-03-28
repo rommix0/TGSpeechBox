@@ -306,6 +306,51 @@ settings:
 
   spellingDiphthongMode: monophthong
   legacyPitchInflectionScale: 0.56
+
+  dictSuffixes:
+    - "öcske" # diminutive (rounded front)
+    - "ocska" # diminutive (back)
+    - "ecske" # diminutive (front)
+    - "ként"  # essive-formal "as"
+    - "ból"   # elative (back) "out of"
+    - "ből"   # elative (front)
+    - "tól"   # ablative (back) "from"
+    - "től"   # ablative (front)
+    - "hoz"   # allative (back) "to"
+    - "hez"   # allative (front)
+    - "höz"   # allative (rounded front)
+    - "nál"   # adessive (back) "at"
+    - "nél"   # adessive (front)
+    - "ról"   # delative (back) "about"
+    - "ről"   # delative (front)
+    - "ban"   # inessive (back) "in"
+    - "ben"   # inessive (front)
+    - "nak"   # dative (back)
+    - "nek"   # dative (front)
+    - "val"   # instrumental (back) "with"
+    - "vel"   # instrumental (front)
+    - "ért"   # causal "for"
+    - "ok"    # plural (back)
+    - "ek"    # plural (front)
+    - "ök"    # plural (rounded front)
+    - "ak"    # plural (back, after vowel)
+    - "at"    # accusative (back)
+    - "et"    # accusative (front)
+    - "ot"    # accusative (back rounded)
+    - "öt"    # accusative (rounded front)
+    - "ra"    # sublative (back) "onto"
+    - "re"    # sublative (front)
+    - "ig"    # terminative "until"
+    - "on"    # superessive (back) "on"
+    - "en"    # superessive (front)
+    - "ön"    # superessive (rounded front)
+    - "ul"    # modal (back)
+    - "ül"    # modal (front)
+    - "é"     # possessive
+    - "i"     # adjectival
+    - "k"     # plural
+    - "t"     # accusative
+
 normalization:
   preReplacements:
     # === LONG VOWEL MAPPINGS ===

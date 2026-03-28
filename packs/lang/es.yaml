@@ -78,6 +78,11 @@ settings:
     applyAcrossWordBoundary: false
   legacyPitchMode: espeak_style
 
+  dictSuffixes:
+    - "mente" # adverb
+    - "es"    # plural (after consonant)
+    - "s"     # plural (after vowel)
+
 normalization:
   classes:
     # Let's define vowels for further pronounciation exceptions.

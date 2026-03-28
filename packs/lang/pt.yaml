@@ -23,6 +23,12 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  dictSuffixes:
+    - "mente" # adverb
+    - "ões"   # plural (-ão words)
+    - "es"    # plural (after consonant)
+    - "s"     # plural (after vowel)
+
 normalization:
   classes:
     # eSpeak Portuguese often uses "ŋ" as a generic *coda nasal marker*

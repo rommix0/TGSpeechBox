@@ -20,6 +20,11 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  dictSuffixes:
+    - "ment"  # adverb
+    - "es"    # feminine plural
+    - "s"     # plural
+
 normalization:
   replacements:
     # Safety fallback: if an upstream voice emits alveolar r, route to uvular ʁ.

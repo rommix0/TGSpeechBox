@@ -41,6 +41,17 @@ settings:
   singleWordFinalHoldMs: 40
   singleWordFinalFadeMs: 16
 
+  dictSuffixes:
+    - "ите"   # definite plural
+    - "ове"   # plural
+    - "ът"    # masculine definite
+    - "та"    # feminine definite
+    - "то"    # neuter definite
+    - "те"    # plural definite
+    - "а"     # feminine/accusative
+    - "и"     # plural
+    - "о"     # neuter
+
 normalization:
   preReplacements:
     # Map IPA palatalization marker ʲ to internal key (U+E001) to avoid engine bug.
