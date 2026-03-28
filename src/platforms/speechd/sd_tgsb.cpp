@@ -16,13 +16,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <atomic>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include <dlfcn.h>
+#include <signal.h>
+#include <sys/select.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "speechPlayer.h"
@@ -268,7 +269,12 @@ static void sd_send(const char* msg) {
 }
 
 // ============================================================================
-// HDLC-escaped audio output (705 AUDIO blocks)
+// Audio output — 705 AUDIO protocol (SD handles playback + flushing).
+//
+// Same approach as sd_espeak-ng: synchronous, single-threaded.
+// Audio chunks sent via HDLC-escaped 705 blocks. SD server plays them
+// and can flush instantly on STOP — no buffer tail issues.
+// Format from speechd/src/modules/module_process.c.
 // ============================================================================
 
 static void sd_send_audio(const int16_t* samples, int count, int sampleRate) {
@@ -279,26 +285,61 @@ static void sd_send_audio(const int16_t* samples, int count, int sampleRate) {
   fprintf(stdout, "705-sample_rate=%d\n", sampleRate);
   fprintf(stdout, "705-num_samples=%d\n", count);
   fprintf(stdout, "705-big_endian=0\n");
+  // "705-AUDIO" followed by null byte — marks start of binary data
+  fprintf(stdout, "705-AUDIO");
+  fputc(0, stdout);
 
-  // HDLC-escape the raw PCM data.
-  // Special chars that need escaping: 0x00 (null terminator), 0x0A (newline), 0x7D (escape).
-  // Encoding: replace special byte B with 0x7D followed by (B ^ 0x20).
-  const uint8_t* data = (const uint8_t*)samples;
-  size_t len = (size_t)count * 2;  // 16-bit samples = 2 bytes each
-  for (size_t i = 0; i < len; i++) {
-    uint8_t b = data[i];
-    if (b == 0x00 || b == 0x0A || b == 0x7D) {
-      fputc(0x7D, stdout);
-      fputc(b ^ 0x20, stdout);
+  // HDLC escaping: only 0x7D (escape) and 0x0A (newline) need escaping.
+  // NOT 0x00 — that's valid data. (Confirmed from speechd source.)
+  const char escape = 0x7D;
+  const char invert = 1 << 5;  // 0x20
+  const uint8_t* p = (const uint8_t*)samples;
+  const uint8_t* end = p + (size_t)count * 2;
+  while (p < end) {
+    // Find next special character
+    const uint8_t* esc = (const uint8_t*)memchr(p, escape, end - p);
+    const uint8_t* nl  = (const uint8_t*)memchr(p, '\n', end - p);
+    const uint8_t* stop = nullptr;
+    if (esc && (!nl || esc < nl)) stop = esc;
+    else if (nl) stop = nl;
+    if (!stop) stop = end;
+    // Write non-special bytes
+    if (stop > p) fwrite(p, 1, stop - p, stdout);
+    // Escape the special byte
+    if (stop < end) {
+      fputc(escape, stdout);
+      fputc((*stop) ^ invert, stdout);
+      p = stop + 1;
     } else {
-      fputc(b, stdout);
+      p = stop;
     }
   }
 
-  fputc(0, stdout);    // null terminator
   fputc('\n', stdout);
   fprintf(stdout, "705 AUDIO\n");
   fflush(stdout);
+}
+
+// Non-blocking check for STOP/CANCEL on stdin.
+// Same approach as sd_espeak-ng's module_process(STDIN_FILENO, 0).
+static bool sd_poll_stop() {
+  fd_set rfds;
+  struct timeval tv = {0, 0};  // non-blocking
+  FD_ZERO(&rfds);
+  FD_SET(STDIN_FILENO, &rfds);
+  if (select(STDIN_FILENO + 1, &rfds, nullptr, nullptr, &tv) > 0) {
+    // Data available — peek at it
+    char buf[256];
+    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+    if (n > 0) {
+      buf[n] = '\0';
+      if (strstr(buf, "STOP") || strstr(buf, "CANCEL")) {
+        dbg("POLL: got STOP/CANCEL");
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 // ============================================================================
@@ -358,7 +399,7 @@ static void synthesize(const std::string& text,
                        int sampleRate,
                        double speed, double basePitchHz, double inflection,
                        double volume, const BuiltinVoice* voice,
-                       std::atomic<bool>& stopFlag) {
+                       bool& stopFlag) {
   dbg("SYNTH: text='%s' lang speed=%.2f pitch=%.1f", text.c_str(), speed, basePitchHz);
   sd_send("701 BEGIN");
 
@@ -375,7 +416,7 @@ static void synthesize(const std::string& text,
 
   // Clause-splitting loop (same as tgsbRender --espeak / tgsb_bridge.cpp)
   const char *p = text.c_str();
-  while (*p && !stopFlag.load(std::memory_order_relaxed)) {
+  while (*p && !stopFlag) {
     while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
     if (!*p) break;
 
@@ -426,20 +467,22 @@ static void synthesize(const std::string& text,
         speed, basePitchHz, inflection, clauseStr, 0, onFrame, &ctx);
     dbg("SYNTH: queueIPA returned %d, frames queued: %d", qok, g_frameCount);
 
-    // Synthesize this clause's audio and send immediately
-    // (incremental: lower latency to first audio, responsive to STOP)
+    // Synthesize this clause's audio and send via 705 blocks.
+    // Poll stdin between chunks for responsive STOP (same as sd_espeak-ng).
     std::vector<sample> pcm(2048);
     int totalSamples = 0;
-    while (!stopFlag.load(std::memory_order_relaxed)) {
+    while (!stopFlag) {
       int n = speechPlayer_synthesize(player, (unsigned int)pcm.size(), pcm.data());
       if (n <= 0) break;
       totalSamples += n;
       sd_send_audio((const int16_t*)pcm.data(), n, sampleRate);
+      // Poll stdin for STOP/CANCEL between chunks
+      if (sd_poll_stop()) { stopFlag = true; break; }
     }
     dbg("SYNTH: synthesized %d total samples", totalSamples);
   }
 
-  if (stopFlag.load(std::memory_order_relaxed)) {
+  if (stopFlag) {
     // Drain any remaining frames
     speechPlayer_queueFrame(player, nullptr, 0, 0, -1, true);
     sd_send("703 STOP");
@@ -469,6 +512,10 @@ static std::string findPackDir() {
 int main(int argc, char** argv) {
   // Disable buffering on stdout (protocol is line-oriented)
   setvbuf(stdout, nullptr, _IONBF, 0);
+
+  // Ignore SIGPIPE — when we kill paplay on STOP, the next write() to the
+  // dead pipe must return EPIPE, not kill our entire module process.
+  signal(SIGPIPE, SIG_IGN);
 
   std::string packDir = findPackDir();
   int sampleRate = 22050;
@@ -550,9 +597,8 @@ int main(int argc, char** argv) {
 
   sd_send("299 OK LOADED SUCCESSFULLY");
 
-  // Synthesis state
-  std::atomic<bool> stopFlag{false};
-  std::thread synthThread;
+  // Synthesis state (single-threaded — no std::thread needed)
+  bool stopFlag = false;
 
   // Command loop
   while (true) {
@@ -567,11 +613,7 @@ int main(int argc, char** argv) {
         continue;
       }
 
-      // Stop previous synthesis
-      stopFlag.store(true, std::memory_order_relaxed);
-      if (synthThread.joinable()) synthThread.join();
-      stopFlag.store(false, std::memory_order_relaxed);
-      speechPlayer_queueFrame(player, nullptr, 0, 0, -1, true);
+      stopFlag = false;
 
       double speed = ssipRateToSpeed(ssipRate);
       double pitch = sliderPitchToBaseHz(ssipPitch);
@@ -597,22 +639,21 @@ int main(int argc, char** argv) {
 
       sd_send("200 OK SPEAKING");
 
-      synthThread = std::thread(synthesize,
-          text, std::ref(espeak), fe, player,
+      // Synchronous synthesis — same architecture as sd_espeak-ng.
+      // Audio sent via 705 blocks (SD handles playback + flushing).
+      // sd_poll_stop() checks stdin between chunks for responsive STOP.
+      synthesize(text, espeak, fe, player,
           sampleRate, speed, pitch, inflection,
-          ssipVolume, activeVoice, std::ref(stopFlag));
+          ssipVolume, activeVoice, stopFlag);
     }
-    else if (cmd == "STOP") {
-      stopFlag.store(true, std::memory_order_relaxed);
-      if (synthThread.joinable()) synthThread.join();
-      stopFlag.store(false, std::memory_order_relaxed);
+    else if (cmd == "STOP" || cmd == "CANCEL") {
+      // In synchronous mode, STOP arrives via sd_poll_stop() during synthesis.
+      // If we get here, synthesis already finished — just purge.
+      stopFlag = true;
       speechPlayer_queueFrame(player, nullptr, 0, 0, -1, true);
     }
     else if (cmd == "PAUSE") {
-      // Pause = stop at end of current sentence (simplified: same as STOP)
-      stopFlag.store(true, std::memory_order_relaxed);
-      if (synthThread.joinable()) synthThread.join();
-      stopFlag.store(false, std::memory_order_relaxed);
+      stopFlag = true;
       speechPlayer_queueFrame(player, nullptr, 0, 0, -1, true);
     }
     else if (cmd == "SET" || cmd.compare(0, 4, "SET ") == 0) {
@@ -696,8 +737,6 @@ int main(int argc, char** argv) {
       fflush(stdout);
     }
     else if (cmd == "QUIT") {
-      stopFlag.store(true, std::memory_order_relaxed);
-      if (synthThread.joinable()) synthThread.join();
       break;
     }
     else if (cmd == "AUDIO" || cmd == "LOGLEVEL" ||

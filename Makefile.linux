@@ -94,7 +94,7 @@ RENDER_BIN = $(BUILDDIR)/tgsbRender
 SD_TGSB_BIN = $(BUILDDIR)/sd_tgsb
 
 # sd_tgsb sources
-SD_TGSB_SRCS = src/speechd/sd_tgsb.cpp
+SD_TGSB_SRCS = src/platforms/speechd/sd_tgsb.cpp
 
 # Targets
 .PHONY: all clean dirs
