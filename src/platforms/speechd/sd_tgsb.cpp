@@ -724,7 +724,25 @@ int main(int argc, char** argv) {
       }
       if (langs.empty()) langs.push_back("en");
 
+      // Filter out root language tags that have region-specific children.
+      // e.g. "en" is excluded if "en-us" or "en-gb" exist; "es" if "es-mx" exists.
+      std::vector<std::string> filtered;
       for (const auto& lang : langs) {
+        if (lang.find('-') == std::string::npos) {
+          // Root tag — check if any child exists
+          bool hasChild = false;
+          std::string prefix = lang + "-";
+          for (const auto& other : langs) {
+            if (other.compare(0, prefix.size(), prefix) == 0) {
+              hasChild = true; break;
+            }
+          }
+          if (hasChild) continue;  // skip root, children cover it
+        }
+        filtered.push_back(lang);
+      }
+
+      for (const auto& lang : filtered) {
         for (int i = 0; i < kNumVoices; i++) {
           fprintf(stdout, "200-%s\t%s\tMALE%d\n",
                   kBuiltinVoices[i].name, lang.c_str(), (i % 3) + 1);
