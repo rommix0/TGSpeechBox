@@ -121,42 +121,25 @@ else:
 ' "$1"
 }
 
-# Process each clause through the pipeline.
-split_clauses "$TEXT" | while IFS= read -r clause; do
-  [ -z "$clause" ] && continue
-
-  ctype=$(detect_clause "$clause")
-
-  if [ "$STDOUT_MODE" = 1 ]; then
-    # Output raw PCM to stdout — sd_generic pipes this to $PLAY_COMMAND
-    printf '%s' "$clause" \
-      | espeak-ng -q -v "$LANG" --ipa=1 --stdin \
-      | tgsbRender \
-          --packdir "$PACKDIR" \
-          --lang "$LANG" \
-          --voice "$VOICE" \
-          --text "$clause" \
-          --clause "$ctype" \
-          --rate "$RATE" \
-          --pitch "$PITCH" \
-          --volume "$VOLUME" \
-          --samplerate "$SAMPLERATE" \
-          $BOOST_FLAG
-  else
-    # Direct playback via paplay/aplay
-    printf '%s' "$clause" \
-      | espeak-ng -q -v "$LANG" --ipa=1 --stdin \
-      | tgsbRender \
-          --packdir "$PACKDIR" \
-          --lang "$LANG" \
-          --voice "$VOICE" \
-          --text "$clause" \
-          --clause "$ctype" \
-          --rate "$RATE" \
-          --pitch "$PITCH" \
-          --volume "$VOLUME" \
-          --samplerate "$SAMPLERATE" \
-          $BOOST_FLAG \
-      | $PLAY_CMD
-  fi
-done
+# Single-pipeline mode: pass entire text through one espeak→tgsbRender pipeline.
+# This keeps the DSP state warm across clauses (no resonator resets) and avoids
+# audio gaps from per-clause process spawning. tgsbRender handles clause detection
+# internally via --text.
+{
+  printf '%s' "$TEXT" \
+    | espeak-ng -q -v "$LANG" --ipa=1 --stdin \
+    | tgsbRender \
+        --packdir "$PACKDIR" \
+        --lang "$LANG" \
+        --voice "$VOICE" \
+        --text "$TEXT" \
+        --rate "$RATE" \
+        --pitch "$PITCH" \
+        --volume "$VOLUME" \
+        --samplerate "$SAMPLERATE" \
+        $BOOST_FLAG
+} | if [ "$STDOUT_MODE" = 1 ]; then
+  cat
+else
+  $PLAY_CMD
+fi
