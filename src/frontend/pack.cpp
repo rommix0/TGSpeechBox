@@ -646,6 +646,11 @@ getNum("primaryStressDiv", lp.primaryStressDiv);
   // Year splitting
   getBool("yearSplittingEnabled", lp.yearSplittingEnabled);
 
+  // Dictionary suffix stripping (per-language).
+  getStrListFrom(settings, "dictSuffixes", lp.dictSuffixes);
+  std::sort(lp.dictSuffixes.begin(), lp.dictSuffixes.end(),
+      [](const std::string& a, const std::string& b) { return a.size() > b.size(); });
+
   // Special coarticulation rules (language-specific Hz deltas)
   getBool("specialCoarticulationEnabled", lp.specialCoarticulationEnabled);
   getNum("specialCoarticMaxDeltaHz", lp.specialCoarticMaxDeltaHz);

@@ -961,6 +961,7 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
                                              h->langTag,
                                              h->pack.lang.yearSplittingEnabled,
                                              h->pack.lang.numberExpansion.ohDigit,
+                                             h->pack.lang.dictSuffixes,
                                              &h->ipaOverrides);
 
   if (result == original) return nullptr;  // no changes

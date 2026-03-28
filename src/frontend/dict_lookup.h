@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE for details.
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace nvsp_frontend {
 
@@ -24,7 +25,14 @@ namespace nvsp_frontend {
 // toIpa are NOT replaced in the text (left for eSpeak to phonemize
 // naturally).  Instead, their lowercase key and toIpa value are
 // recorded in the map for downstream IPA splicing.
+//
+// suffixes: per-language list of suffixes (pre-sorted longest-first).
+// When an exact/lowercase lookup fails, each suffix is tried: if the
+// word minus the suffix matches a dict entry, the replacement is used
+// with the suffix reattached (text respelling) or split off for
+// separate eSpeak phonemization (IPA injection).
 std::string dictReplaceInText(const std::string& text, const PronDict& dict,
+    const std::vector<std::string>& suffixes = {},
     std::unordered_map<std::string, std::string>* ipaOverrides = nullptr);
 
 }  // namespace nvsp_frontend

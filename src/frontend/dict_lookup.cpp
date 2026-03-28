@@ -9,6 +9,7 @@ Licensed under the MIT License. See LICENSE for details.
 #include <cctype>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 // Debug logging (shares TPARSER_DEBUG_LOG toggle from text_parser.cpp).
 #if 0
@@ -83,6 +84,7 @@ static size_t unicodePunctLen(const std::string& s, size_t i) {
 }
 
 std::string dictReplaceInText(const std::string& text, const PronDict& dict,
+    const std::vector<std::string>& suffixes,
     std::unordered_map<std::string, std::string>* ipaOverrides) {
   if (text.empty() || dict.entries.empty()) return text;
 
@@ -154,11 +156,54 @@ std::string dictReplaceInText(const std::string& text, const PronDict& dict,
       // Fallback to lowercase.
       it = dict.entries.find(lowerKey);
       if (it == dict.entries.end() || it->second.masked) {
+        std::string core(token, lo, hi - lo);
+
+        // Suffix stripping: try removing each suffix (longest-first) and
+        // look up the stem.  "launching" → strip "ing" → "launch" → match.
+        bool suffixHandled = false;
+        if (!suffixes.empty()) {
+          for (const auto& sfx : suffixes) {
+            if (lowerKey.size() <= sfx.size()) continue;
+            size_t stemLen = lowerKey.size() - sfx.size();
+            if (stemLen < 3) continue;
+            if (lowerKey.compare(stemLen, sfx.size(), sfx) != 0) continue;
+
+            std::string stemExact = stripVariationSelectors(
+                core.substr(0, stemLen));
+            std::string stemLower = lowerKey.substr(0, stemLen);
+
+            auto sit = dict.entries.find(stemExact);
+            if (sit == dict.entries.end() || sit->second.masked)
+              sit = dict.entries.find(stemLower);
+            if (sit == dict.entries.end() || sit->second.masked) continue;
+
+            // For suffix-stripped matches, always use text respelling so
+            // eSpeak phonemizes the suffix naturally in context (e.g. "'s"
+            // becomes /z/ not "ess").  IPA-only entries (no toText) are
+            // skipped — they need explicit suffixed dict entries.
+            if (sit->second.toText.empty()) continue;
+
+            std::string origSuffix = core.substr(stemLen);
+            std::string rep;
+            rep.reserve(sit->second.toText.size() + origSuffix.size());
+            for (char c : sit->second.toText)
+              rep += (c == '-') ? ' ' : c;
+            rep += origSuffix;
+            DLLOG("  suffixReplace: \"%s\" -> \"%s\"\n",
+                  core.c_str(), rep.c_str());
+            result += token.substr(0, lo);
+            result += rep;
+            result += token.substr(hi);
+            suffixHandled = true;
+            break;
+          }
+        }
+        if (suffixHandled) continue;
+
         // Token not found as a whole.  If it contains hyphens, split into
         // hyphen-separated parts and look up each part individually so that
         // "this-pentagon-official" still matches a dict entry for "pentagon"
         // even when the full hyphenated string has no entry.
-        std::string core(token, lo, hi - lo);
         if (core.find('-') != std::string::npos) {
           DLLOG("  hyphen-split fallback for \"%s\"\n", core.c_str());
           std::string rebuilt;

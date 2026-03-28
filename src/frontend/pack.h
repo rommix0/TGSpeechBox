@@ -859,6 +859,11 @@ double lengthContrastPreGeminateVowelScale = 0.85;
   // Off by default — users opt in via setSettings.
   bool yearSplittingEnabled = false;
 
+  // Dictionary suffix stripping — per-language list of suffixes to try
+  // removing during dict lookup so inflected forms ("launching") inherit
+  // their stem entry ("launch").  Pre-sorted longest-first at load time.
+  std::vector<std::string> dictSuffixes;
+
   // Special coarticulation rules (language-specific Hz deltas).
   bool specialCoarticulationEnabled = false;
   std::vector<SpecialCoarticRule> specialCoarticRules;

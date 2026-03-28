@@ -1044,6 +1044,7 @@ std::string prepareTextForEspeak(
     const std::string& langTag,
     bool yearSplitting,
     const std::string& ohDigit,
+    const std::vector<std::string>& dictSuffixes,
     std::unordered_map<std::string, std::string>* ipaOverrides)
 {
   if (text.empty()) return text;
@@ -1100,7 +1101,7 @@ std::string prepareTextForEspeak(
   // Words with toIpa set are left in place; their overrides are collected
   // in ipaOverrides for downstream splicing in runTextParser.
   if (!pronDict.entries.empty() && disabledDictTypes.count("pronounce") == 0) {
-    result = dictReplaceInText(result, pronDict, ipaOverrides);
+    result = dictReplaceInText(result, pronDict, dictSuffixes, ipaOverrides);
   }
 
   // 1. Compound splitting.
