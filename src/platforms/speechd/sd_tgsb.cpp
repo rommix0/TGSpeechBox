@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -237,13 +238,33 @@ static void dbg(const char* fmt, ...) {
   fputc('\n', g_dbg); fflush(g_dbg);
 }
 
+// ============================================================================
+// Shared read buffer — both sd_readline() and sd_poll_stop() use raw read()
+// on STDIN_FILENO through this buffer. NEVER use fgets/fread on stdin.
+// This avoids mixing buffered and raw I/O which causes lost commands.
+// ============================================================================
+
+static std::string g_readBuf;
+static bool g_eof = false;
+
 static std::string sd_readline() {
-  char buf[8192];
-  if (!fgets(buf, sizeof(buf), stdin)) { dbg("RECV: <EOF>"); return {}; }
-  std::string s = buf;
-  while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
-  dbg("RECV: %s", s.c_str());
-  return s;
+  while (true) {
+    // Check for a complete line in the buffer
+    auto nl = g_readBuf.find('\n');
+    if (nl != std::string::npos) {
+      std::string line = g_readBuf.substr(0, nl);
+      g_readBuf.erase(0, nl + 1);
+      if (!line.empty() && line.back() == '\r') line.pop_back();
+      dbg("RECV: %s", line.c_str());
+      return line;
+    }
+    if (g_eof) return {};
+    // Read more from stdin
+    char buf[4096];
+    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf));
+    if (n <= 0) { g_eof = true; dbg("RECV: <EOF>"); return {}; }
+    g_readBuf.append(buf, (size_t)n);
+  }
 }
 
 static std::string sd_read_text() {
@@ -251,8 +272,7 @@ static std::string sd_read_text() {
   while (true) {
     std::string line = sd_readline();
     if (line == ".") break;
-    if (line.empty() && feof(stdin)) break;
-    // Unescape: lines starting with "." have it stripped
+    if (line.empty() && g_eof) break;
     if (!line.empty() && line[0] == '.') line = line.substr(1);
     if (!text.empty()) text += ' ';
     text += line;
@@ -321,23 +341,26 @@ static void sd_send_audio(const int16_t* samples, int count, int sampleRate) {
 }
 
 // Non-blocking check for STOP/CANCEL on stdin.
-// Same approach as sd_espeak-ng's module_process(STDIN_FILENO, 0).
+// Reads into the shared buffer so sd_readline() can process the full commands later.
 static bool sd_poll_stop() {
   fd_set rfds;
   struct timeval tv = {0, 0};  // non-blocking
   FD_ZERO(&rfds);
   FD_SET(STDIN_FILENO, &rfds);
-  if (select(STDIN_FILENO + 1, &rfds, nullptr, nullptr, &tv) > 0) {
-    // Data available — peek at it
-    char buf[256];
-    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-    if (n > 0) {
-      buf[n] = '\0';
-      if (strstr(buf, "STOP") || strstr(buf, "CANCEL")) {
-        dbg("POLL: got STOP/CANCEL");
-        return true;
-      }
-    }
+  if (select(STDIN_FILENO + 1, &rfds, nullptr, nullptr, &tv) <= 0)
+    return false;
+
+  // Read available data into shared buffer
+  char buf[4096];
+  ssize_t n = read(STDIN_FILENO, buf, sizeof(buf));
+  if (n <= 0) { g_eof = true; return true; }  // EOF = stop
+  g_readBuf.append(buf, (size_t)n);
+
+  // Check if buffer contains STOP or CANCEL (leave data for sd_readline)
+  if (g_readBuf.find("STOP") != std::string::npos ||
+      g_readBuf.find("CANCEL") != std::string::npos) {
+    dbg("POLL: got STOP/CANCEL in buffer");
+    return true;
   }
   return false;
 }
@@ -598,9 +621,9 @@ int main(int argc, char** argv) {
   // Command loop
   while (true) {
     cmd = sd_readline();
-    if (cmd.empty() && feof(stdin)) break;
+    if (cmd.empty() && g_eof) break;
 
-    if (cmd == "SPEAK") {
+    if (cmd == "SPEAK" || cmd == "CHAR" || cmd == "KEY" || cmd == "SOUND_ICON") {
       sd_send("202 OK RECEIVING MESSAGE");
       std::string text = sd_read_text();
       if (text.empty()) {
@@ -654,12 +677,15 @@ int main(int argc, char** argv) {
     else if (cmd == "SET" || cmd.compare(0, 4, "SET ") == 0) {
       // Handle both multi-line "SET\nKEY=val\n." and single-line "SET SELF RATE 50"
       // Multi-line needs "202 OK RECEIVING MESSAGE" ack first.
-      auto applyParam = [&](const std::string& key, const std::string& val) {
-        if (key == "RATE") ssipRate = atoi(val.c_str());
-        else if (key == "PITCH") ssipPitch = atoi(val.c_str());
-        else if (key == "VOLUME") ssipVolume = 1.0 + atoi(val.c_str()) / 100.0;
-        else if (key == "VOICE" || key == "voice" ||
-                 key == "synthesis_voice") {
+      auto applyParam = [&](const std::string& rawKey, const std::string& val) {
+        // SD sends lowercase keys in multi-line SET blocks (rate=78)
+        std::string key = rawKey;
+        for (auto& c : key) c = (char)tolower((unsigned char)c);
+
+        if (key == "rate") ssipRate = atoi(val.c_str());
+        else if (key == "pitch") ssipPitch = atoi(val.c_str());
+        else if (key == "volume") ssipVolume = 1.0 + atoi(val.c_str()) / 100.0;
+        else if (key == "voice" || key == "synthesis_voice") {
           // SD sends voice=male1 (generic) and synthesis_voice=Adam (specific).
           // Ignore generic SSIP voice types.
           if (val == "male1" || val == "male2" || val == "male3" ||
@@ -674,7 +700,7 @@ int main(int argc, char** argv) {
           else if (!val.empty())
             nvspFrontend_setVoiceProfile(fe, val.c_str());
         }
-        else if (key == "LANGUAGE" || key == "language") {
+        else if (key == "language") {
           // SD sends "c", "C", or "NULL" for unset language — keep default
           if (val != "c" && val != "C" && val != "NULL" && !val.empty()) {
             language = val;
@@ -699,7 +725,7 @@ int main(int argc, char** argv) {
         sd_send("202 OK RECEIVING MESSAGE");
         while (true) {
           std::string line = sd_readline();
-          if (line == "." || (line.empty() && feof(stdin))) break;
+          if (line == "." || (line.empty() && g_eof)) break;
           auto eq = line.find('=');
           if (eq != std::string::npos)
             applyParam(line.substr(0, eq), line.substr(eq + 1));
@@ -742,10 +768,27 @@ int main(int argc, char** argv) {
         filtered.push_back(lang);
       }
 
+      // Sort with en-us first — Orca picks the language from the first voice
+      // entry when switching voices, so the default must be sensible.
+      std::sort(filtered.begin(), filtered.end(), [](const std::string& a, const std::string& b) {
+        if (a == "en-us") return true;
+        if (b == "en-us") return false;
+        return a < b;
+      });
+
       for (const auto& lang : filtered) {
+        // Uppercase dialect portion to match Orca's locale format.
+        // Orca prepends a default voice with locale-derived "en-US" — if we
+        // output "en-us", Orca shows two separate language entries.
+        std::string displayLang = lang;
+        auto dash = displayLang.find('-');
+        if (dash != std::string::npos) {
+          for (size_t i = dash + 1; i < displayLang.size(); i++)
+            displayLang[i] = (char)toupper((unsigned char)displayLang[i]);
+        }
         for (int i = 0; i < kNumVoices; i++) {
           fprintf(stdout, "200-%s\t%s\tMALE%d\n",
-                  kBuiltinVoices[i].name, lang.c_str(), (i % 3) + 1);
+                  kBuiltinVoices[i].name, displayLang.c_str(), (i % 3) + 1);
         }
       }
       fprintf(stdout, "249 OK VOICES LISTED\n");
@@ -760,9 +803,14 @@ int main(int argc, char** argv) {
       sd_send("202 OK RECEIVING MESSAGE");
       while (true) {
         std::string line = sd_readline();
-        if (line == "." || (line.empty() && feof(stdin))) break;
+        if (line == "." || (line.empty() && g_eof)) break;
       }
       sd_send("203 OK SETTINGS RECEIVED");
+    }
+    else {
+      // Unknown command — respond with error so SD doesn't hang waiting
+      dbg("UNKNOWN: %s", cmd.c_str());
+      sd_send("300 ERR UNKNOWN COMMAND");
     }
   }
 
