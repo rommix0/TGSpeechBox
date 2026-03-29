@@ -1097,6 +1097,31 @@ std::string prepareTextForEspeak(
     result = std::move(dehyph);
   }
 
+  // -0.25. Thousands-separator commas → spaces: "1,213" → "1 213".
+  // Pattern: digit + comma + exactly 3 digits + (non-digit or end).
+  // Keeps decimal commas like "3,14" (only 2 digits after comma).
+  // Space-separated digit groups are how eSpeak recognizes thousands
+  // in Hungarian and other European locales (comma = decimal there).
+  {
+    std::string cleaned;
+    cleaned.reserve(result.size());
+    for (size_t ci = 0; ci < result.size(); ++ci) {
+      if (result[ci] == ',' && ci > 0 &&
+          std::isdigit(static_cast<unsigned char>(result[ci - 1])) &&
+          ci + 3 < result.size() &&
+          std::isdigit(static_cast<unsigned char>(result[ci + 1])) &&
+          std::isdigit(static_cast<unsigned char>(result[ci + 2])) &&
+          std::isdigit(static_cast<unsigned char>(result[ci + 3])) &&
+          (ci + 4 >= result.size() ||
+           !std::isdigit(static_cast<unsigned char>(result[ci + 4])))) {
+        cleaned += ' ';  // replace comma with space
+        continue;
+      }
+      cleaned += result[ci];
+    }
+    result = std::move(cleaned);
+  }
+
   // 0. Pronunciation dictionary replacement (highest priority).
   // Words with toIpa set are left in place; their overrides are collected
   // in ipaOverrides for downstream splicing in runTextParser.
