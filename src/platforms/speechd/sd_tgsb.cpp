@@ -634,7 +634,8 @@ int main(int argc, char** argv) {
       stopFlag = false;
 
       double speed = ssipRateToSpeed(ssipRate);
-      double pitch = sliderPitchToBaseHz(ssipPitch);
+      // SD sends pitch in -100..+100 (0=default), sliderPitchToBaseHz expects 0..100 (50=default)
+      double pitch = sliderPitchToBaseHz((ssipPitch + 100) / 2);
 
       // Strip SSML tags (SD wraps text in <speak>...</speak>)
       {
