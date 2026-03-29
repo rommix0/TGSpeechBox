@@ -156,3 +156,4 @@ For more detailed information, see:
 
 - **[Developers.md](Developers.md)** — DSP pipeline internals, VoicingTone API, FrameEx struct, frontend architecture, and technical implementation details.
 - **[Tuning.md](Tuning.md)** — Language pack settings, phoneme tuning, normalization rules, voice profiles, and how to add or modify languages.
+- **[Dictionary-editing.md](Dictionary-editing.md)** — Pronunciation overrides, IPA injection, user dictionaries, stress/compound dictionaries, and cross-platform import/export.

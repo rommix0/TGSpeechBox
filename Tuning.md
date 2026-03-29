@@ -3,6 +3,8 @@
 This document covers language pack configuration, phoneme tuning, voice profiles, normalization rules, and frontend processing passes.
 
 > **Note on dictionaries:** Pronunciation dictionaries, user dictionaries, stress dictionaries, and compound splitting are covered in **[Dictionary-editing.md](Dictionary-editing.md)**. Dictionaries operate above the phoneme/pack level — they intercept text before it reaches eSpeak and redirect pronunciation at the word level. This guide focuses on the lower-level tuning: phoneme formant values, language pack settings, allophone rules, and DSP parameters.
+>
+> **Dictionary ↔ YAML interaction:** The `dictSuffixes` setting (see [Dictionary suffix stripping](#dictionary-suffix-stripping) below) is defined in language pack YAML but affects dictionary lookup behavior. When tuning a language, consider both the YAML settings here and the dictionary configuration in Dictionary-editing.md.
 
 ## phonemes.yaml
 `packs/phonemes.yaml` defines how each phoneme maps to Klatt-style frame parameters. Keys are IPA symbols or internal symbols (we use some private keys like `ᴇ`, `ᴒ`, etc. for language-specific tuning).
@@ -200,6 +202,8 @@ These settings control the short "silence gap" inserted before stops/affricates 
   - `"none"`: never insert closure gaps
 - `stopClosureClusterGapsEnabled` (bool, default `true`): Enables the cluster part of `"vowel-and-cluster"`.
 - `stopClosureAfterNasalsEnabled` (bool, default `false`): If true, allows closure gaps before stops even after nasals. Helpful when nasal+stop clusters swallow the stop at higher rates.
+- `stopClosureNasalToStopGapMs` (number, default `0.0`): When > 0, inserts a dedicated short closure gap between nasals and following stops (/mp/, /nt/, /nk/). This prevents the stop burst from being swallowed at speed — the shared place of articulation means boundary smoothing can erase the acoustic discontinuity without an explicit gap. Uses its own timing (typically 10ms gap / 2ms fade) to avoid the "click" artifacts that caused `stopClosureAfterNasalsEnabled` to default to false. Enabled at 10ms across 20 language packs (Spanish, Portuguese, French, Finnish, German, Italian, Polish, Dutch, Swedish, Danish, Turkish, Czech, Slovak, Croatian, Romanian, Russian, Ukrainian, Bulgarian). English excluded (often unreleased nasal+stop). Hungarian uses the older `stopClosureAfterNasalsEnabled` instead.
+- `stopClosureNasalToStopFadeMs` (number, default `0.0`): Fade duration for the nasal-to-stop closure gap. Typically 2ms (vs the general cluster fade of 4ms).
 
 ### Stop closure gap timing (ms at speed=1.0)
 - `stopClosureVowelGapMs` (number, default `41.0`)
@@ -315,6 +319,29 @@ This is a more speech-like alternative to inserting a pause. It changes how some
 - `spellingDiphthongMode` (string, default "none"): One of:
   - `none`: do nothing
   - `monophthong`: in acronym-like words, treat the English letter name **A** (/eɪ/, often pack-normalized to /ej/) as a long monophthong by dropping the offglide and marking the nucleus lengthened. This reduces the unwanted "y"-glide in cases like "NVDA".
+
+### Dictionary suffix stripping
+When a word isn't found in the pronunciation dictionary, the frontend tries stripping per-language suffixes (longest-first) and looking up the remaining stem. If the stem matches, the text respelling is used with the suffix reattached, so eSpeak phonemizes the suffix naturally in context.
+
+- `dictSuffixes` (string list, default `[]`): Per-language list of suffixes to try. Pre-sorted longest-first at load time. Only stems of 3+ characters are considered (prevents false matches on short words like "as" → "a" + "s").
+
+Example (English, in `en.yaml`):
+```yaml
+settings:
+  dictSuffixes:
+    - "'s"
+    - "ing"
+    - "est"
+    - "ed"
+    - "er"
+    - "es"
+    - "ly"
+    - "s"
+```
+
+With a dict entry `launch → lawnch`, speaking "launching" automatically produces "lawnching". For IPA-injection entries (those with `toIpa` set), the text respelling path is used instead of IPA splitting, so suffixes like "'s" get natural connected-speech phonemization (e.g. /z/ after voiced sounds, not the letter "ess").
+
+Agglutinative languages like Hungarian and Turkish have large suffix lists (42 and 22 entries respectively) covering case endings, plurals, and diminutives. Isolating languages like Chinese have no suffixes. See each language's YAML for the full list.
 
 ### Post-stop aspiration insertion (English-style)
 - `postStopAspirationEnabled` (bool, default `false`): Inserts a short aspiration phoneme after unvoiced stops in specific contexts.
