@@ -693,12 +693,18 @@ int main(int argc, char** argv) {
               val == "child_male" || val == "child_female" || val == "NULL")
             return;
           voiceName = val;
-          activeVoice = findBuiltinVoice(val.c_str());
+          // Strip " (profile)" suffix if present (from LIST VOICES output)
+          std::string cleanName = val;
+          auto paren = cleanName.find(" (profile)");
+          if (paren != std::string::npos) cleanName = cleanName.substr(0, paren);
+
+          activeVoice = findBuiltinVoice(cleanName.c_str());
           // Built-in voices are frame multipliers, not YAML profiles
-          if (activeVoice)
+          if (activeVoice) {
             nvspFrontend_setVoiceProfile(fe, "");
-          else if (!val.empty())
-            nvspFrontend_setVoiceProfile(fe, val.c_str());
+          } else if (!cleanName.empty()) {
+            nvspFrontend_setVoiceProfile(fe, cleanName.c_str());
+          }
         }
         else if (key == "language") {
           // SD sends "c", "C", or "NULL" for unset language — keep default
@@ -786,9 +792,25 @@ int main(int argc, char** argv) {
           for (size_t i = dash + 1; i < displayLang.size(); i++)
             displayLang[i] = (char)toupper((unsigned char)displayLang[i]);
         }
+        // Built-in voices (frame multipliers, not YAML profiles)
         for (int i = 0; i < kNumVoices; i++) {
           fprintf(stdout, "200-%s\t%s\tMALE%d\n",
                   kBuiltinVoices[i].name, displayLang.c_str(), (i % 3) + 1);
+        }
+        // YAML voice profiles (Beth, Bobby, user-defined)
+        const char* profileNames = nvspFrontend_getVoiceProfileNames(fe);
+        if (profileNames && profileNames[0]) {
+          const char* p2 = profileNames;
+          while (*p2) {
+            const char* nl2 = strchr(p2, '\n');
+            std::string name(p2, nl2 ? nl2 : p2 + strlen(p2));
+            if (!name.empty()) {
+              fprintf(stdout, "200-%s (profile)\t%s\tMALE1\n",
+                      name.c_str(), displayLang.c_str());
+            }
+            if (!nl2) break;
+            p2 = nl2 + 1;
+          }
         }
       }
       fprintf(stdout, "249 OK VOICES LISTED\n");
