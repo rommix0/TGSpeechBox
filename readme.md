@@ -46,19 +46,20 @@ This project uses a dual-license model. The core source code is MIT-licensed, bu
 - **Language packs** (`packs/`) — YAML phoneme definitions, language rules, and dictionaries
 - **NVDA driver** (`addon/synthDrivers/`) — Python driver for NVDA screen reader
 - **Phoneme editor** (`tools/tgsbPhonemeEditorWin32/`) — Win32 pack editing and preview tool
+- **tgsbRender** (`tools/tgsbRender.cpp`) — command-line IPA-to-PCM renderer. The `--espeak` flag optionally loads the system's libespeak-ng.so via dlopen at runtime, but the base tool (IPA from stdin) is phonemizer-agnostic and fully MIT.
 - **Supporting tools and scripts**
 
 You can use, modify, and redistribute any of these under the MIT license. See the `LICENSE` file in the repository root.
 
 ### What's GPLv3
-When the MIT-licensed code is compiled and statically linked with eSpeak-NG (a GPLv3 phonemizer), the resulting combined binary is distributed under GPLv3. This applies to:
+When the MIT-licensed code is compiled and linked with eSpeak-NG (a GPLv3 phonemizer), the resulting combined binary is distributed under GPLv3. This applies to:
 
-- **Android app** (`src/platforms/android/`) — eSpeak-NG linked into the TTS service
-- **iOS and macOS app** (`src/platforms/ios/`) — eSpeak-NG linked into the Audio Unit extension
-- **SAPI5 engine** (`src/sapi/`) — eSpeak-NG linked into the COM wrapper DLL
-- **Linux CLI tools** — prebuilt binaries that include eSpeak-NG
+- **Android app** (`src/platforms/android/`) — eSpeak-NG statically linked into the TTS service
+- **iOS and macOS app** (`src/platforms/ios/`) — eSpeak-NG statically linked into the Audio Unit extension
+- **SAPI5 engine** (`src/sapi/`) — eSpeak-NG statically linked into the COM wrapper DLL
+- **Native Speech Dispatcher module** (`src/platforms/speechd/sd_tgsb.cpp`) — dynamically loads libespeak-ng.so via dlopen and requires it to function. Source file is GPL-3.0 licensed.
 
-The GPL boundary is at link time, not at the source level. If you build these platforms from source, the combined work must be distributed under GPLv3. If you use only the core engine and frontend libraries (without eSpeak-NG), the MIT license applies.
+The GPL boundary is at link time (or, for sd_tgsb, at the functional-dependency level). If you build these platforms from source, the combined work must be distributed under GPLv3. If you use only the core engine and frontend libraries (without eSpeak-NG), the MIT license applies.
 
 For the full text of the GPLv3, see: https://www.gnu.org/licenses/gpl-3.0.html
 

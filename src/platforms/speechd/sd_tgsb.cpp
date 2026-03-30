@@ -1,6 +1,12 @@
 /*
  * sd_tgsb — Native Speech Dispatcher module for TGSpeechBox.
- * Copyright 2025-2026 Tamas Geczy.  Licensed under the MIT License.
+ * Copyright 2025-2026 Tamas Geczy.
+ *
+ * This file is licensed under the GNU General Public License v3.0 (GPL-3.0)
+ * because it dynamically loads and requires espeak-ng (GPL-3.0) at runtime.
+ * See LICENSE-GPL3 for details.
+ *
+ * The rest of TGSpeechBox (DSP engine, frontend, tgsbRender) is MIT-licensed.
  *
  * Persistent process: initializes espeak + frontend + player once at startup.
  * Handles SPEAK/STOP/SET/LIST VOICES/QUIT via the SD module text protocol.
