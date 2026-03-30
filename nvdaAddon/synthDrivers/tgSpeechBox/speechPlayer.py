@@ -76,7 +76,7 @@ class FrameEx(Structure):
     If you don't need these, just use queueFrame() as before.
     
     IMPORTANT: This struct must match nvspFrontend_FrameEx / speechPlayer_frameEx_t
-    exactly (23 doubles = 184 bytes). Field order matters for ctypes.memmove().
+    exactly (27 doubles = 216 bytes). Field order matters for ctypes.memmove().
     """
     _fields_ = [
         # Voice quality parameters (DSP v5)
