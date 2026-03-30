@@ -447,12 +447,16 @@ public:
         // closure because it has the bandwidth to represent the harmonics;
         // the decimation LP then removes energy above the output Nyquist.
         {
-            // Output-rate settings (also used when oversampling is off)
-            if (sampleRate >= 44100)      outputBaseSharpness = 10.0;
-            else if (sampleRate >= 32000) outputBaseSharpness = 8.0;
-            else if (sampleRate >= 22050) outputBaseSharpness = 4.0;
-            else if (sampleRate >= 16000) outputBaseSharpness = 3.0;
-            else                          outputBaseSharpness = 2.5;
+            // Output-rate settings (also used when oversampling is off).
+            // Values reduced from pre-F7/F8 defaults because the higher
+            // cascade formants now resonate sharp closure harmonics that
+            // previously fell into a spectral gap.  Slider 50 (multiplier
+            // 1.0) should sound like old slider ~30 at 44100.
+            if (sampleRate >= 44100)      outputBaseSharpness = 6.0;
+            else if (sampleRate >= 32000) outputBaseSharpness = 4.5;
+            else if (sampleRate >= 22050) outputBaseSharpness = 2.0;
+            else if (sampleRate >= 16000) outputBaseSharpness = 1.5;
+            else                          outputBaseSharpness = 1.3;
 
             if (sampleRate <= 11025)      { outputLfBlendBase = 0.30; outputLfCap = 0.35; }
             else if (sampleRate >= 16000) { outputLfBlendBase = 1.0;  outputLfCap = 1.0;  }
@@ -461,15 +465,18 @@ public:
                 outputLfCap = 0.85;
             }
 
-            // Oversampled (2x) settings
+            // Oversampled (2x) settings — slightly below output ladder
+            // to compensate for half-band decimation filter leakage.
+            // 22050→44100 OS would otherwise match native 44100 sharpness,
+            // but the simple average doesn't fully suppress aliased harmonics.
             if (sampleRate < 44100) {
                 sourceOversampleActive = true;
                 int esr = 2 * sampleRate;
-                if (esr >= 44100)      osBaseSharpness = 10.0;
-                else if (esr >= 32000) osBaseSharpness = 8.0;
-                else if (esr >= 22050) osBaseSharpness = 4.0;
-                else if (esr >= 16000) osBaseSharpness = 3.0;
-                else                    osBaseSharpness = 2.5;
+                if (esr >= 44100)      osBaseSharpness = 4.5;
+                else if (esr >= 32000) osBaseSharpness = 3.5;
+                else if (esr >= 22050) osBaseSharpness = 3.5;
+                else if (esr >= 16000) osBaseSharpness = 1.5;
+                else                    osBaseSharpness = 1.3;
 
                 if (esr <= 11025)      { osLfBlendBase = 0.30; osLfCap = 0.35; }
                 else if (esr >= 16000) { osLfBlendBase = 1.0;  osLfCap = 1.0;  }
