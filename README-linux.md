@@ -9,7 +9,8 @@ Pre-built binaries are available for Linux x86_64 and aarch64 (ARM64, e.g. Raspb
 ```
 tgspeechbox-linux-<arch>/        # where <arch> is x86_64 or aarch64
 ├── bin/
-│   ├── tgsbRender     # Core binary (IPA → raw PCM)
+│   ├── tgsbRender     # Core binary (IPA → raw PCM, optional --espeak mode)
+│   ├── sd_tgsb        # Native Speech Dispatcher module
 │   └── tgsp           # Wrapper script with paths configured
 ├── lib/
 │   ├── libtgspeechbox.so     # DSP engine
@@ -19,7 +20,7 @@ tgspeechbox-linux-<arch>/        # where <arch> is x86_64 or aarch64
 │   │   ├── phonemes.yaml
 │   │   └── lang/      # Language-specific rules
 │   └── extras/
-│       └── speech-dispatcher/  # Config for Speech Dispatcher
+│       └── speech-dispatcher/  # Config files (native + generic)
 ├── install.sh         # Installation script
 └── README.md          # This file
 ```
@@ -33,11 +34,11 @@ You can run directly from this directory:
 echo 'həˈloʊ wɜːld' | ./bin/tgsp --lang en-us > test.raw
 
 # Play with aplay (ALSA)
-echo 'həˈloʊ wɜːld' | ./bin/tgsp --lang en-us | aplay -q -r 16000 -f S16_LE -t raw -
+echo 'həˈloʊ wɜːld' | ./bin/tgsp --lang en-us | aplay -q -r 22050 -f S16_LE -t raw -
 
 # Convert to WAV with ffmpeg
 echo 'həˈloʊ wɜːld' | ./bin/tgsp --lang en-us | \
-    ffmpeg -f s16le -ar 16000 -ac 1 -i - output.wav
+    ffmpeg -f s16le -ar 22050 -ac 1 -i - output.wav
 ```
 
 ## Installation
@@ -127,23 +128,23 @@ preset VoicingTone and FrameEx parameters for different voice characters.
 ./bin/tgsp --list-voices
 
 # Use a specific profile
-echo 'həˈloʊ' | ./bin/tgsp --lang en-us --voice Clara | aplay -q -r 16000 -f S16_LE -t raw -
+echo 'həˈloʊ' | ./bin/tgsp --lang en-us --voice Clara | aplay -q -r 22050 -f S16_LE -t raw -
 ```
 
 ### Voice Quality Examples
 
 ```bash
 # Creaky/vocal fry voice
-echo 'həˈloʊ' | ./bin/tgsp --lang en-us --creakiness 60 | aplay -q -r 16000 -f S16_LE -t raw -
+echo 'həˈloʊ' | ./bin/tgsp --lang en-us --creakiness 60 | aplay -q -r 22050 -f S16_LE -t raw -
 
 # Breathy voice
-echo 'həˈloʊ' | ./bin/tgsp --lang en-us --breathiness 40 | aplay -q -r 16000 -f S16_LE -t raw -
+echo 'həˈloʊ' | ./bin/tgsp --lang en-us --breathiness 40 | aplay -q -r 22050 -f S16_LE -t raw -
 
 # Add some naturalness with jitter/shimmer
-echo 'həˈloʊ' | ./bin/tgsp --lang en-us --jitter 15 --shimmer 10 | aplay -q -r 16000 -f S16_LE -t raw -
+echo 'həˈloʊ' | ./bin/tgsp --lang en-us --jitter 15 --shimmer 10 | aplay -q -r 22050 -f S16_LE -t raw -
 
 # Brighter voice (more high frequencies)
-echo 'həˈloʊ' | ./bin/tgsp --lang en-us --voiced-tilt 35 --aspiration-tilt 60 | aplay -q -r 16000 -f S16_LE -t raw -
+echo 'həˈloʊ' | ./bin/tgsp --lang en-us --voiced-tilt 35 --aspiration-tilt 60 | aplay -q -r 22050 -f S16_LE -t raw -
 ```
 
 ### Rate Boost
@@ -152,7 +153,7 @@ Rate boost doubles the effective speech rate using DSP time-stretch, matching th
 
 ```bash
 # Rate boost via command line
-echo 'həˈloʊ wɜːld' | ./bin/tgsp --lang en-us --rate-boost | aplay -q -r 16000 -f S16_LE -t raw -
+echo 'həˈloʊ wɜːld' | ./bin/tgsp --lang en-us --rate-boost | aplay -q -r 22050 -f S16_LE -t raw -
 
 # Rate boost via environment variable (for Speech Dispatcher)
 export TGSB_RATE_BOOST=1
@@ -177,7 +178,7 @@ TGSpeechBox needs IPA input. Use eSpeak-ng to convert text to IPA:
 # Using eSpeak-ng for text → IPA → tgsbRender for IPA → audio
 espeak-ng --ipa=1 -v en-us "Hello world" 2>/dev/null | \
     ./bin/tgsp --lang en-us | \
-    aplay -q -r 16000 -f S16_LE -t raw -
+    aplay -q -r 22050 -f S16_LE -t raw -
 ```
 
 Install eSpeak-ng:
@@ -201,7 +202,7 @@ TGSpeechBox is an IPA-to-audio engine – it doesn't do text-to-IPA conversion i
 eSpeak-ng is fast, widely available, and supports many languages:
 ```bash
 espeak-ng --ipa=1 -v en-us "Hello world" 2>/dev/null | \
-    ./bin/tgsp --lang en-us | aplay -q -r 16000 -f S16_LE -t raw -
+    ./bin/tgsp --lang en-us | aplay -q -r 22050 -f S16_LE -t raw -
 ```
 
 The `--ipa=1` flag outputs IPA with stress markers. Use `--ipa=3` for more detail (includes tie bars).
@@ -213,7 +214,7 @@ The [phonemizer](https://github.com/bootphon/phonemizer) package wraps multiple 
 pip install phonemizer
 
 echo "Hello world" | phonemizer -l en-us -b espeak --strip | \
-    ./bin/tgsp --lang en-us | aplay -q -r 16000 -f S16_LE -t raw -
+    ./bin/tgsp --lang en-us | aplay -q -r 22050 -f S16_LE -t raw -
 ```
 
 Phonemizer can also use festival or segments backends for languages where eSpeak coverage is limited.
@@ -242,7 +243,7 @@ shift 2 2>/dev/null
 
 espeak-ng --ipa=1 -v "$LANG" "$@" 2>/dev/null | \
     tgsp --lang "$LANG" --rate "$RATE" | \
-    aplay -q -r 16000 -f S16_LE -t raw -
+    aplay -q -r 22050 -f S16_LE -t raw -
 ```
 
 Usage: `tgsb-say en-us 20 "Hello world"`
@@ -269,24 +270,108 @@ For long documents, process line-by-line to avoid buffering delays:
 cat document.txt | while IFS= read -r line; do
     espeak-ng --ipa=1 -v en-us "$line" 2>/dev/null | \
         ./bin/tgsp --lang en-us
-done | aplay -q -r 16000 -f S16_LE -t raw -
+done | aplay -q -r 22050 -f S16_LE -t raw -
 ```
 
 ## Speech Dispatcher Integration
 
-TGSpeechBox can be used as a Speech Dispatcher voice for desktop accessibility.
+TGSpeechBox includes a native Speech Dispatcher module (`sd_tgsb`) for desktop accessibility with screen readers like Orca. The `install.sh` script configures everything automatically.
 
-See `share/tgspeechbox/extras/speech-dispatcher/README.md` for setup instructions.
+### Native module vs generic module
 
-Quick summary:
-1. Copy `tgsb-generic.conf` to `/etc/speech-dispatcher/modules/`
-2. Edit paths in the config file
-3. Add to `speechd.conf`:
-   ```
-   AddModule "tgsb" "sd_generic" "tgsb-generic.conf"
-   DefaultModule tgsb
-   ```
-4. Test with: `spd-say "Hello from TGSpeechBox"`
+There are two Speech Dispatcher integration paths:
+
+| | Native module (`sd_tgsb`) | Generic module (`tgsb-generic.conf`) |
+|---|---|---|
+| **Config** | `tgsb-native.conf` | `tgsb-generic.conf` |
+| **How it works** | Persistent process. Loads espeak-ng and TGSpeechBox once at startup. Sends audio via the 705 AUDIO protocol. | Spawns `tgsb-speak` per utterance, which calls `tgsbRender --espeak`. |
+| **Audio quality** | Clean — single process, no pipes between phonemizer and renderer. | May have slight shimmer/discontinuity from pipe buffering between processes. |
+| **STOP responsiveness** | Instant — polls stdin between audio chunks, same architecture as sd_espeak-ng. | Relies on SD killing the subprocess. |
+| **Startup cost** | One-time at module load (espeak + engine initialized once). | Per-utterance (new process, new dlopen, new init each time). |
+
+The installer prefers the native module when the `sd_tgsb` binary is available. The generic module serves as a fallback for systems where the native binary doesn't run.
+
+### Automatic setup
+
+```bash
+sudo ./install.sh
+killall speech-dispatcher
+```
+
+The installer:
+- Copies `sd_tgsb` to `/usr/lib/speech-dispatcher-modules/`
+- Installs config files to `/etc/speech-dispatcher/modules/`
+- Adds `AddModule "tgsb" "sd_tgsb" "tgsb-native.conf"` to `speechd.conf`
+- Copies a per-user config template to `~/.config/tgspeechbox/sd_tgsb.conf`
+- Ensures espeak-ng is enabled as a fallback
+
+Test with: `spd-say -o tgsb "Hello from TGSpeechBox"`
+
+### Manual setup
+
+If you prefer to configure manually:
+
+```bash
+# Copy the native module binary
+sudo cp bin/sd_tgsb /usr/lib/speech-dispatcher-modules/
+sudo chmod +x /usr/lib/speech-dispatcher-modules/sd_tgsb
+
+# Copy the config
+sudo cp share/tgspeechbox/extras/speech-dispatcher/tgsb-native.conf \
+       /etc/speech-dispatcher/modules/
+
+# Add to speechd.conf
+echo 'AddModule "tgsb" "sd_tgsb" "tgsb-native.conf"' | \
+    sudo tee -a /etc/speech-dispatcher/speechd.conf
+
+# Restart
+killall speech-dispatcher
+```
+
+### Configuration
+
+The native module reads settings from a config file. Two locations are checked (per-user wins):
+
+| Location | Purpose |
+|----------|---------|
+| `/etc/speech-dispatcher/modules/tgsb-native.conf` | System-wide (login screen, all users) |
+| `~/.config/tgspeechbox/sd_tgsb.conf` | Per-user (personal voice preferences) |
+
+The config file ships as a commented-out template showing all defaults. Uncomment any line to override:
+
+```conf
+# Pitch mode: espeak_style, fujisaki_style, impulse_style, klatt_style
+TGSBPitchMode fujisaki_style
+
+# Pause between clauses: off, short, long
+TGSBPauseMode short
+
+# Sample rate in Hz
+TGSBSampleRate 22050
+
+# Voicing tone (0-100, 50 = neutral)
+TGSBVoicedTilt 40
+TGSBChorusDepth 20
+
+# Voice quality (0-100)
+TGSBBreathiness 10
+```
+
+After editing: `killall speech-dispatcher`
+
+### Built-in voices
+
+Five built-in voices are available: Adam, Benjamin, Caleb, David, Robert. YAML voice profiles (Beth, Bobby, and any user-defined profiles) also appear in Orca's voice list.
+
+### Recovery
+
+If you lose your voice after switching synthesizers:
+
+```bash
+sudo killall -9 speech-dispatcher orca
+sudo sed -i 's/^DefaultModule.*/DefaultModule espeak-ng/' /etc/speech-dispatcher/speechd.conf
+orca --replace &
+```
 
 ## Supported Languages
 
@@ -323,7 +408,7 @@ The following language packs are included:
 
 ## Audio Output Format
 
-- Sample rate: 16000 Hz (default, configurable via --samplerate)
+- Sample rate: 22050 Hz (default, configurable via --samplerate)
 - Bit depth: 16-bit signed
 - Channels: Mono
 - Byte order: Little-endian
@@ -395,7 +480,7 @@ with `phonemes.yaml` and the `lang/` folder.
 
 ## License
 
-TGSpeechBox is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+TGSpeechBox core (DSP engine, frontend, tgsbRender) is MIT-licensed. The native Speech Dispatcher module (`sd_tgsb`) is GPL-3.0 because it requires espeak-ng. See [LICENSE](LICENSE) and the main [README](readme.md) for the full dual-license details.
 
 Copyright (c) 2014 NV Access Limited
 Copyright (c) 2025-2026 Tamas Geczy
