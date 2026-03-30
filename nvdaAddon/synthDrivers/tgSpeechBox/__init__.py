@@ -70,7 +70,7 @@ class SynthDriver(
         DriverSetting("legacyPitchMode", _("Pitch mode"), availableInSettingsRing=True),
         _SynthDriverBase.InflectionSetting(),
         _SynthDriverBase.VolumeSetting(),
-        BooleanDriverSetting("yearSplitting", _("Year splitting (4-digit numbers as digit pairs)"), defaultVal=True),
+        BooleanDriverSetting("yearSplitting", _("Year splitting (4-digit numbers as digit pairs)"), defaultVal=False),
         BooleanDriverSetting("thousandsSeparatorCommaToSpace", _("Thousands separator comma to space"), defaultVal=False),
         NumericDriverSetting("voiceTilt", _("Voice tilt (brightness)"), defaultVal=50),
         NumericDriverSetting("noiseGlottalMod", _("Noise glottal modulation"), defaultVal=0),

@@ -371,7 +371,7 @@ _LANG_PACK_SPECS = (
     ("stripAllophoneDigits", "stripAllophoneDigits", "bool", False, None),
     ("stripHyphen", "stripHyphen", "bool", False, None),
     # --- Year splitting ---
-    ("yearSplitting", "yearSplittingEnabled", "bool", True, None),
+    ("yearSplitting", "yearSplittingEnabled", "bool", False, None),
     # --- Thousands separator ---
     ("thousandsSeparatorCommaToSpace", "thousandsSeparatorCommaToSpace", "bool", False, None),
 )
