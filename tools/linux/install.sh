@@ -234,6 +234,26 @@ configure_speech_dispatcher() {
     fi
     echo "  Installed module config: $sd_modules_dir/"
 
+    # Copy config template to per-user location (don't overwrite existing)
+    local _home="${SUDO_USER:+$(eval echo ~$SUDO_USER)}"
+    _home="${_home:-$HOME}"
+    if [ -n "$_home" ] && [ -f "$src_native" ]; then
+        local user_conf_dir="$_home/.config/tgspeechbox"
+        local user_conf="$user_conf_dir/sd_tgsb.conf"
+        if [ ! -f "$user_conf" ]; then
+            mkdir -p "$user_conf_dir"
+            cp "$src_native" "$user_conf"
+            # Fix ownership if running as sudo
+            if [ -n "$SUDO_USER" ]; then
+                chown -R "$SUDO_USER:$SUDO_USER" "$user_conf_dir"
+            fi
+            echo "  Per-user config template: $user_conf"
+            echo "  (Uncomment lines to customize — see comments in file)"
+        else
+            echo "  Per-user config exists: $user_conf (not overwritten)"
+        fi
+    fi
+
     # --- Ensure espeak-ng module is enabled ---
     # Many distros ship speechd.conf with all AddModule lines commented out.
     # If espeak-ng is commented out, uncomment it so users always have a
