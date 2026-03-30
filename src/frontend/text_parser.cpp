@@ -1098,13 +1098,14 @@ std::string prepareTextForEspeak(
     result = std::move(dehyph);
   }
 
-  // -0.25. Thousands-separator commas → spaces: "1,213" → "1 213".
+  // -0.25. Thousands-separator commas: "44,100" → "44 100" or "44100".
   // Pattern: digit + comma + exactly 3 digits + (non-digit or end).
   // Keeps decimal commas like "3,14" (only 2 digits after comma).
-  // Space-separated digit groups are how eSpeak recognizes thousands
-  // in Hungarian and other European locales (comma = decimal there).
-  // Off for English — numberExpansion already handles commas internally.
-  if (thousandsSeparatorCommaToSpace) {
+  // For European locales (thousandsSeparatorCommaToSpace): → spaces,
+  // because eSpeak recognizes space-separated digit groups as thousands.
+  // For all other locales: strip commas entirely so eSpeak sees "44100"
+  // and handles it natively (e.g. "forty-four thousand one hundred").
+  {
     std::string cleaned;
     cleaned.reserve(result.size());
     for (size_t ci = 0; ci < result.size(); ++ci) {
@@ -1116,7 +1117,8 @@ std::string prepareTextForEspeak(
           std::isdigit(static_cast<unsigned char>(result[ci + 3])) &&
           (ci + 4 >= result.size() ||
            !std::isdigit(static_cast<unsigned char>(result[ci + 4])))) {
-        cleaned += ' ';  // replace comma with space
+        if (thousandsSeparatorCommaToSpace) cleaned += ' ';
+        // else: strip comma entirely
         continue;
       }
       cleaned += result[ci];

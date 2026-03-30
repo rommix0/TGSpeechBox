@@ -287,11 +287,16 @@ class TgsbEngine: ObservableObject {
     func applyEngineSettings() {
         guard engine != nil else { return }
         let d = UserDefaults(suiteName: kAppGroupId)
+        let voice = d?.string(forKey: "adv_selectedVoice") ?? "adam"
 
         func load(_ key: String, _ dflt: Double) -> Double {
-            guard let d = d, d.object(forKey: "adv_\(key)") != nil
-            else { return dflt }
-            return d.double(forKey: "adv_\(key)")
+            guard let d = d else { return dflt }
+            // Try per-voice key first, then global fallback.
+            let voiceKey = "adv_\(key).\(voice)"
+            if d.object(forKey: voiceKey) != nil { return d.double(forKey: voiceKey) }
+            let globalKey = "adv_\(key)"
+            if d.object(forKey: globalKey) != nil { return d.double(forKey: globalKey) }
+            return dflt
         }
 
         applyVoicingToneFromSliders(
