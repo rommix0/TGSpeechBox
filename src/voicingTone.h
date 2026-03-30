@@ -27,7 +27,7 @@ Licensed under the MIT License. See LICENSE for details.
  * the magic won't match and the DLL will treat it as the legacy layout.
  */
 #define SPEECHPLAYER_VOICINGTONE_MAGIC 0x32544F56u /* "VOT2" */
-#define SPEECHPLAYER_VOICINGTONE_VERSION 3u
+#define SPEECHPLAYER_VOICINGTONE_VERSION 4u
 
 #ifdef __cplusplus
 extern "C" {
@@ -345,6 +345,50 @@ typedef struct {
      */
     double nasalGainScale;
 
+    /* ================================================================
+     * V5 additions: Dual-oscillator chorus (vocal fold asymmetry)
+     * ================================================================
+     *
+     * Real vocal folds are not perfectly symmetric — each fold has
+     * slightly different mass and tension, producing cycle-to-cycle
+     * variation in the glottal pulse.  This dual-oscillator model
+     * runs a second phase accumulator at a slightly detuned pitch
+     * and blends it with the primary, creating natural richness
+     * that is deterministic (unlike jitter, which is random).
+     *
+     * The detune offset is tiny (1-3 Hz), so the result is NOT
+     * two separate voices — it's a subtle thickening of a single
+     * voice, similar to what natural vocal fold asymmetry produces.
+     */
+
+    /**
+     * Chorus depth: blend amount of the second oscillator.
+     *
+     * Range: 0.0 to 1.0 (clamped by DSP)
+     *   - 0.0: Off — single oscillator (default, backward compatible)
+     *   - 0.3: Subtle warmth / thickening
+     *   - 0.5: Moderate chorus (natural richness)
+     *   - 1.0: Full 50/50 blend (maximum vocal fold asymmetry effect)
+     *
+     * Default: 0.0 (off)
+     */
+    double chorusDepth;
+
+    /**
+     * Chorus detune: pitch offset of the second oscillator in Hz.
+     *
+     * Controls the beating rate between the two oscillators.
+     * Lower values = slower beating (warm), higher = faster (more alive).
+     *
+     * Range: 0.5 to 5.0 Hz (clamped by DSP)
+     *   - 1.0: Very slow beating (~1 Hz), gentle warmth
+     *   - 2.0: Natural vocal fold asymmetry range (default)
+     *   - 3.0-5.0: Faster beating, more noticeable chorus
+     *
+     * Default: 2.0 Hz
+     */
+    double chorusDetuneHz;
+
 } speechPlayer_voicingTone_t;
 
 /**
@@ -372,7 +416,9 @@ typedef struct {
     0.0,    /* tremorDepth (no tremor by default) */ \
     1.0,    /* nasalBwScale (no scaling) */ \
     1.0,    /* f4FreqScale (no scaling, base F4 ~3300 Hz) */ \
-    1.0     /* nasalGainScale (no scaling) */ \
+    1.0,    /* nasalGainScale (no scaling) */ \
+    0.0,    /* chorusDepth (off by default) */ \
+    2.0     /* chorusDetuneHz (natural vocal fold asymmetry range) */ \
 }
 
 /**

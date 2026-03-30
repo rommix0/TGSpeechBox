@@ -153,10 +153,14 @@ typedef struct nvspFrontend_VoicingTone {
   double nasalBwScale;          /* Nasal resonator bandwidth multiplier (1.0 = neutral) */
   double f4FreqScale;           /* F4 frequency multiplier for pharynx length (1.0 = neutral) */
   double nasalGainScale;        /* Nasal pole coupling amplitude multiplier (1.0 = neutral) */
+
+  /* V5 parameters — dual-oscillator chorus (vocal fold asymmetry) */
+  double chorusDepth;           /* Blend amount of second oscillator (0.0-1.0, default 0.0 = off) */
+  double chorusDetuneHz;        /* Pitch offset of second oscillator in Hz (0.5-5.0, default 2.0) */
 } nvspFrontend_VoicingTone;
 
 /* Number of fields in VoicingTone struct */
-#define NVSP_FRONTEND_VOICINGTONE_NUM_PARAMS 17
+#define NVSP_FRONTEND_VOICINGTONE_NUM_PARAMS 19
 
 /*
   VoiceProfileSliders - the 12 user-adjustable slider values (ABI v2+).

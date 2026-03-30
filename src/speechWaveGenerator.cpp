@@ -869,6 +869,9 @@ public:
 
         // Update tremor depth for elderly/shaky voice
         voiceGenerator.setTremorDepth(currentTone.tremorDepth);
+
+        // Dual-oscillator chorus for vocal fold asymmetry
+        voiceGenerator.setChorusParams(currentTone.chorusDepth, currentTone.chorusDetuneHz);
     }
 
     void getVoicingTone(speechPlayer_voicingTone_t* tone) {

@@ -211,6 +211,52 @@ class VoicingToneMixin:
         except Exception:
             pass
 
+    # ---- Chorus Depth slider ----
+    # 0 = off (default), 100 = full 50/50 blend
+
+    def _get_chorusDepth(self):
+        return int(getattr(self, "_curChorusDepth", 0))
+
+    def _set_chorusDepth(self, val):
+        try:
+            newVal = int(val)
+            if newVal == getattr(self, "_curChorusDepth", 0):
+                return
+            self._curChorusDepth = newVal
+            if not getattr(self, "_initComplete", False):
+                return
+            curVoice = getattr(self, "_curVoice", "Adam") or "Adam"
+            if curVoice.startswith(VOICE_PROFILE_PREFIX):
+                profileName = curVoice[len(VOICE_PROFILE_PREFIX):]
+            else:
+                profileName = ""
+            self._applyVoicingTone(profileName)
+        except Exception:
+            pass
+
+    # ---- Chorus Detune slider ----
+    # 0 = 0.5 Hz (slow beating), 50 = 2.0 Hz (default), 100 = 5.0 Hz (fast)
+
+    def _get_chorusDetune(self):
+        return int(getattr(self, "_curChorusDetune", 33))
+
+    def _set_chorusDetune(self, val):
+        try:
+            newVal = int(val)
+            if newVal == getattr(self, "_curChorusDetune", 33):
+                return
+            self._curChorusDetune = newVal
+            if not getattr(self, "_initComplete", False):
+                return
+            curVoice = getattr(self, "_curVoice", "Adam") or "Adam"
+            if curVoice.startswith(VOICE_PROFILE_PREFIX):
+                profileName = curVoice[len(VOICE_PROFILE_PREFIX):]
+            else:
+                profileName = ""
+            self._applyVoicingTone(profileName)
+        except Exception:
+            pass
+
     # ---- Voice Tremor slider ----
 
     def _get_voiceTremor(self):
@@ -385,6 +431,9 @@ class VoicingToneMixin:
                         tone.nasalBwScale = frontendTone.nasalBwScale
                         tone.f4FreqScale = frontendTone.f4FreqScale
                         tone.nasalGainScale = frontendTone.nasalGainScale
+                        if hasattr(frontendTone, 'chorusDepth'):
+                            tone.chorusDepth = frontendTone.chorusDepth
+                            tone.chorusDetuneHz = frontendTone.chorusDetuneHz
 
             # Helper for slider values
             def safe_float(val, default=0.0):
@@ -450,6 +499,17 @@ class VoicingToneMixin:
                 # 50 -> 1.0 (neutral), 100 -> 0.85 (large)
                 tone.f4FreqScale = 1.0 - ((headSizeSlider - 50.0) / 50.0) * 0.15
             tone.f4FreqScale = max(0.7, min(1.5, tone.f4FreqScale))
+
+            # Apply chorus depth from slider (0-100 maps to 0.0-1.0)
+            chorusSlider = safe_float(getattr(self, "_curChorusDepth", 0), 0.0)
+            tone.chorusDepth = chorusSlider / 100.0
+            tone.chorusDepth = max(0.0, min(1.0, tone.chorusDepth))
+
+            # Apply chorus detune from slider (0-100 maps to 0.5-5.0 Hz)
+            # Default slider 33 maps to 2.0 Hz
+            detuneSlider = safe_float(getattr(self, "_curChorusDetune", 33), 33.0)
+            tone.chorusDetuneHz = 0.5 + (detuneSlider / 100.0) * 4.5
+            tone.chorusDetuneHz = max(0.5, min(5.0, tone.chorusDetuneHz))
 
             # Apply to player
             self._player.setVoicingTone(tone)

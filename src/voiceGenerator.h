@@ -67,6 +67,12 @@ private:
     // Speed quotient: glottal pulse asymmetry (V3 voicingTone)
     double speedQuotient;
 
+    // Dual-oscillator chorus (V5 voicingTone): second phase accumulator
+    // at slightly detuned pitch for vocal fold asymmetry simulation.
+    double chorusDepth;       // 0.0 = off, 1.0 = full 50/50 blend
+    double chorusDetuneHz;    // pitch offset of second oscillator (Hz)
+    double chorusPhase;       // second oscillator phase accumulator (0..1)
+
     // Spectral tilt (Bipolar) for voiced signal
     double tiltTargetTlDb;
     double tiltTlDb;
@@ -485,6 +491,9 @@ public:
         voicedPreEmphMix = defaults.voicedPreEmphMix;
         noiseGlottalModDepth = clampDouble(defaults.noiseGlottalModDepth, 0.0, 1.0);
         speedQuotient = clampDouble(defaults.speedQuotient, 0.5, 4.0);
+        chorusDepth = clampDouble(defaults.chorusDepth, 0.0, 1.0);
+        chorusDetuneHz = clampDouble(defaults.chorusDetuneHz, 0.5, 5.0);
+        chorusPhase = 0.0;
         setTiltDbPerOct(defaults.voicedTiltDbPerOct);
         setAspirationTiltDbPerOct(defaults.aspirationTiltDbPerOct);
 
@@ -518,6 +527,7 @@ public:
         jitterMul = 1.0;
         shimmerMul = 1.0;
         glottisOpen=false;
+        chorusPhase = 0.0;
         aspLpState = 0.0;
         fricLpState = 0.0;
         voicedAntiAliasLp1.reset();
@@ -569,6 +579,14 @@ public:
     double getTremorDepth() const {
         return tremorDepth;
     }
+
+    void setChorusParams(double depth, double detuneHz) {
+        chorusDepth = clampDouble(depth, 0.0, 1.0);
+        chorusDetuneHz = clampDouble(detuneHz, 0.5, 5.0);
+    }
+
+    double getChorusDepth() const { return chorusDepth; }
+    double getChorusDetuneHz() const { return chorusDetuneHz; }
 
     double getLastNoiseMod() const { return lastNoiseMod; }
 
@@ -816,6 +834,9 @@ public:
         glottisOpen = (pitchHz > 0.0) && (cyclePos >= effectiveOQ);
 
         double flow = 0.0;
+        // peakPos declared here (not inside glottisOpen) so the chorus
+        // oscillator can also use it after the main flow block.
+        double peakPos = voicingPeakPos;
         if(glottisOpen) {
             double openLen = 1.0 - effectiveOQ;
             if (openLen < 0.0001) openLen = 0.0001;
@@ -847,8 +868,8 @@ public:
                 // Scale 0.6: maps LF range into ~±0.20 around voicingPeakPos
                 sqPeakDelta = rawDelta * 0.6;
             }
-            double peakPos = voicingPeakPos + sqPeakDelta
-                           + (0.02 * breathiness) - (0.05 * creakiness);
+            peakPos = voicingPeakPos + sqPeakDelta
+                    + (0.02 * breathiness) - (0.05 * creakiness);
 
             const double minCloseSamples = 2.0;
             if (pitchHz > 0.0) {
@@ -882,6 +903,40 @@ public:
                                    pitchHz, frameExSharpness,
                                    outputBaseSharpness, outputLfBlendBase, outputLfCap);
             }
+        }
+
+        // Dual-oscillator chorus: blend a second phase accumulator at
+        // slightly detuned pitch for natural vocal fold asymmetry.
+        // The detune is tiny (1-3 Hz), creating subtle cycle-to-cycle
+        // variation that thickens the voice without doubling it.
+        if (chorusDepth > 0.001 && pitchHz > 0.0) {
+            double chorusPitchHz = pitchHz + chorusDetuneHz;
+            chorusPhase = fmod(chorusPhase + chorusPitchHz / (double)sampleRate, 1.0);
+
+            double chorusFlow;
+            if (sourceOversampleActive) {
+                double cInc = chorusPitchHz / (double)sampleRate;
+                double cMid = chorusPhase - cInc * 0.5;
+                if (cMid < 0.0) cMid += 1.0;
+                double cFlowMid = flowAtPhase(cMid, effectiveOQ, peakPos,
+                                              pitchHz, frameExSharpness,
+                                              osBaseSharpness, osLfBlendBase, osLfCap);
+                double cFlowCur = flowAtPhase(chorusPhase, effectiveOQ, peakPos,
+                                              pitchHz, frameExSharpness,
+                                              osBaseSharpness, osLfBlendBase, osLfCap);
+                chorusFlow = 0.5 * (cFlowMid + cFlowCur);
+            } else {
+                chorusFlow = flowAtPhase(chorusPhase, effectiveOQ, peakPos,
+                                         pitchHz, frameExSharpness,
+                                         outputBaseSharpness, outputLfBlendBase, outputLfCap);
+            }
+
+            // Blend: depth 0 = pure original, depth 1 = 50/50 mix
+            double blend = chorusDepth * 0.5;
+            flow = flow * (1.0 - blend) + chorusFlow * blend;
+        } else if (pitchHz <= 0.0) {
+            // Keep chorus oscillator synced when unvoiced
+            chorusPhase = 0.0;
         }
 
         const double flowScale = 1.6;

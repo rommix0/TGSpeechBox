@@ -49,7 +49,7 @@ struct SpeechSettings {
 #endif
 
 #ifndef SPEECHPLAYER_VOICINGTONE_VERSION
-#define SPEECHPLAYER_VOICINGTONE_VERSION 3u
+#define SPEECHPLAYER_VOICINGTONE_VERSION 4u
 #endif
 
 #ifndef SPEECHPLAYER_DSP_VERSION
@@ -78,6 +78,13 @@ struct EditorVoicingToneV3 {
   double aspirationTiltDbPerOct;
   double cascadeBwScale;
   double tremorDepth;
+  // V4 additions — vocal tract shape
+  double nasalBwScale;
+  double f4FreqScale;
+  double nasalGainScale;
+  // V5 additions — dual-oscillator chorus
+  double chorusDepth;
+  double chorusDetuneHz;
 };
 
 // Alias for backward compatibility

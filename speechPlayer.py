@@ -76,7 +76,7 @@ class FrameEx(Structure):
     If you don't need these, just use queueFrame() as before.
     
     IMPORTANT: This struct must match nvspFrontend_FrameEx / speechPlayer_frameEx_t
-    exactly (23 doubles = 184 bytes). Field order matters for ctypes.memmove().
+    exactly (27 doubles = 216 bytes). Field order matters for ctypes.memmove().
     """
     _fields_ = [
         # Voice quality parameters (DSP v5)
@@ -116,6 +116,12 @@ class FrameEx(Structure):
         # Amplitude crossfade mode (DSP v7.1)
         # 0.0 = linear (legacy), 1.0 = equal-power (sin/cos, prevents energy dips)
         ("transAmplitudeMode", c_double),
+
+        # Higher cascade formants F7/F8 (DSP v8, Rabiner 1968 defaults)
+        ("cf7", c_double),          # F7 frequency (Hz), default 6500.0
+        ("cb7", c_double),          # F7 bandwidth (Hz), default 720.0
+        ("cf8", c_double),          # F8 frequency (Hz), default 7500.0
+        ("cb8", c_double),          # F8 bandwidth (Hz), default 1250.0
     ]
     
     @classmethod
@@ -159,6 +165,11 @@ class FrameEx(Structure):
         ex.transNasalScale = 0.0
         # Amplitude crossfade: 0.0 = linear (legacy default)
         ex.transAmplitudeMode = 0.0
+        # Higher cascade formants F7/F8 (Rabiner 1968 defaults)
+        ex.cf7 = 6500.0
+        ex.cb7 = 720.0
+        ex.cf8 = 7500.0
+        ex.cb8 = 1250.0
         return ex
 
 
@@ -204,6 +215,10 @@ class VoicingTone(Structure):
         ("nasalBwScale", c_double),              # Nasal resonator bandwidth multiplier (0.5-2.0, default 1.0)
         ("f4FreqScale", c_double),               # F4 frequency multiplier (0.7-1.5, default 1.0)
         ("nasalGainScale", c_double),            # Nasal pole coupling amplitude multiplier (0.5-1.5, default 1.0)
+
+        # New v5 parameters — dual-oscillator chorus
+        ("chorusDepth", c_double),               # Chorus blend amount (0.0-1.0, default 0.0 = off)
+        ("chorusDetuneHz", c_double),            # Chorus pitch offset in Hz (0.5-5.0, default 2.0)
     ]
     
     @classmethod
@@ -214,7 +229,7 @@ class VoicingTone(Structure):
         tone.magic = SPEECHPLAYER_VOICINGTONE_MAGIC
         tone.structSize = ctypes.sizeof(cls)
         tone.structVersion = SPEECHPLAYER_VOICINGTONE_VERSION
-        tone.dspVersion = 6  # Current DSP version
+        tone.dspVersion = 8  # Current DSP version
         
         # Original parameters
         tone.voicingPeakPos = 0.91
@@ -240,6 +255,10 @@ class VoicingTone(Structure):
         tone.nasalBwScale = 1.0                 # No scaling (default)
         tone.f4FreqScale = 1.0                  # No scaling (default)
         tone.nasalGainScale = 1.0               # No scaling (default)
+
+        # New v5 parameters — dual-oscillator chorus
+        tone.chorusDepth = 0.0                  # Off by default
+        tone.chorusDetuneHz = 2.0               # Natural vocal fold asymmetry range
         return tone
 
 

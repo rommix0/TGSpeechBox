@@ -80,6 +80,8 @@ class SynthDriver(
         NumericDriverSetting("aspirationTilt", _("Aspiration tilt (breath color)"), defaultVal=50),
         NumericDriverSetting("cascadeBwScale", _("Formant sharpness (cascade bandwidth)"), defaultVal=50),
         NumericDriverSetting("voiceTremor", _("Voice tremor (shakiness)"), defaultVal=0),
+        NumericDriverSetting("chorusDepth", _("Chorus depth (vocal fold asymmetry)"), defaultVal=0),
+        NumericDriverSetting("chorusDetune", _("Chorus detune (beating speed)"), defaultVal=33),
         NumericDriverSetting("headSize", _("Head size (pharynx length)"), defaultVal=50),
         # FrameEx voice quality params (DSP v5+) - for creaky voice, breathiness, etc.
         NumericDriverSetting("frameExCreakiness", _("Creakiness (laryngealization)"), defaultVal=0),
@@ -923,6 +925,10 @@ class SynthDriver(
     _set_cascadeBwScale = VoicingToneMixin._set_cascadeBwScale
     _get_voiceTremor = VoicingToneMixin._get_voiceTremor
     _set_voiceTremor = VoicingToneMixin._set_voiceTremor
+    _get_chorusDepth = VoicingToneMixin._get_chorusDepth
+    _set_chorusDepth = VoicingToneMixin._set_chorusDepth
+    _get_chorusDetune = VoicingToneMixin._get_chorusDetune
+    _set_chorusDetune = VoicingToneMixin._set_chorusDetune
     _get_headSize = VoicingToneMixin._get_headSize
     _set_headSize = VoicingToneMixin._set_headSize
     _get_frameExCreakiness = VoicingToneMixin._get_frameExCreakiness
