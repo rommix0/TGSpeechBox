@@ -178,6 +178,8 @@ struct TgsbEngine {
     double userAspirationTiltDbPerOct;
     double userCascadeBwScale;
     double userTremorDepth;
+    double userChorusDepth;
+    double userChorusDetuneHz;
 
     /* Pitch inflection (0..1), default 0.5 */
     double inflection;
@@ -586,7 +588,9 @@ void tgsb_set_voicing_tone(TgsbEngine *engine,
     double tremorDepth,
     double nasalBwScale,
     double f4FreqScale,
-    double nasalGainScale)
+    double nasalGainScale,
+    double chorusDepth,
+    double chorusDetuneHz)
 {
     if (!engine || !engine->player) return;
 
@@ -599,6 +603,8 @@ void tgsb_set_voicing_tone(TgsbEngine *engine,
     engine->userAspirationTiltDbPerOct = aspirationTiltDbPerOct;
     engine->userCascadeBwScale = cascadeBwScale;
     engine->userTremorDepth = tremorDepth;
+    engine->userChorusDepth = chorusDepth;
+    engine->userChorusDetuneHz = chorusDetuneHz;
 
     speechPlayer_voicingTone_t tone = speechPlayer_getDefaultVoicingTone();
     const VoicePreset *vp = &kPresets[engine->voiceIndex];
@@ -616,6 +622,8 @@ void tgsb_set_voicing_tone(TgsbEngine *engine,
     tone.nasalBwScale = nasalBwScale;
     tone.f4FreqScale = f4FreqScale;
     tone.nasalGainScale = nasalGainScale;
+    tone.chorusDepth = chorusDepth;
+    tone.chorusDetuneHz = chorusDetuneHz;
 
     speechPlayer_setVoicingTone(engine->player, &tone);
 }
@@ -686,6 +694,8 @@ void tgsb_set_sample_rate(TgsbEngine *engine, int sampleRate)
         tone.aspirationTiltDbPerOct = engine->userAspirationTiltDbPerOct;
         tone.cascadeBwScale = engine->userCascadeBwScale;
         tone.tremorDepth = engine->userTremorDepth;
+        tone.chorusDepth = engine->userChorusDepth;
+        tone.chorusDetuneHz = engine->userChorusDetuneHz;
 
         speechPlayer_setVoicingTone(engine->player, &tone);
     } else {

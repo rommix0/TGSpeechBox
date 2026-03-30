@@ -1074,8 +1074,8 @@ tgsb_editor::SpeechSettings loadSpeechSettingsFromIni() {
   for (size_t i = 0; i < voicingNames.size(); ++i) {
 std::wstring key = L"voicing_" + utf8ToWide(voicingNames[i]);
     // Try voice-specific section first, fallback to [speech] defaults
-    // tremorDepth (index 13) defaults to 0, others to 50
-    int defaultVal = (i == 13) ? 0 : 50;
+    // tremorDepth (13), chorusDepth (17) default to 0; chorusDetune (18) to 33
+    int defaultVal = (i == 13 || i == 17) ? 0 : (i == 18) ? 33 : 50;
     int val = readIniInt(voiceSection.c_str(), key.c_str(), -1);
     if (val < 0) {
       val = readIniInt(L"speech", key.c_str(), defaultVal);
@@ -1457,8 +1457,10 @@ static INT_PTR CALLBACK SpeechSettingsDlgProc(HWND hDlg, UINT msg, WPARAM wParam
       }
 if (id == IDC_SPEECH_VOICING_RESET_ALL) {
         st->settings.voicingParams.assign(st->voicingParamNames.size(), 50);
-        // tremorDepth (index 13) defaults to 0, not 50
+        // tremorDepth (13), chorusDepth (17) default to 0; chorusDetune (18) defaults to 33
         if (st->settings.voicingParams.size() > 13) st->settings.voicingParams[13] = 0;
+        if (st->settings.voicingParams.size() > 17) st->settings.voicingParams[17] = 0;
+        if (st->settings.voicingParams.size() > 18) st->settings.voicingParams[18] = 33;
         HWND lb = GetDlgItem(hDlg, IDC_SPEECH_VOICING_LIST);
         populateParamList(lb, st->voicingParamNames, st->settings.voicingParams);
         syncSelectedVoicingParamToUi();

@@ -27,6 +27,8 @@ Licensed under the MIT License. See LICENSE for details.
 #define IDC_SL_CASCADE_BW      1106
 #define IDC_SL_TREMOR          1107
 #define IDC_SL_HEAD_SIZE       1108
+#define IDC_SL_CHORUS_DEPTH    1109
+#define IDC_SL_CHORUS_DETUNE   1115
 
 // FrameEx sliders
 #define IDC_SL_CREAKINESS      1110

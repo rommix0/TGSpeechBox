@@ -65,6 +65,8 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     val cascadeBwScale = MutableStateFlow(loadSlider("cascadeBwScale", 50f))
     val voiceTremor = MutableStateFlow(loadSlider("voiceTremor", 0f))
     val headSize = MutableStateFlow(loadSlider("headSize", if (currentVoiceId == "david") 100f else 50f))
+    val chorusDepth = MutableStateFlow(loadSlider("chorusDepth", 0f))
+    val chorusDetune = MutableStateFlow(loadSlider("chorusDetune", 33f))
 
     // ── Pitch settings ──────────────────────────────────────────────
 
@@ -278,6 +280,8 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         cascadeBwScale.value     = loadSlider("cascadeBwScale", 50f)
         voiceTremor.value        = loadSlider("voiceTremor", 0f)
         headSize.value           = loadSlider("headSize", if (currentVoiceId == "david") 100f else 50f)
+        chorusDepth.value        = loadSlider("chorusDepth", 0f)
+        chorusDetune.value       = loadSlider("chorusDetune", 33f)
 
         // FrameEx sliders
         creakiness.value         = loadSlider("creakiness", 0f)
@@ -303,6 +307,8 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
     fun onCascadeBwScaleChanged(v: Float)  { cascadeBwScale.value = v;  saveSlider("cascadeBwScale", v);  applyVoicingTone() }
     fun onVoiceTremorChanged(v: Float)     { voiceTremor.value = v;     saveSlider("voiceTremor", v);     applyVoicingTone() }
     fun onHeadSizeChanged(v: Float)       { headSize.value = v;       saveSlider("headSize", v);       applyVoicingTone() }
+    fun onChorusDepthChanged(v: Float)    { chorusDepth.value = v;    saveSlider("chorusDepth", v);    applyVoicingTone() }
+    fun onChorusDetuneChanged(v: Float)   { chorusDetune.value = v;   saveSlider("chorusDetune", v);   applyVoicingTone() }
 
     fun onCreakinessChanged(v: Float)      { creakiness.value = v;      saveSlider("creakiness", v);      applyFrameExDefaults() }
     fun onBreathinessChanged(v: Float)     { breathiness.value = v;     saveSlider("breathiness", v);     applyFrameExDefaults() }
@@ -350,6 +356,8 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
                 ed.putFloat("${PREF_PREFIX}pitchSyncB1.$v", 50f)
                 ed.putFloat("${PREF_PREFIX}voiceTremor.$v", 0f)
                 ed.putFloat("${PREF_PREFIX}headSize.$v", 50f)
+                ed.putFloat("${PREF_PREFIX}chorusDepth.$v", 0f)
+                ed.putFloat("${PREF_PREFIX}chorusDetune.$v", 33f)
                 ed.putFloat("${PREF_PREFIX}creakiness.$v", 0f)
                 ed.putFloat("${PREF_PREFIX}breathiness.$v", 0f)
                 ed.putFloat("${PREF_PREFIX}jitter.$v", 0f)
@@ -376,6 +384,8 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
             onPitchSyncB1Changed(50f)
             onVoiceTremorChanged(0f)
             onHeadSizeChanged(50f)
+            onChorusDepthChanged(0f)
+            onChorusDetuneChanged(33f)
 
             // Per-voice: FrameEx sliders
             onCreakinessChanged(0f)
@@ -437,10 +447,14 @@ class TgsbViewModel(application: Application) : AndroidViewModel(application) {
         else
             1.0 - ((hsSlider - 50.0) / 50.0) * 0.15                // 1.0..0.85
 
+        val cd = chorusDepth.value / 100.0                          // 0..1.0
+        val cdt = 0.5 + (chorusDetune.value / 100.0) * 4.5         // 0.5..5.0 Hz
+
         engine.setVoicingTone(
             tilt.toDouble(), noiseMod.toDouble(),
             psF1.toDouble(), psB1.toDouble(),
-            sq, aspTilt.toDouble(), bw, tremor.toDouble(), hs
+            sq, aspTilt.toDouble(), bw, tremor.toDouble(), hs,
+            cd, cdt
         )
     }
 

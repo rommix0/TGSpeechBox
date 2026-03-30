@@ -74,7 +74,7 @@ void speechPlayer_getVoicingTone(speechPlayer_handle_t handle,
 // Default 1.0. Typical: NVDA=1.0, iOS=1.7, Android=1.6.
 void speechPlayer_setOutputGain(speechPlayer_handle_t handle, double gain);
 
-// DSP version detection (currently returns 6)
+// DSP version detection (currently returns 8)
 unsigned int speechPlayer_getDspVersion(void);
 
 // Pitch-synchronous time-stretch for rate boost beyond 2x.
@@ -157,7 +157,7 @@ typedef struct {
 
 Global voice quality parameters that shape the glottal pulse, spectral character, and vocal tract geometry. These persist across frames and are typically set once per voice profile.
 
-The struct contains **17 parameters** plus a version detection header. DSP version: **6**. Struct version: **3**.
+The struct contains **20 parameters** plus a version detection header. DSP version: **8**. Struct version: **4**.
 
 ### Version detection header
 
@@ -165,8 +165,8 @@ The struct contains **17 parameters** plus a version detection header. DSP versi
 |-------|------|-------------|
 | `magic` | uint32 | Magic number `0x32544F56` ("VOT2" in little-endian) |
 | `structSize` | uint32 | Size of the struct in bytes |
-| `structVersion` | uint32 | Struct version (currently 3) |
-| `dspVersion` | uint32 | DSP version (currently 6) |
+| `structVersion` | uint32 | Struct version (currently 4) |
+| `dspVersion` | uint32 | DSP version (currently 8) |
 
 When the DLL receives a `VoicingTone` struct, it checks the magic number:
 - **If magic matches**: Reads up to `structSize` bytes, applying defaults for any trailing fields not present
@@ -213,13 +213,22 @@ These model structural vocal tract differences (pharynx length, nasal passages) 
 | `f4FreqScale` | double | 1.0 | 0.7–1.5 | F4 frequency multiplier. Shorter pharynx (female/child) raises F4. One of the strongest cues for perceived vocal tract size. |
 | `nasalGainScale` | double | 1.0 | 0.5–1.5 | Nasal pole coupling amplitude multiplier. Higher = more nasality. |
 
+### V5 parameters (DSP version 8+) — dual-oscillator chorus
+
+Models vocal fold asymmetry by running a second glottal phase accumulator at a slightly detuned pitch and blending it with the primary oscillator. Real vocal folds are not perfectly symmetric, producing cycle-to-cycle variation that this approximates.
+
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| `chorusDepth` | double | 0.0 | 0.0–1.0 | Blend amount of the second oscillator. 0 = off (single oscillator), 1.0 = full 50/50 blend. |
+| `chorusDetuneHz` | double | 2.0 | 0.5–5.0 | Pitch offset of the second oscillator in Hz. Lower = slower beating (warm); higher = faster beating. |
+
 ---
 
 ## FrameEx struct (DSP version 5+)
 
 Optional per-frame extension for voice quality parameters that vary during speech (e.g., Danish stod, diphthong formant sweeps, Fujisaki pitch contours). This keeps the original 47-parameter frame ABI stable.
 
-The struct is currently **23 doubles = 184 bytes**. The `speechPlayer_queueFrameEx()` function takes a `frameExSize` parameter; the DSP starts with defaults then overlays `min(frameExSize, sizeof(speechPlayer_frameEx_t))` bytes. This provides forward/backward ABI compatibility — callers with smaller structs simply don't override the trailing fields.
+The struct is currently **27 doubles = 216 bytes**. The `speechPlayer_queueFrameEx()` function takes a `frameExSize` parameter; the DSP starts with defaults then overlays `min(frameExSize, sizeof(speechPlayer_frameEx_t))` bytes. This provides forward/backward ABI compatibility — callers with smaller structs simply don't override the trailing fields.
 
 ### Voice quality (DSP v5+)
 
@@ -284,6 +293,34 @@ When the voicing source type changes between frames (e.g. voiced /n/ → voicele
 The DSP applies equal-power only to source amplitude parameters (`voiceAmplitude`, `aspirationAmplitude`, `fricationAmplitude`, `voiceTurbulenceAmplitude`, `preFormantGain`). Parallel amplitudes (`pa1`-`pa6`), `outputGain`, and `caNP` are excluded — they track formant structure, not energy sources.
 
 The frontend (`frame_emit.cpp`) sets this automatically when it detects a voicing source change (amplitude crosses a 0.05 threshold in either direction).
+
+### Higher cascade formants F7/F8 (DSP v8)
+
+At sample rates >= 22050 Hz, the original 6 cascade formants leave a spectral gap above F6 (~5.5 kHz). Adding explicit F7 and F8 as fixed cascade resonators fills this gap with the correct spectral envelope, adding natural "presence" and "air." Defaults from Rabiner 1968, as cited in the [QLatt project](https://github.com/nicclase/qlatt).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cf7` | double | 6500.0 | F7 frequency (Hz). Vocal-tract-length property, not vowel-dependent. |
+| `cb7` | double | 720.0 | F7 bandwidth (Hz). |
+| `cf8` | double | 7500.0 | F8 frequency (Hz). |
+| `cb8` | double | 1250.0 | F8 bandwidth (Hz). |
+
+Per-phoneme overridable via YAML keys `cf7`, `cb7`, `cf8`, `cb8`. At low sample rates, the cascade Nyquist-proximity fade automatically mutes them (ratio > 0.85 -> bypass), so they cost nothing at 11025/16000 Hz.
+
+Cascade order: N0 -> NP -> F8 -> F7 -> F6 -> F5 -> F4 -> F3 -> F2 -> F1.
+
+### 2x source oversampling (DSP v8)
+
+The glottal LF model is evaluated at twice the output sample rate, using sharper closure settings appropriate for the effective 2x rate, then decimated with a half-band average filter. This produces cleaner harmonics at lower sample rates without aliasing.
+
+| Output SR | Effective source SR | Before | After |
+|-----------|---------------------|--------|-------|
+| 11025 Hz | 22050 Hz | sharpness 2.5, 30% LF | sharpness 3.5, 100% LF |
+| 16000 Hz | 32000 Hz | sharpness 3.0, 100% LF | sharpness 3.5, 100% LF |
+| 22050 Hz | 44100 Hz | sharpness 4.0, 100% LF | sharpness 4.5, 100% LF |
+| 44100 Hz | (no oversampling) | sharpness 6.0, 100% LF | unchanged |
+
+The oversampling is bypassed at 44100+ Hz where the existing sharpness is already clean.
 
 ### Silence transition fixes (DSP v7+)
 

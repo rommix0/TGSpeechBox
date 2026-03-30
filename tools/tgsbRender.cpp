@@ -26,11 +26,16 @@ Licensed under the MIT License. See LICENSE for details.
     - Voice profile support via nvspFrontend_setVoiceProfile
     - --list-voices to show available profiles for speech-dispatcher config
     - Automatic voicing tone loading from YAML when --voice is specified
-    
+
   DSP V6 Features:
     - Formant end targets for within-frame ramping (DECTalk-style transitions)
     - Fujisaki-Bartman pitch model for Eloquence-style prosody contours
     - FrameEx extended to 22 fields (176 bytes)
+
+  DSP V8 Features:
+    - VoicingTone V4/V5 support (nasalBwScale, f4FreqScale, nasalGainScale,
+      chorusDepth, chorusDetuneHz — 22 parameters total)
+    - FrameEx extended to 27 fields (216 bytes) with higher cascade F7/F8
 */
 
 #include <cmath>
@@ -56,7 +61,7 @@ Licensed under the MIT License. See LICENSE for details.
 namespace {
 
 // ============================================================================
-// VoicingTone V3 structure (must match voicingTone.h)
+// VoicingTone structure (must match voicingTone.h — V3+V4+V5 fields)
 // ============================================================================
 
 #ifndef SPEECHPLAYER_VOICINGTONE_MAGIC
@@ -64,11 +69,11 @@ namespace {
 #endif
 
 #ifndef SPEECHPLAYER_VOICINGTONE_VERSION
-#define SPEECHPLAYER_VOICINGTONE_VERSION 3u
+#define SPEECHPLAYER_VOICINGTONE_VERSION 4u
 #endif
 
 #ifndef SPEECHPLAYER_DSP_VERSION
-#define SPEECHPLAYER_DSP_VERSION 6u
+#define SPEECHPLAYER_DSP_VERSION 8u
 #endif
 
 struct VoicingToneV3 {
@@ -92,10 +97,17 @@ struct VoicingToneV3 {
   double aspirationTiltDbPerOct;
   double cascadeBwScale;
   double tremorDepth;
+  // V4 additions: vocal tract shape
+  double nasalBwScale;
+  double f4FreqScale;
+  double nasalGainScale;
+  // V5 additions: dual-oscillator chorus
+  double chorusDepth;
+  double chorusDetuneHz;
 };
 
 // ============================================================================
-// FrameEx structure (must match frame.h - 23 doubles = 184 bytes)
+// FrameEx structure (must match frame.h - 27 doubles = 216 bytes)
 // ============================================================================
 
 struct FrameEx {
@@ -129,6 +141,11 @@ struct FrameEx {
   // Amplitude crossfade curve (DSP v7.1)
   // 0.0 = linear, 1.0 = equal-power (sin/cos)
   double transAmplitudeMode;
+  // Higher cascade formants (DSP v8)
+  double cf7;   // F7 frequency (Hz).  Default 6500.0
+  double cb7;   // F7 bandwidth (Hz).  Default 720.0
+  double cf8;   // F8 frequency (Hz).  Default 7500.0
+  double cb8;   // F8 bandwidth (Hz).  Default 1250.0
 };
 
 // ============================================================================
@@ -464,6 +481,8 @@ struct Options {
   int aspirationTiltDbPerOct = 50; // -12 to +12, default 0
   int cascadeBwScale = 50;        // 0.4-1.4, default 1.0
   int tremor = 0;                 // 0.0-0.4, default 0 (no tremor)
+  int chorusDepth = 0;            // 0.0-1.0, default 0 (off)
+  int chorusDetune = 33;          // 0.5-5.0 Hz, default ~2.0 Hz
 
   // -------------------------------------------------------------------------
   // FrameEx parameters (0-100 sliders)
@@ -519,6 +538,8 @@ static void printHelp(const char* argv0) {
     << "  --cascade-bw-scale <int>       Formant sharpness (cascade bandwidth) (default: 50)\n"
     << "  --formant-sharpness <int>      Formant sharpness (cascade bandwidth, default: 50)\n"
     << "  --tremor <int>                 Voice tremor / shakiness (default: 0)\n"
+    << "  --chorus-depth <int>           Dual-oscillator chorus depth (default: 0)\n"
+    << "  --chorus-detune <int>          Chorus detune Hz (default: 33, maps 0.5-5.0 Hz)\n"
     << "\n"
     << "FrameEx voice quality parameters (0-100 sliders):\n"
     << "  --creakiness <int>    Laryngealization / creaky voice (default: 0)\n"
@@ -676,6 +697,8 @@ static Options parseArgs(int argc, char** argv) {
     if (a == "--aspiration-tilt") { parseIntArg(a.c_str(), opt.aspirationTiltDbPerOct); continue; }
     if (a == "--cascade-bw-scale" || a == "--formant-sharpness") { parseIntArg(a.c_str(), opt.cascadeBwScale); continue; }
     if (a == "--tremor") { parseIntArg(a.c_str(), opt.tremor); continue; }
+    if (a == "--chorus-depth") { parseIntArg(a.c_str(), opt.chorusDepth); continue; }
+    if (a == "--chorus-detune") { parseIntArg(a.c_str(), opt.chorusDetune); continue; }
 
     // FrameEx parameters
     if (a == "--creakiness") { parseIntArg(a.c_str(), opt.creakiness); continue; }
@@ -706,7 +729,7 @@ static std::string readAllStdin() {
 }
 
 // ============================================================================
-// VoicingTone V3 builder (slider 0-100 -> actual values)
+// VoicingTone builder (slider 0-100 -> actual values)
 // ============================================================================
 
 static VoicingToneV3 buildVoicingTone(const Options& opt) {
@@ -740,6 +763,13 @@ static VoicingToneV3 buildVoicingTone(const Options& opt) {
   }
   // tremorDepth: 0-100 maps to 0.0-0.4
   tone.tremorDepth = slider(opt.tremor) * 0.4;
+  // V4: vocal tract shape defaults (neutral)
+  tone.nasalBwScale = 1.0;
+  tone.f4FreqScale = 1.0;
+  tone.nasalGainScale = 1.0;
+  // V5: chorus
+  tone.chorusDepth = slider(opt.chorusDepth);                      // 0-100 -> 0.0-1.0
+  tone.chorusDetuneHz = 0.5 + slider(opt.chorusDetune) * 4.5;     // 0-100 -> 0.5-5.0 Hz
 
   return tone;
 }
@@ -819,7 +849,7 @@ static void onFrontendFrameEx(
       
       // Start with per-phoneme values from frontend (includes Fujisaki pitch model)
       if (frameExOrNull) {
-        // Copy all 23 fields - frontend provides formant ramping, Fujisaki, and transition data
+        // Copy all 27 fields - frontend provides formant ramping, Fujisaki, transition, and F7/F8 data
         std::memcpy(&merged, frameExOrNull, sizeof(FrameEx));
       } else {
         merged.sharpness = 1.0;  // Neutral default for sharpness
@@ -874,7 +904,8 @@ static bool hasVoicingToneEffect(const Options& opt) {
           opt.voicedTiltDbPerOct != 50 || opt.noiseGlottalModDepth != 0 ||
           opt.pitchSyncF1DeltaHz != 50 || opt.pitchSyncB1DeltaHz != 50 ||
           opt.speedQuotient != 50 || opt.aspirationTiltDbPerOct != 50 ||
-          opt.cascadeBwScale != 50 || opt.tremor != 0);
+          opt.cascadeBwScale != 50 || opt.tremor != 0 ||
+          opt.chorusDepth != 0 || opt.chorusDetune != 33);
 }
 
 }  // namespace
@@ -1039,7 +1070,12 @@ int main(int argc, char** argv) {
     tone.aspirationTiltDbPerOct = 0.0;
     tone.cascadeBwScale = 1.0;
     tone.tremorDepth = 0.0;
-    
+    tone.nasalBwScale = 1.0;
+    tone.f4FreqScale = 1.0;
+    tone.nasalGainScale = 1.0;
+    tone.chorusDepth = 0.0;
+    tone.chorusDetuneHz = 2.0;
+
     // Try to get voicing tone from YAML (if voice profile has one)
     nvspFrontend_VoicingTone yamlTone{};
     if (nvspFrontend_getVoicingTone(fe, &yamlTone)) {
@@ -1083,8 +1119,10 @@ int main(int argc, char** argv) {
       if (opt.aspirationTiltDbPerOct != 50) tone.aspirationTiltDbPerOct = cliTone.aspirationTiltDbPerOct;
       if (opt.cascadeBwScale != 50) tone.cascadeBwScale = cliTone.cascadeBwScale;
       if (opt.tremor != 0) tone.tremorDepth = cliTone.tremorDepth;
+      if (opt.chorusDepth != 0) tone.chorusDepth = cliTone.chorusDepth;
+      if (opt.chorusDetune != 33) tone.chorusDetuneHz = cliTone.chorusDetuneHz;
     }
-    
+
     speechPlayer_setVoicingTone(player, reinterpret_cast<const speechPlayer_voicingTone_t*>(&tone));
   }
 

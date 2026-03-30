@@ -504,6 +504,8 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         let pitchSyncB1    = load("pitchSyncB1", 50)
         let voiceTremor    = load("voiceTremor", 0)
         let headSizeSlider = load("headSize", voice == "david" ? 100 : 50)
+        let chorusDepthSlider  = load("chorusDepth", 0)
+        let chorusDetuneSlider = load("chorusDetuneHz", 33)
 
         let tilt     = (voiceTilt - 50.0) * (24.0 / 50.0)
         let noiseMod = noiseGlottalMod / 100.0
@@ -520,10 +522,13 @@ public class TGSBAudioUnit: AVSpeechSynthesisProviderAudioUnit {
         let hs       = headSizeSlider <= 50.0
             ? 1.25 - (headSizeSlider / 50.0) * 0.25
             : 1.0 - ((headSizeSlider - 50.0) / 50.0) * 0.15
+        let chDepth  = chorusDepthSlider / 100.0
+        let chDetune = 0.5 + (chorusDetuneSlider / 100.0) * 4.5
 
         tgsb_set_voicing_tone(eng, tilt, noiseMod, psF1, psB1,
                               sq, aspTilt, bw, tremor,
-                              1.0, hs, 1.0)
+                              1.0, hs, 1.0,
+                              chDepth, chDetune)
 
         // FrameEx: convert 0–100 sliders to engine parameters
         let creak    = load("creakiness", 0) / 100.0

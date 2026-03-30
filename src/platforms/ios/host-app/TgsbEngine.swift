@@ -215,7 +215,8 @@ class TgsbEngine: ObservableObject {
         aspirationTilt: Double, cascadeBwScale bw: Double,
         noiseGlottalMod: Double, pitchSyncF1: Double,
         pitchSyncB1: Double, voiceTremor: Double,
-        headSize: Double
+        headSize: Double,
+        chorusDepth: Double, chorusDetuneHz: Double
     ) {
         guard let eng = engine else { return }
 
@@ -234,10 +235,13 @@ class TgsbEngine: ObservableObject {
         let hs       = headSize <= 50.0
             ? 1.25 - (headSize / 50.0) * 0.25
             : 1.0 - ((headSize - 50.0) / 50.0) * 0.15
+        let chDepth  = chorusDepth / 100.0
+        let chDetune = 0.5 + (chorusDetuneHz / 100.0) * 4.5
 
         tgsb_set_voicing_tone(eng, tilt, noiseMod, psF1, psB1,
                               sqVal, aspTilt, bwVal, tremor,
-                              1.0, hs, 1.0)
+                              1.0, hs, 1.0,
+                              chDepth, chDetune)
     }
 
     /// Apply FrameEx defaults from 0–100 slider values.
@@ -299,7 +303,9 @@ class TgsbEngine: ObservableObject {
             pitchSyncF1: load("pitchSyncF1", 50),
             pitchSyncB1: load("pitchSyncB1", 50),
             voiceTremor: load("voiceTremor", 0),
-            headSize: load("headSize", 50))
+            headSize: load("headSize", 50),
+            chorusDepth: load("chorusDepth", 0),
+            chorusDetuneHz: load("chorusDetuneHz", 33))
 
         applyFrameExFromSliders(
             creakiness: load("creakiness", 0),

@@ -203,7 +203,9 @@ class TgsbTtsService : TextToSpeechService() {
         tremorDepth: Double,
         nasalBwScale: Double,
         f4FreqScale: Double,
-        nasalGainScale: Double
+        nasalGainScale: Double,
+        chorusDepth: Double,
+        chorusDetuneHz: Double
     )
     private external fun nativeSetFrameExDefaults(
         handle: Long,
@@ -359,6 +361,9 @@ class TgsbTtsService : TextToSpeechService() {
         val tremorSlider = prefFloat("voiceTremor", 0f, voice)
         val hsSlider     = prefFloat("headSize", if (voice == "david") 100f else 50f, voice)
 
+        val chorusDepthSlider = prefFloat("chorusDepth", 0f, voice)
+        val chorusDetuneSlider = prefFloat("chorusDetune", 33f, voice)
+
         val tilt = (tiltSlider - 50f) * (24f / 50f)
         val sq = if (sqSlider <= 50f)
             0.5 + (sqSlider / 50.0) * 1.5
@@ -373,13 +378,16 @@ class TgsbTtsService : TextToSpeechService() {
             1.25 - (hsSlider / 50.0) * 0.25
         else
             1.0 - ((hsSlider - 50.0) / 50.0) * 0.15
+        val chorusDepth = chorusDepthSlider / 100.0
+        val chorusDetune = 0.5 + (chorusDetuneSlider / 100.0) * 4.5
 
         nativeSetVoicingTone(
             nativeHandle,
             tilt.toDouble(), noiseMod.toDouble(),
             psF1.toDouble(), psB1.toDouble(),
             sq, aspTilt.toDouble(), bw, tremor.toDouble(),
-            1.0, hs, 1.0
+            1.0, hs, 1.0,
+            chorusDepth, chorusDetune
         )
 
         // FrameEx defaults

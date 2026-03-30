@@ -52,6 +52,8 @@ struct EngineSettingsView: View {
     @State private var pitchSyncB1: Double
     @State private var voiceTremor: Double
     @State private var headSize: Double
+    @State private var chorusDepth: Double
+    @State private var chorusDetuneHz: Double
 
     // FrameEx sliders (0–100)
     @State private var creakiness: Double
@@ -105,6 +107,8 @@ struct EngineSettingsView: View {
         _pitchSyncB1     = State(initialValue: Self.loadV(d, "pitchSyncB1", 50, voice))
         _voiceTremor     = State(initialValue: Self.loadV(d, "voiceTremor", 0, voice))
         _headSize        = State(initialValue: Self.loadV(d, "headSize", voice == "david" ? 100 : 50, voice))
+        _chorusDepth     = State(initialValue: Self.loadV(d, "chorusDepth", 0, voice))
+        _chorusDetuneHz  = State(initialValue: Self.loadV(d, "chorusDetuneHz", 33, voice))
 
         _creakiness       = State(initialValue: Self.loadV(d, "creakiness", 0, voice))
         _breathiness      = State(initialValue: Self.loadV(d, "breathiness", 0, voice))
@@ -244,6 +248,8 @@ struct EngineSettingsView: View {
                 toneSlider("Pitch-Sync B1", $pitchSyncB1, "pitchSyncB1")
                 toneSlider("Voice Tremor", $voiceTremor, "voiceTremor")
                 toneSlider("Head Size", $headSize, "headSize")
+                toneSlider("Chorus Depth", $chorusDepth, "chorusDepth")
+                toneSlider("Chorus Variation (needs depth)", $chorusDetuneHz, "chorusDetuneHz")
 
                 Divider()
 
@@ -372,6 +378,8 @@ struct EngineSettingsView: View {
         pitchSyncB1     = Self.loadV(d, "pitchSyncB1", 50, voice)
         voiceTremor     = Self.loadV(d, "voiceTremor", 0, voice)
         headSize        = Self.loadV(d, "headSize", voice == "david" ? 100 : 50, voice)
+        chorusDepth     = Self.loadV(d, "chorusDepth", 0, voice)
+        chorusDetuneHz  = Self.loadV(d, "chorusDetuneHz", 33, voice)
 
         creakiness       = Self.loadV(d, "creakiness", 0, voice)
         breathiness      = Self.loadV(d, "breathiness", 0, voice)
@@ -395,6 +403,7 @@ struct EngineSettingsView: View {
         noiseGlottalMod = 0;  pitchSyncF1 = 50
         pitchSyncB1 = 50;     voiceTremor = 0
         headSize = 50
+        chorusDepth = 0;      chorusDetuneHz = 33
 
         creakiness = 0;       breathiness = 0
         jitter = 0;           shimmer = 0
@@ -427,6 +436,8 @@ struct EngineSettingsView: View {
             d?.set(50.0, forKey: "adv_pitchSyncB1.\(v)")
             d?.set(0.0,  forKey: "adv_voiceTremor.\(v)")
             d?.set(50.0, forKey: "adv_headSize.\(v)")
+            d?.set(0.0,  forKey: "adv_chorusDepth.\(v)")
+            d?.set(33.0, forKey: "adv_chorusDetuneHz.\(v)")
             d?.set(0.0,  forKey: "adv_creakiness.\(v)")
             d?.set(0.0,  forKey: "adv_breathiness.\(v)")
             d?.set(0.0,  forKey: "adv_jitter.\(v)")
@@ -491,7 +502,9 @@ struct EngineSettingsView: View {
             pitchSyncF1: pitchSyncF1,
             pitchSyncB1: pitchSyncB1,
             voiceTremor: voiceTremor,
-            headSize: headSize)
+            headSize: headSize,
+            chorusDepth: chorusDepth,
+            chorusDetuneHz: chorusDetuneHz)
 
         engine.applyFrameExFromSliders(
             creakiness: creakiness,

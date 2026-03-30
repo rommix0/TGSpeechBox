@@ -193,6 +193,8 @@ wrapper_settings load_settings(const std::wstring& base_dir)
     out.cascadeBwScale  = readSlider(L"cascadeBwScale");
     out.voiceTremor     = readSlider(L"voiceTremor");
     out.headSize        = readSlider(L"headSize");
+    out.chorusDepth     = readSlider(L"chorusDepth");
+    out.chorusDetune    = readSlider(L"chorusDetune");
 
     // FrameEx sliders.
     out.frameExCreakiness  = readSlider(L"frameExCreakiness");

@@ -67,6 +67,8 @@
     <string name="pitch_sync_b1_label">Pitch-Sync B1</string>
     <string name="voice_tremor_label">Voice Tremor</string>
     <string name="head_size_label">Head Size</string>
+    <string name="chorus_depth_label">Chorus Depth</string>
+    <string name="chorus_detune_label">Chorus Variation (needs depth)</string>
 
     <!-- Advanced tab: Per-Frame Voice Quality (FrameEx) -->
     <string name="frame_quality_title">Per-Frame Voice Quality</string>

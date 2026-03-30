@@ -197,6 +197,18 @@ fun AdvancedScreen(
                 onChange = { viewModel.onHeadSizeChanged(it) },
                 format = { v -> "${v.roundToInt()}" }
             )
+            VoicingToneSlider(
+                label = stringResource(R.string.chorus_depth_label),
+                flow = viewModel.chorusDepth,
+                onChange = { viewModel.onChorusDepthChanged(it) },
+                format = { v -> "${v.roundToInt()}" }
+            )
+            VoicingToneSlider(
+                label = stringResource(R.string.chorus_detune_label),
+                flow = viewModel.chorusDetune,
+                onChange = { viewModel.onChorusDetuneChanged(it) },
+                format = { v -> "${v.roundToInt()}" }
+            )
         }
 
         Spacer(Modifier.height(20.dp))

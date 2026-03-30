@@ -152,7 +152,14 @@ const std::vector<std::string>& TgsbRuntime::voicingParamNames() {
       "speedQuotient",
       "aspirationTiltDbPerOct",
       "cascadeBwScale",
-      "tremorDepth"
+      "tremorDepth",
+      // V4: vocal tract shape
+      "nasalBwScale",
+      "f4FreqScale",
+      "nasalGainScale",
+      // V5: dual-oscillator chorus
+      "chorusDepth",
+      "chorusDetuneHz"
     };
   }
   return names;
@@ -203,8 +210,10 @@ TgsbRuntime::TgsbRuntime() {
   // No static layout assumptions: we convert frames field-by-field in the callback.
   m_speech.frameParams.assign(frameParamNames().size(), 50);
   m_speech.voicingParams.assign(voicingParamNames().size(), 50);
-// tremorDepth (index 13) defaults to 0, not 50
+// tremorDepth (13), chorusDepth (17) default to 0; chorusDetune (18) defaults to 33
 if (m_speech.voicingParams.size() > 13) m_speech.voicingParams[13] = 0;
+if (m_speech.voicingParams.size() > 17) m_speech.voicingParams[17] = 0;
+if (m_speech.voicingParams.size() > 18) m_speech.voicingParams[18] = 33;
   // FrameEx params: creakiness/breathiness/jitter/shimmer default to 0, sharpness to 50
   m_speech.frameExParams.assign(frameExParamNames().size(), 0);
   if (m_speech.frameExParams.size() >= 5) m_speech.frameExParams[4] = 50; // sharpness default
@@ -291,6 +300,18 @@ case 12: // cascadeBwScale: 0.3-2.0, default 1.0 at slider 50
       return 1.0 - ((sv - 50.0) / 50.0) * 0.7;  // 50 -> 1.0, 100 -> 0.3
     case 13: // tremorDepth: 0.0-0.4, default 0.0 at 0
       return (sv / 100.0) * 0.4;
+    case 14: // nasalBwScale: 0.5-2.0, default 1.0 at 50
+      return 0.5 + (sv / 100.0) * 1.5;
+    case 15: // f4FreqScale: 0.7-1.5, default 1.0 at 50
+      if (sv <= 50.0)
+        return 1.25 - (sv / 50.0) * 0.25;
+      return 1.0 - ((sv - 50.0) / 50.0) * 0.15;
+    case 16: // nasalGainScale: 0.5-1.5, default 1.0 at 50
+      return 0.5 + (sv / 100.0) * 1.0;
+    case 17: // chorusDepth: 0.0-1.0, default 0.0 at 0
+      return sv / 100.0;
+    case 18: // chorusDetuneHz: 0.5-5.0, default 2.0 at ~33
+      return 0.5 + (sv / 100.0) * 4.5;
     default:
       return 0.0;
   }
@@ -322,7 +343,14 @@ static EditorVoicingToneV2 buildVoicingToneV2(const std::vector<int>& sliders) {
   tone.aspirationTiltDbPerOct = (sliders.size() > 11) ? mapVoicingSliderToValue(11, sliders[11]) : 0.0;
   tone.cascadeBwScale = (sliders.size() > 12) ? mapVoicingSliderToValue(12, sliders[12]) : 1.0;
   tone.tremorDepth = (sliders.size() > 13) ? mapVoicingSliderToValue(13, sliders[13]) : 0.0;
-  
+  // V4: vocal tract shape
+  tone.nasalBwScale = (sliders.size() > 14) ? mapVoicingSliderToValue(14, sliders[14]) : 1.0;
+  tone.f4FreqScale = (sliders.size() > 15) ? mapVoicingSliderToValue(15, sliders[15]) : 1.0;
+  tone.nasalGainScale = (sliders.size() > 16) ? mapVoicingSliderToValue(16, sliders[16]) : 1.0;
+  // V5: dual-oscillator chorus
+  tone.chorusDepth = (sliders.size() > 17) ? mapVoicingSliderToValue(17, sliders[17]) : 0.0;
+  tone.chorusDetuneHz = (sliders.size() > 18) ? mapVoicingSliderToValue(18, sliders[18]) : 2.0;
+
   return tone;
 }
 

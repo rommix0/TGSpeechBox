@@ -169,6 +169,8 @@ struct Settings {
     int cascadeBwScale  = 50;
     int voiceTremor     = 0;
     int headSize        = 50;
+    int chorusDepth     = 0;
+    int chorusDetune    = 33;
 
     // FrameEx (0-100).
     int frameExCreakiness  = 0;
@@ -230,6 +232,8 @@ Settings load_settings(const std::wstring& ini_path)
     s.cascadeBwScale  = rd(L"cascadeBwScale", 50);
     s.voiceTremor     = rd(L"voiceTremor", 0);
     s.headSize        = rd(L"headSize", 50);
+    s.chorusDepth     = rd(L"chorusDepth", 0);
+    s.chorusDetune    = rd(L"chorusDetune", 33);
 
     s.frameExCreakiness  = rd(L"frameExCreakiness", 0);
     s.frameExBreathiness = rd(L"frameExBreathiness", 0);
@@ -290,6 +294,8 @@ bool save_settings(const std::wstring& ini_path, const Settings& s)
     wr(L"cascadeBwScale",  s.cascadeBwScale);
     wr(L"voiceTremor",     s.voiceTremor);
     wr(L"headSize",        s.headSize);
+    wr(L"chorusDepth",     s.chorusDepth);
+    wr(L"chorusDetune",    s.chorusDetune);
 
     wr(L"frameExCreakiness",  s.frameExCreakiness);
     wr(L"frameExBreathiness", s.frameExBreathiness);
@@ -426,6 +432,8 @@ void populate_sliders_from_settings(HWND hDlg, const Settings& s)
     init_slider(hDlg, IDC_SL_CASCADE_BW,  s.cascadeBwScale);
     init_slider(hDlg, IDC_SL_TREMOR,      s.voiceTremor);
     init_slider(hDlg, IDC_SL_HEAD_SIZE,   s.headSize);
+    init_slider(hDlg, IDC_SL_CHORUS_DEPTH,  s.chorusDepth);
+    init_slider(hDlg, IDC_SL_CHORUS_DETUNE, s.chorusDetune);
 
     init_slider(hDlg, IDC_SL_CREAKINESS,  s.frameExCreakiness);
     init_slider(hDlg, IDC_SL_BREATHINESS, s.frameExBreathiness);
@@ -449,6 +457,8 @@ void read_sliders_to_settings(HWND hDlg, Settings& s)
     s.cascadeBwScale  = get_slider(hDlg, IDC_SL_CASCADE_BW);
     s.voiceTremor     = get_slider(hDlg, IDC_SL_TREMOR);
     s.headSize        = get_slider(hDlg, IDC_SL_HEAD_SIZE);
+    s.chorusDepth     = get_slider(hDlg, IDC_SL_CHORUS_DEPTH);
+    s.chorusDetune    = get_slider(hDlg, IDC_SL_CHORUS_DETUNE);
 
     s.frameExCreakiness  = get_slider(hDlg, IDC_SL_CREAKINESS);
     s.frameExBreathiness = get_slider(hDlg, IDC_SL_BREATHINESS);
@@ -472,6 +482,8 @@ void reset_sliders_to_defaults(HWND hDlg)
     set_slider(hDlg, IDC_SL_CASCADE_BW,  50);
     set_slider(hDlg, IDC_SL_TREMOR,      0);
     set_slider(hDlg, IDC_SL_HEAD_SIZE,   50);
+    set_slider(hDlg, IDC_SL_CHORUS_DEPTH,  0);
+    set_slider(hDlg, IDC_SL_CHORUS_DETUNE, 33);
 
     set_slider(hDlg, IDC_SL_CREAKINESS,  0);
     set_slider(hDlg, IDC_SL_BREATHINESS, 0);

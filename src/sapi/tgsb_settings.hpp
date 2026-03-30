@@ -46,6 +46,8 @@ struct wrapper_settings {
     int cascadeBwScale = -1;      // 50 = neutral
     int voiceTremor = -1;         // 0 = neutral (off)
     int headSize = -1;            // 50 = neutral
+    int chorusDepth = -1;         // 0 = off (default)
+    int chorusDetune = -1;        // 33 = ~2.0 Hz (default)
 
     // FrameEx sliders (0-100).
     int frameExCreakiness = -1;   // 0 = off

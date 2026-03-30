@@ -698,6 +698,13 @@ void runtime::apply_voicing_tone_if_available()
             dsp_tone.f4FreqScale = 1.0 - ((hs - 50.0) / 50.0) * 0.15;
         dsp_tone.f4FreqScale = clamp(dsp_tone.f4FreqScale, 0.7, 1.5);
     }
+    if (s.chorusDepth >= 0) {
+        dsp_tone.chorusDepth = clamp(s.chorusDepth / 100.0, 0.0, 1.0);
+    }
+    if (s.chorusDetune >= 0) {
+        dsp_tone.chorusDetuneHz = 0.5 + (s.chorusDetune / 100.0) * 4.5;
+        dsp_tone.chorusDetuneHz = clamp(dsp_tone.chorusDetuneHz, 0.5, 5.0);
+    }
 
     speechPlayer_setVoicingTone(speech_player_, &dsp_tone);
 
