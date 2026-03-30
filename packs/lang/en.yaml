@@ -92,6 +92,7 @@ settings:
   # Sorted longest-first at load time; 3-char minimum stem.
   dictSuffixes:
     - "'s"
+    - "’s"
     - "ing"
     - "est"
     - "ed"
