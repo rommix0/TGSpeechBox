@@ -81,7 +81,7 @@ class SynthDriver(
         NumericDriverSetting("cascadeBwScale", _("Formant sharpness (cascade bandwidth)"), defaultVal=50),
         NumericDriverSetting("voiceTremor", _("Voice tremor (shakiness)"), defaultVal=0),
         NumericDriverSetting("chorusDepth", _("Chorus depth (vocal fold asymmetry)"), defaultVal=0),
-        NumericDriverSetting("chorusDetune", _("Chorus detune (beating speed)"), defaultVal=33),
+        NumericDriverSetting("chorusDetune", _("Chorus variation (requires depth)"), defaultVal=33),
         NumericDriverSetting("headSize", _("Head size (pharynx length)"), defaultVal=50),
         # FrameEx voice quality params (DSP v5+) - for creaky voice, breathiness, etc.
         NumericDriverSetting("frameExCreakiness", _("Creakiness (laryngealization)"), defaultVal=0),
