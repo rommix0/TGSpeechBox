@@ -369,11 +369,18 @@ static bool sd_poll_stop() {
 // Frame callback (queues to speechPlayer — same as tgsbRender)
 // ============================================================================
 
+// FrameEx user overrides (from config, additive with per-phoneme values)
+struct FrameExOverride {
+  double creakiness, breathiness, jitter, shimmer, sharpness;
+  bool active;
+};
+
 struct SynthCtx {
   speechPlayer_handle_t player;
   int sampleRate;
   double volume;
   const BuiltinVoice* builtinVoice;
+  FrameExOverride fxOverride;
 };
 
 static int g_frameCount = 0;
@@ -398,9 +405,20 @@ static void onFrame(void* userData,
     f.outputGain *= ctx->volume;
     if (ctx->builtinVoice) applyBuiltinVoice(f, *ctx->builtinVoice);
 
-    if (frameExOrNull) {
+    if (frameExOrNull || ctx->fxOverride.active) {
+      // Merge per-phoneme FrameEx with user config overrides
+      nvspFrontend_FrameEx merged{};
+      if (frameExOrNull) std::memcpy(&merged, frameExOrNull, sizeof(merged));
+      else merged.sharpness = 1.0;
+      if (ctx->fxOverride.active) {
+        merged.creakiness = std::min(1.0, merged.creakiness + ctx->fxOverride.creakiness);
+        merged.breathiness = std::min(1.0, merged.breathiness + ctx->fxOverride.breathiness);
+        merged.jitter = std::min(1.0, merged.jitter + ctx->fxOverride.jitter);
+        merged.shimmer = std::min(1.0, merged.shimmer + ctx->fxOverride.shimmer);
+        merged.sharpness *= ctx->fxOverride.sharpness;
+      }
       speechPlayer_queueFrameEx(ctx->player, &f,
-          (const speechPlayer_frameEx_t*)frameExOrNull,
+          (const speechPlayer_frameEx_t*)&merged,
           (unsigned int)sizeof(nvspFrontend_FrameEx),
           minSamples, fadeSamples, userIndex, false);
     } else {
@@ -422,6 +440,8 @@ static void synthesize(const std::string& text,
                        int sampleRate,
                        double speed, double basePitchHz, double inflection,
                        double volume, const BuiltinVoice* voice,
+                       const FrameExOverride& fxOverride,
+                       int pauseMode,
                        bool& stopFlag) {
   dbg("SYNTH: text='%s' lang speed=%.2f pitch=%.1f", text.c_str(), speed, basePitchHz);
   sd_send("701 BEGIN");
@@ -431,6 +451,7 @@ static void synthesize(const std::string& text,
   ctx.sampleRate = sampleRate;
   ctx.volume = volume;
   ctx.builtinVoice = voice;
+  ctx.fxOverride = fxOverride;
 
   // Cap synthesis at 2.0x, excess into time-stretch
   double timeStretch = 1.0;
@@ -503,6 +524,27 @@ static void synthesize(const std::string& text,
       if (sd_poll_stop()) { stopFlag = true; break; }
     }
     dbg("SYNTH: synthesized %d total samples", totalSamples);
+
+    // Punctuation pause between clauses (same as iOS bridge / NVDA driver)
+    if (pauseMode > 0 && totalSamples > 0) {
+      double pauseMs = 0.0;
+      if (clauseType == '.' || clauseType == '!' || clauseType == '?')
+        pauseMs = pauseMode == 2 ? 60.0 : 35.0;
+      else if (clauseType == ',')
+        pauseMs = pauseMode == 2 ? 50.0 : 25.0;
+      if (pauseMs > 0.0) {
+        unsigned int samples = (unsigned int)(pauseMs * sampleRate / 1000.0 + 0.5);
+        unsigned int fadeSamp = (unsigned int)(3.0 * sampleRate / 1000.0 + 0.5);
+        speechPlayer_queueFrame(player, nullptr, samples, fadeSamp, -1, false);
+        // Synthesize the silence
+        std::vector<sample> sil(512);
+        while (!stopFlag) {
+          int n = speechPlayer_synthesize(player, (unsigned int)sil.size(), sil.data());
+          if (n <= 0) break;
+          sd_send_audio((const int16_t*)sil.data(), n, sampleRate);
+        }
+      }
+    }
   }
 
   if (stopFlag) {
@@ -544,30 +586,87 @@ int main(int argc, char** argv) {
   int sampleRate = 22050;
   std::string language = "en-us";
   std::string voiceName = "Adam";
+  std::string pitchMode = "";  // empty = use pack default
   int ssipRate = 0;
   int ssipPitch = 50;
   double ssipVolume = 1.0;
   double inflection = 0.5;
+  int pauseMode = 0;  // 0=off, 1=short, 2=long
 
-  // Parse simple config file if given (one keyword per line)
-  if (argc > 1 && argv[1]) {
-    FILE* f = fopen(argv[1], "r");
-    if (f) {
-      char line[1024];
-      while (fgets(line, sizeof(line), f)) {
-        // Skip comments and empty lines
-        if (line[0] == '#' || line[0] == '\n') continue;
-        char key[256], val[256];
-        // Parse: Keyword "value" or Keyword value
-        if (sscanf(line, "%255s \"%255[^\"]\"", key, val) == 2 ||
-            sscanf(line, "%255s %255s", key, val) == 2) {
-          if (strcmp(key, "TGSBPackDir") == 0) packDir = val;
-          else if (strcmp(key, "TGSBSampleRate") == 0) sampleRate = atoi(val);
-          else if (strcmp(key, "TGSBDefaultVoice") == 0) voiceName = val;
-          else if (strcmp(key, "TGSBDefaultLanguage") == 0) language = val;
+  // Voicing tone sliders (0-100, 50=neutral for most)
+  int vtVoicingPeakPos = 50, vtVoicedPreEmphA = 50, vtVoicedPreEmphMix = 50;
+  int vtHighShelfGainDb = 50, vtHighShelfFcHz = 50, vtHighShelfQ = 50;
+  int vtVoicedTiltDbPerOct = 50, vtNoiseGlottalModDepth = 0;
+  int vtPitchSyncF1DeltaHz = 50, vtPitchSyncB1DeltaHz = 50;
+  int vtSpeedQuotient = 50, vtAspirationTiltDbPerOct = 50;
+  int vtCascadeBwScale = 50, vtTremor = 0;
+  int vtChorusDepth = 0, vtChorusDetune = 33;
+  bool hasVoicingToneOverride = false;
+
+  // FrameEx sliders (0-100)
+  int fxCreakiness = 0, fxBreathiness = 0, fxJitter = 0, fxShimmer = 0, fxSharpness = 50;
+  bool hasFrameExOverride = false;
+
+  // Parse config file: per-user wins over system
+  auto parseConfig = [&](const char* path) {
+    FILE* f = fopen(path, "r");
+    if (!f) return false;
+    dbg("CONFIG: loading %s", path);
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+      if (line[0] == '#' || line[0] == '\n') continue;
+      char key[256], val[256];
+      if (sscanf(line, "%255s \"%255[^\"]\"", key, val) == 2 ||
+          sscanf(line, "%255s %255s", key, val) == 2) {
+        // Basic settings
+        if (!strcmp(key, "TGSBPackDir")) packDir = val;
+        else if (!strcmp(key, "TGSBSampleRate")) sampleRate = atoi(val);
+        else if (!strcmp(key, "TGSBDefaultVoice")) voiceName = val;
+        else if (!strcmp(key, "TGSBDefaultLanguage")) language = val;
+        else if (!strcmp(key, "TGSBPitchMode")) pitchMode = val;
+        else if (!strcmp(key, "TGSBInflection")) inflection = atof(val);
+        else if (!strcmp(key, "TGSBPauseMode")) {
+          if (!strcmp(val, "short")) pauseMode = 1;
+          else if (!strcmp(val, "long")) pauseMode = 2;
+          else pauseMode = 0;
         }
+        // Voicing tone (0-100 sliders)
+        else if (!strcmp(key, "TGSBVoicingPeakPos"))    { vtVoicingPeakPos = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBVoicedPreEmphA"))    { vtVoicedPreEmphA = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBVoicedPreEmphMix"))  { vtVoicedPreEmphMix = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBHighShelfGain"))      { vtHighShelfGainDb = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBHighShelfFc"))        { vtHighShelfFcHz = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBHighShelfQ"))         { vtHighShelfQ = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBVoicedTilt"))         { vtVoicedTiltDbPerOct = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBNoiseGlottalMod"))    { vtNoiseGlottalModDepth = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBPitchSyncF1"))        { vtPitchSyncF1DeltaHz = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBPitchSyncB1"))        { vtPitchSyncB1DeltaHz = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBSpeedQuotient"))      { vtSpeedQuotient = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBAspirationTilt"))     { vtAspirationTiltDbPerOct = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBCascadeBwScale"))     { vtCascadeBwScale = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBTremor"))             { vtTremor = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBChorusDepth"))        { vtChorusDepth = atoi(val); hasVoicingToneOverride = true; }
+        else if (!strcmp(key, "TGSBChorusDetune"))       { vtChorusDetune = atoi(val); hasVoicingToneOverride = true; }
+        // FrameEx voice quality (0-100 sliders)
+        else if (!strcmp(key, "TGSBCreakiness"))   { fxCreakiness = atoi(val); hasFrameExOverride = true; }
+        else if (!strcmp(key, "TGSBBreathiness"))  { fxBreathiness = atoi(val); hasFrameExOverride = true; }
+        else if (!strcmp(key, "TGSBJitter"))       { fxJitter = atoi(val); hasFrameExOverride = true; }
+        else if (!strcmp(key, "TGSBShimmer"))      { fxShimmer = atoi(val); hasFrameExOverride = true; }
+        else if (!strcmp(key, "TGSBSharpness"))    { fxSharpness = atoi(val); hasFrameExOverride = true; }
       }
-      fclose(f);
+    }
+    fclose(f);
+    return true;
+  };
+
+  // Per-user config wins over system config
+  {
+    std::string home = getenv("HOME") ? getenv("HOME") : "";
+    std::string userConf = home + "/.config/tgspeechbox/sd_tgsb.conf";
+    if (!home.empty() && parseConfig(userConf.c_str())) {
+      dbg("CONFIG: using per-user config");
+    } else if (argc > 1 && argv[1]) {
+      parseConfig(argv[1]);  // system config from SD
     }
   }
 
@@ -604,14 +703,72 @@ int main(int argc, char** argv) {
   }
   nvspFrontend_setLanguage(fe, language.c_str());
 
-  // Default voicing tone
-  speechPlayer_voicingTone_t tone = speechPlayer_getDefaultVoicingTone();
-  speechPlayer_setVoicingTone(player, &tone);
+  // Re-apply pitch mode after any setLanguage (pack load overwrites it).
+  auto reapplyPitchMode = [&]() {
+    if (!pitchMode.empty())
+      nvspFrontend_setPitchMode(fe, pitchMode.c_str());
+  };
+  reapplyPitchMode();
+  if (!pitchMode.empty()) dbg("CONFIG: pitchMode=%s", pitchMode.c_str());
+
+  // Build voicing tone from config sliders (same mapping as tgsbRender / NVDA driver)
+  {
+    // VoicingTone struct — must match voicingTone.h layout
+    struct VT {
+      uint32_t magic, structSize, structVersion, dspVersion;
+      double voicingPeakPos, voicedPreEmphA, voicedPreEmphMix;
+      double highShelfGainDb, highShelfFcHz, highShelfQ;
+      double voicedTiltDbPerOct, noiseGlottalModDepth;
+      double pitchSyncF1DeltaHz, pitchSyncB1DeltaHz;
+      double speedQuotient, aspirationTiltDbPerOct, cascadeBwScale, tremorDepth;
+      double nasalBwScale, f4FreqScale, nasalGainScale;
+      double chorusDepth, chorusDetuneHz;
+    } vt{};
+    vt.magic = 0x32544F56u;  // "VOT2"
+    vt.structSize = sizeof(VT);
+    vt.structVersion = 4u;
+    vt.dspVersion = 8u;
+
+    auto sl = [](int v) { return (double)(v < 0 ? 0 : v > 100 ? 100 : v) / 100.0; };
+
+    // Defaults first (same as tgsbRender)
+    vt.voicingPeakPos = 0.91;  vt.voicedPreEmphA = 0.92;  vt.voicedPreEmphMix = 0.35;
+    vt.highShelfGainDb = 4.0;  vt.highShelfFcHz = 2000.0;  vt.highShelfQ = 0.7;
+    vt.voicedTiltDbPerOct = 0.0;  vt.noiseGlottalModDepth = 0.0;
+    vt.pitchSyncF1DeltaHz = 0.0;  vt.pitchSyncB1DeltaHz = 0.0;
+    vt.speedQuotient = 2.0;  vt.aspirationTiltDbPerOct = 0.0;
+    vt.cascadeBwScale = 1.0;  vt.tremorDepth = 0.0;
+    vt.nasalBwScale = 1.0;  vt.f4FreqScale = 1.0;  vt.nasalGainScale = 1.0;
+    vt.chorusDepth = 0.0;  vt.chorusDetuneHz = 2.0;
+
+    // Apply config overrides (slider 0-100 → actual values)
+    if (hasVoicingToneOverride) {
+      vt.voicingPeakPos = 0.85 + sl(vtVoicingPeakPos) * 0.10;
+      vt.voicedPreEmphA = sl(vtVoicedPreEmphA) * 0.97;
+      vt.voicedPreEmphMix = sl(vtVoicedPreEmphMix);
+      vt.highShelfGainDb = -12.0 + sl(vtHighShelfGainDb) * 24.0;
+      vt.highShelfFcHz = 500.0 + sl(vtHighShelfFcHz) * 7500.0;
+      vt.highShelfQ = 0.3 + sl(vtHighShelfQ) * 1.7;
+      vt.voicedTiltDbPerOct = -24.0 + sl(vtVoicedTiltDbPerOct) * 48.0;
+      vt.noiseGlottalModDepth = sl(vtNoiseGlottalModDepth);
+      vt.pitchSyncF1DeltaHz = -60.0 + sl(vtPitchSyncF1DeltaHz) * 120.0;
+      vt.pitchSyncB1DeltaHz = -50.0 + sl(vtPitchSyncB1DeltaHz) * 100.0;
+      vt.speedQuotient = 0.5 + sl(vtSpeedQuotient) * 3.5;
+      vt.aspirationTiltDbPerOct = -12.0 + sl(vtAspirationTiltDbPerOct) * 24.0;
+      // cascadeBwScale: piecewise so 50 => 1.0
+      int cs = vtCascadeBwScale < 0 ? 0 : vtCascadeBwScale > 100 ? 100 : vtCascadeBwScale;
+      vt.cascadeBwScale = cs <= 50 ? 2.0 - (cs / 50.0) : 1.0 - ((cs - 50) / 50.0) * 0.7;
+      vt.tremorDepth = sl(vtTremor) * 0.4;
+      vt.chorusDepth = sl(vtChorusDepth);
+      vt.chorusDetuneHz = 0.5 + sl(vtChorusDetune) * 4.5;
+      dbg("CONFIG: voicing tone applied (16 params)");
+    }
+
+    speechPlayer_setVoicingTone(player, (const speechPlayer_voicingTone_t*)&vt);
+  }
 
   // Apply built-in voice
   const BuiltinVoice* activeVoice = findBuiltinVoice(voiceName.c_str());
-  // Note: built-in voice voicedTilt is applied per-frame in applyBuiltinVoice().
-  // No need to poke the voicingTone struct directly (was using unsafe pointer arithmetic).
 
   sd_send("299 OK LOADED SUCCESSFULLY");
 
@@ -653,7 +810,19 @@ int main(int argc, char** argv) {
       if (language == "c" || language == "C" || language == "NULL" || language.empty()) {
         language = "en-us";
         nvspFrontend_setLanguage(fe, language.c_str());
+        reapplyPitchMode();
         espeak.setVoice(language.c_str());
+      }
+
+      // Purge any stale frames from previous utterance
+      speechPlayer_queueFrame(player, nullptr, 0, 0, -1, true);
+
+      // If STOP/CANCEL is already queued in the read buffer (from rapid key
+      // repeat), skip this utterance entirely — don't synthesize stale speech.
+      if (sd_poll_stop()) {
+        sd_send("200 OK SPEAKING");
+        sd_send("703 STOP");
+        continue;
       }
 
       sd_send("200 OK SPEAKING");
@@ -661,9 +830,21 @@ int main(int argc, char** argv) {
       // Synchronous synthesis — same architecture as sd_espeak-ng.
       // Audio sent via 705 blocks (SD handles playback + flushing).
       // sd_poll_stop() checks stdin between chunks for responsive STOP.
+      // Build FrameEx override from config
+      FrameExOverride fxo{};
+      if (hasFrameExOverride) {
+        auto sl = [](int v) { return (double)(v < 0 ? 0 : v > 100 ? 100 : v) / 100.0; };
+        fxo.creakiness = sl(fxCreakiness);
+        fxo.breathiness = sl(fxBreathiness);
+        fxo.jitter = sl(fxJitter);
+        fxo.shimmer = sl(fxShimmer);
+        fxo.sharpness = 0.5 + sl(fxSharpness) * 1.5;
+        fxo.active = true;
+      }
+
       synthesize(text, espeak, fe, player,
           sampleRate, speed, pitch, inflection,
-          ssipVolume, activeVoice, stopFlag);
+          ssipVolume, activeVoice, fxo, pauseMode, stopFlag);
     }
     else if (cmd == "STOP" || cmd == "CANCEL") {
       // In synchronous mode, STOP arrives via sd_poll_stop() during synthesis.
@@ -712,6 +893,7 @@ int main(int argc, char** argv) {
           if (val != "c" && val != "C" && val != "NULL" && !val.empty()) {
             language = val;
             nvspFrontend_setLanguage(fe, val.c_str());
+            reapplyPitchMode();  // setLanguage reloads pack, wipes pitch mode
             espeak.setVoice(val.c_str());
           }
         }
