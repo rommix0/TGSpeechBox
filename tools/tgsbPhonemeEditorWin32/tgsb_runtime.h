@@ -95,7 +95,7 @@ struct EditorVoicingToneV1 {
 };
 
 // FrameEx struct - per-frame voice quality extensions (DSP v5+)
-// Must match nvspFrontend_FrameEx / speechPlayer_frameEx_t exactly (23 doubles = 184 bytes)
+// Must match nvspFrontend_FrameEx / speechPlayer_frameEx_t exactly (27 doubles = 216 bytes)
 struct EditorFrameEx {
   // Voice quality parameters (DSP v5)
   double creakiness;      // laryngealization / creaky voice
@@ -125,6 +125,11 @@ struct EditorFrameEx {
   double transNasalScale;     // cfN0, cfNP, cbN0, cbNP, caNP
   // Amplitude crossfade mode: 0.0 = linear, 1.0 = equal-power
   double transAmplitudeMode;
+  // Higher cascade formants F7/F8 (DSP v8, Rabiner 1968 defaults)
+  double cf7;   // F7 frequency (Hz).  Default 6500.0
+  double cb7;   // F7 bandwidth (Hz).  Default 720.0
+  double cf8;   // F8 frequency (Hz).  Default 7500.0
+  double cb8;   // F8 bandwidth (Hz).  Default 1250.0
 };
 
 // speechPlayer.dll API

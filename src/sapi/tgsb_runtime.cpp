@@ -209,7 +209,7 @@ void __cdecl runtime::frontend_frame_ex_cb(void* userData, const nvspFrontend_Fr
     memcpy(&frame, frameOrNull, sizeof(frame));
     rt.apply_preset_and_volume(&frame, *ctx->params);
 
-    // nvspFrontend_FrameEx and speechPlayer_frameEx_t are layout-compatible (both 23 doubles).
+    // nvspFrontend_FrameEx and speechPlayer_frameEx_t are layout-compatible (both 27 doubles).
     const unsigned int frameExSize = frameExOrNull ? static_cast<unsigned int>(sizeof(speechPlayer_frameEx_t)) : 0;
     speechPlayer_queueFrameEx(rt.speech_player_, &frame, reinterpret_cast<const speechPlayer_frameEx_t*>(frameExOrNull), frameExSize, minSamples, fadeSamples, userIndex, false);
 }

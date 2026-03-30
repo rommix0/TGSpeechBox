@@ -106,10 +106,19 @@ typedef struct nvspFrontend_FrameEx {
      Equal-power prevents energy dips at source transitions (voiced→voiceless).
      Set by frame_emit when it detects a voicing source change. */
   double transAmplitudeMode;
+
+  /* Higher cascade formants F7/F8 (DSP v8).
+     Fills the spectral gap above F6 at sample rates >= 22050 Hz.
+     Defaults from Rabiner 1968, cited in QLatt (github.com/nicclase/qlatt).
+     Per-phoneme overridable via YAML keys cf7/cb7/cf8/cb8. */
+  double cf7;   /* F7 frequency (Hz).  Default 6500.0 */
+  double cb7;   /* F7 bandwidth (Hz).  Default 720.0  */
+  double cf8;   /* F8 frequency (Hz).  Default 7500.0 */
+  double cb8;   /* F8 bandwidth (Hz).  Default 1250.0 */
 } nvspFrontend_FrameEx;
 
 /* Number of fields in FrameEx struct (for size validation) */
-#define NVSP_FRONTEND_FRAMEEX_NUM_PARAMS 23
+#define NVSP_FRONTEND_FRAMEEX_NUM_PARAMS 27
 
 /*
   VoicingTone parameters for DSP-level voice quality (ABI v2+).

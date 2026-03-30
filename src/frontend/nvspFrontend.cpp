@@ -455,6 +455,10 @@ static int queueIPA_ExImpl(
   frameExDefaults.endPf1 = NAN;
   frameExDefaults.endPf2 = NAN;
   frameExDefaults.endPf3 = NAN;
+  frameExDefaults.cf7 = 6500.0;
+  frameExDefaults.cb7 = 720.0;
+  frameExDefaults.cf8 = 7500.0;
+  frameExDefaults.cb8 = 1250.0;
 
   emitFramesEx(h->pack, tokens, userIndexBase, speed, frameExDefaults, &h->trajectoryState, cb, userData);
 

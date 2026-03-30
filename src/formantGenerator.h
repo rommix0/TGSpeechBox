@@ -16,7 +16,7 @@ class CascadeFormantGenerator {
 private:
     int sampleRate;
     PitchSyncResonator r1;  // F1 gets pitch-sync treatment
-    Resonator r2, r3, r4, r5, r6, rN0, rNP;
+    Resonator r2, r3, r4, r5, r6, r7, r8, rN0, rNP;
     
     // Pitch-sync params from voicingTone
     double pitchSyncF1Delta;
@@ -28,17 +28,18 @@ private:
     double nasalGainScale; // Nasal pole coupling amplitude multiplier
 
 public:
-    CascadeFormantGenerator(int sr): sampleRate(sr), r1(sr), r2(sr), r3(sr), r4(sr), r5(sr), r6(sr), rN0(sr,true), rNP(sr),
+    CascadeFormantGenerator(int sr): sampleRate(sr), r1(sr), r2(sr), r3(sr), r4(sr), r5(sr), r6(sr), r7(sr), r8(sr), rN0(sr,true), rNP(sr),
         pitchSyncF1Delta(0.0), pitchSyncB1Delta(0.0), bwScale(1.0), f1BwOffset(0.0),
         nasalBwScale(1.0), f4FreqScale(1.0), nasalGainScale(1.0) {}
 
     void reset() {
-        r1.reset(); r2.reset(); r3.reset(); r4.reset(); r5.reset(); r6.reset(); rN0.reset(); rNP.reset();
+        r1.reset(); r2.reset(); r3.reset(); r4.reset(); r5.reset(); r6.reset(); r7.reset(); r8.reset(); rN0.reset(); rNP.reset();
     }
 
     void decay(double factor) {
         r1.decay(factor); r2.decay(factor); r3.decay(factor);
         r4.decay(factor); r5.decay(factor); r6.decay(factor);
+        r7.decay(factor); r8.decay(factor);
         rN0.decay(factor); rNP.decay(factor);
     }
 
@@ -153,6 +154,38 @@ void setCascadeBwScale(double scale) {
         const double hs1 = (f4FreqScale != 1.0) ? pow(f4FreqScale, 0.2) : 1.0;
         const double hs2 = (f4FreqScale != 1.0) ? pow(f4FreqScale, 0.5) : 1.0;
         const double hs3 = (f4FreqScale != 1.0) ? pow(f4FreqScale, 0.8) : 1.0;
+
+        // Higher cascade formants F7/F8 (DSP v8).
+        // Fills the spectral gap above F6 at sample rates >= 22050 Hz.
+        // Defaults from Rabiner 1968, as cited in QLatt
+        // (https://github.com/nicclase/qlatt, notes-formant-research.md).
+        // At low SRs the Nyquist fade naturally bypasses them.
+        {
+            const double defaultCf7 = 6500.0, defaultCb7 = 720.0;
+            const double defaultCf8 = 7500.0, defaultCb8 = 1250.0;
+            double fcf8 = frameEx ? frameEx->cf8 : defaultCf8;
+            double fcb8 = frameEx ? frameEx->cb8 : defaultCb8;
+            double fcf7 = frameEx ? frameEx->cf7 : defaultCf7;
+            double fcb7 = frameEx ? frameEx->cb7 : defaultCb7;
+            if (!std::isfinite(fcf8) || fcf8 <= 0.0) fcf8 = defaultCf8;
+            if (!std::isfinite(fcb8) || fcb8 <= 0.0) fcb8 = defaultCb8;
+            if (!std::isfinite(fcf7) || fcf7 <= 0.0) fcf7 = defaultCf7;
+            if (!std::isfinite(fcb7) || fcb7 <= 0.0) fcb7 = defaultCb7;
+
+            // Full head-size scaling (same tier as F4-F6)
+            fcf8 *= f4FreqScale;
+            fcf7 *= f4FreqScale;
+
+            double preR8 = output;
+            output = r8.resonate(output, fcf8, fcb8 * cascadeBwScale);
+            double fade8 = cascadeFade(fcf8);
+            output = preR8 + fade8 * (output - preR8);
+
+            double preR7 = output;
+            output = r7.resonate(output, fcf7, fcb7 * cascadeBwScale);
+            double fade7 = cascadeFade(fcf7);
+            output = preR7 + fade7 * (output - preR7);
+        }
 
         double preR6 = output;
         output = r6.resonate(output, frame->cf6 * f4FreqScale, cb6);

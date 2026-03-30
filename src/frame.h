@@ -125,6 +125,33 @@ typedef struct {
 	 * change in voicing source. The DSP does not need phoneme awareness.
 	 */
 	double transAmplitudeMode;
+
+	/* =========================================================================
+	 * Higher cascade formants F7/F8 (DSP v8)
+	 * =========================================================================
+	 *
+	 * At sample rates >= 22050 Hz, Klatt's original 5-6 cascade formants leave
+	 * a spectral gap above F6 (~5.5 kHz).  The implicit z-transform phantom
+	 * poles that filled this gap at the original 10 kHz rate are inaudible at
+	 * 44.1 kHz.  Adding explicit F7 (~6.5 kHz) and F8 (~7.5 kHz) restores the
+	 * spectral envelope above F6, adding "presence" and "air."
+	 *
+	 * Defaults from Rabiner 1968, as cited in the QLatt project
+	 * (https://github.com/nicclase/qlatt):
+	 *   F7: 6500 Hz, BW 720 Hz  (Q ~ 9)
+	 *   F8: 7500 Hz, BW 1250 Hz (Q ~ 6)
+	 *
+	 * These are vocal-tract-length properties, not vowel-dependent — they
+	 * stay roughly constant across all phonemes.  Individual phonemes can
+	 * override them via YAML keys cf7/cb7/cf8/cb8.
+	 *
+	 * At low sample rates the cascade Nyquist-proximity fade automatically
+	 * mutes them (ratio > 0.85 → bypass), so they cost nothing at 11025 Hz.
+	 */
+	double cf7;   /* F7 frequency (Hz).  Default 6500.0 */
+	double cb7;   /* F7 bandwidth (Hz).  Default 720.0  */
+	double cf8;   /* F8 frequency (Hz).  Default 7500.0 */
+	double cb8;   /* F8 bandwidth (Hz).  Default 1250.0 */
 } speechPlayer_frameEx_t;
 
 // Default values for frameEx parameters. Used when:
@@ -155,7 +182,11 @@ static const speechPlayer_frameEx_t speechPlayer_frameEx_defaults = {
 	0.0,  // transF2Scale: no override
 	0.0,  // transF3Scale: no override
 	0.0,  // transNasalScale: no override
-	0.0   // transAmplitudeMode: linear (legacy)
+	0.0,   // transAmplitudeMode: linear (legacy)
+	6500.0, // cf7: Rabiner 1968 default
+	720.0,  // cb7: Rabiner 1968 default
+	7500.0, // cf8: Rabiner 1968 default
+	1250.0  // cb8: Rabiner 1968 default
 };
 
 const int speechPlayer_frameEx_numParams=sizeof(speechPlayer_frameEx_t)/sizeof(double);

@@ -408,6 +408,13 @@ static void generateAcousticEvents(
       }
     }
 
+    // Higher cascade formants F7/F8 (DSP v8).
+    // Per-phoneme override if set, otherwise Rabiner 1968 defaults.
+    frameEx.cf7 = (t.def && t.def->hasCf7) ? t.def->cf7 : 6500.0;
+    frameEx.cb7 = (t.def && t.def->hasCb7) ? t.def->cb7 : 720.0;
+    frameEx.cf8 = (t.def && t.def->hasCf8) ? t.def->cf8 : 7500.0;
+    frameEx.cb8 = (t.def && t.def->hasCb8) ? t.def->cb8 : 1250.0;
+
     // Fujisaki pitch model parameters (set by applyPitchFujisaki)
     // These pass phrase/accent commands to the DSP for natural prosody contours.
     frameEx.fujisakiEnabled = t.fujisakiEnabled ? 1.0 : 0.0;

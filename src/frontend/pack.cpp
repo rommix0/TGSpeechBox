@@ -238,6 +238,23 @@ static bool loadPhonemes(const fs::path& packsRoot, PackSet& out, std::string& o
         double v; if (val.asNumber(v)) { def.hasDurationScale = true; def.durationScale = v; }
         continue;
       }
+      // Higher cascade formants F7/F8 (DSP v8, FrameEx fields)
+      if (fieldName == "cf7") {
+        double v; if (val.asNumber(v)) { def.hasCf7 = true; def.cf7 = v; }
+        continue;
+      }
+      if (fieldName == "cb7") {
+        double v; if (val.asNumber(v)) { def.hasCb7 = true; def.cb7 = v; }
+        continue;
+      }
+      if (fieldName == "cf8") {
+        double v; if (val.asNumber(v)) { def.hasCf8 = true; def.cf8 = v; }
+        continue;
+      }
+      if (fieldName == "cb8") {
+        double v; if (val.asNumber(v)) { def.hasCb8 = true; def.cb8 = v; }
+        continue;
+      }
 
       FieldId id;
       if (!parseFieldId(fieldName, id)) {

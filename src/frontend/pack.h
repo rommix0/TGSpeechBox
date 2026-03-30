@@ -166,6 +166,18 @@ struct PhonemeDef {
   // Default 1.0 (no change). Consumed by ipa_engine timing, not frame_emit.
   double durationScale = 1.0;
   bool hasDurationScale = false;
+
+  // Higher cascade formants F7/F8 (DSP v8, Rabiner 1968 defaults).
+  // These are vocal-tract-length properties, not vowel-dependent.
+  // Per-phoneme override via YAML keys cf7/cb7/cf8/cb8.
+  bool hasCf7 = false;
+  double cf7 = 6500.0;
+  bool hasCb7 = false;
+  double cb7 = 720.0;
+  bool hasCf8 = false;
+  double cf8 = 7500.0;
+  bool hasCb8 = false;
+  double cb8 = 1250.0;
 };
 
 // In YAML we keep replacements in UTF-8; we convert to UTF-32 during load.
