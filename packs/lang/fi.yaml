@@ -99,6 +99,8 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "ssä"   # inessive (front)
     - "ssa"   # inessive (back)

@@ -130,6 +130,8 @@ settings:
   microprosodyVoicedF0LowerEnabled: true
   microprosodyVoicedF0LowerHz: -5
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "chen"  # diminutive
     - "lein"  # diminutive

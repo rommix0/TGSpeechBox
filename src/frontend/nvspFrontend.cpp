@@ -960,6 +960,7 @@ NVSP_FRONTEND_API char* nvspFrontend_prepareText(
                                              h->pack.pronDict, disabled,
                                              h->langTag,
                                              h->pack.lang.yearSplittingEnabled,
+                                             h->pack.lang.thousandsSeparatorCommaToSpace,
                                              h->pack.lang.numberExpansion.ohDigit,
                                              h->pack.lang.dictSuffixes,
                                              &h->ipaOverrides);

@@ -23,6 +23,8 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "mente" # adverb
     - "ões"   # plural (-ão words)

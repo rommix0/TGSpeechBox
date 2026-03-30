@@ -2898,3 +2898,13 @@ msgstr "Divisão de anos (números de 4 dígitos como pares)"
 #: synthDrivers/tgspeechbox/langPackSettingsPanel.py
 msgid "Year Splitting Enabled"
 msgstr "Divisão de Anos Habilitada"
+
+#. Driver setting: thousands separator checkbox
+#: synthDrivers/tgspeechbox/__init__.py
+msgid "Thousands separator comma to space"
+msgstr "Separador de milhares vírgula para espaço"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Thousands Separator Comma To Space"
+msgstr "Separador de Milhares Vírgula Para Espaço"

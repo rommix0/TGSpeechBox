@@ -859,6 +859,12 @@ double lengthContrastPreGeminateVowelScale = 0.85;
   // Off by default — users opt in via setSettings.
   bool yearSplittingEnabled = false;
 
+  // Thousands-separator commas → spaces: "1,213" → "1 213".
+  // Needed for languages where comma = decimal separator (Hungarian, etc.)
+  // so eSpeak reads the number as thousands, not decimal.
+  // Off by default — English numberExpansion already handles commas.
+  bool thousandsSeparatorCommaToSpace = false;
+
   // Dictionary suffix stripping — per-language list of suffixes to try
   // removing during dict lookup so inflected forms ("launching") inherit
   // their stem entry ("launch").  Pre-sorted longest-first at load time.

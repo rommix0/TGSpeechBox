@@ -379,6 +379,8 @@ settings:
   legacyPitchMode: espeak_style
   legacyPitchInflectionScale: 0.56
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "lar"   # plural (back)
     - "ler"   # plural (front)

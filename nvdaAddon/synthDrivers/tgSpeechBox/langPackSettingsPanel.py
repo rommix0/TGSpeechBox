@@ -730,6 +730,8 @@ def _getPanelClass():
                 "wordFinalSchwaScale",
                 # --- Year splitting ---
                 "yearSplittingEnabled",
+                # --- Thousands separator ---
+                "thousandsSeparatorCommaToSpace",
             ]
             for k in _extraKeys:
                 if k not in self._knownKeys:

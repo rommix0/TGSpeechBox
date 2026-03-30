@@ -14,6 +14,8 @@ settings:
   stopClosureNasalToStopGapMs: 10
   stopClosureNasalToStopFadeMs: 2
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "ima"   # dative/instrumental/locative plural
     - "ama"   # dative plural (feminine)

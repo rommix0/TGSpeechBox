@@ -2898,3 +2898,13 @@ msgstr "Évszám-bontás (4 jegyű számok számpárokként)"
 #: synthDrivers/tgspeechbox/langPackSettingsPanel.py
 msgid "Year Splitting Enabled"
 msgstr "Évszám-bontás engedélyezve"
+
+#. Driver setting: thousands separator checkbox
+#: synthDrivers/tgspeechbox/__init__.py
+msgid "Thousands separator comma to space"
+msgstr "Ezres elválasztó vessző szóközzé"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Thousands Separator Comma To Space"
+msgstr "Ezres Elválasztó Vessző Szóközzé"

@@ -50,6 +50,8 @@ settings:
   singleWordFinalHoldMs: 40
   singleWordFinalFadeMs: 16
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "ами"   # instrumental plural
     - "ів"    # genitive plural

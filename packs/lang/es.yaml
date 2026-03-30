@@ -78,6 +78,8 @@ settings:
     applyAcrossWordBoundary: false
   legacyPitchMode: espeak_style
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "mente" # adverb
     - "es"    # plural (after consonant)

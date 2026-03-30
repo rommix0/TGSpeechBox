@@ -1043,6 +1043,7 @@ std::string prepareTextForEspeak(
     const std::unordered_set<std::string>& disabledDictTypes,
     const std::string& langTag,
     bool yearSplitting,
+    bool thousandsSeparatorCommaToSpace,
     const std::string& ohDigit,
     const std::vector<std::string>& dictSuffixes,
     std::unordered_map<std::string, std::string>* ipaOverrides)
@@ -1102,7 +1103,8 @@ std::string prepareTextForEspeak(
   // Keeps decimal commas like "3,14" (only 2 digits after comma).
   // Space-separated digit groups are how eSpeak recognizes thousands
   // in Hungarian and other European locales (comma = decimal there).
-  {
+  // Off for English — numberExpansion already handles commas internally.
+  if (thousandsSeparatorCommaToSpace) {
     std::string cleaned;
     cleaned.reserve(result.size());
     for (size_t ci = 0; ci < result.size(); ++ci) {

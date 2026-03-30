@@ -58,6 +58,8 @@ settings:
     enabled: false
     applyAcrossWordBoundary: false
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "erne"  # definite plural (common)
     - "ene"   # definite plural

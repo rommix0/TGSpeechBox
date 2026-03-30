@@ -19,6 +19,8 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "ului"  # genitive/dative definite masculine
     - "lor"   # genitive/dative plural

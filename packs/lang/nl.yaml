@@ -50,6 +50,8 @@ settings:
   # Enable microprosody
   microprosodyEnabled: true
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "tje"   # diminutive
     - "je"    # diminutive

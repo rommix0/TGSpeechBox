@@ -26,6 +26,8 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "mente" # adverb
     - "i"     # masculine plural

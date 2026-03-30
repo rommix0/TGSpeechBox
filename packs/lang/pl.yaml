@@ -97,6 +97,8 @@ settings:
     clusterProportionGuard: true
     clusterMaxRatioShift: 0.4
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "ach"   # locative plural
     - "ami"   # instrumental plural

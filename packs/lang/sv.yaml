@@ -54,6 +54,8 @@ settings:
   microprosodyVoicedF0LowerEnabled: true
   microprosodyVoicedF0LowerHz: -6
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "orna"  # definite plural (3rd declension)
     - "erna"  # definite plural (5th declension)

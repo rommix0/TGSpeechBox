@@ -41,6 +41,8 @@ settings:
   singleWordFinalHoldMs: 40
   singleWordFinalFadeMs: 16
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "ите"   # definite plural
     - "ове"   # plural

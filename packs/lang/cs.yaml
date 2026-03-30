@@ -15,6 +15,8 @@ settings:
   # Czech vowel length (short vs long) is phonemic.
   lengthenedScale: 1.4
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "ách"   # locative plural
     - "ami"   # instrumental plural

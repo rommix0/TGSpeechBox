@@ -55,6 +55,7 @@ std::string prepareTextForEspeak(
     const std::unordered_set<std::string>& disabledDictTypes,
     const std::string& langTag,
     bool yearSplitting,
+    bool thousandsSeparatorCommaToSpace = false,
     const std::string& ohDigit = "",
     const std::vector<std::string>& dictSuffixes = {},
     std::unordered_map<std::string, std::string>* ipaOverrides = nullptr);

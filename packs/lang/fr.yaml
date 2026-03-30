@@ -20,6 +20,8 @@ settings:
   singleWordClauseTypeOverride: "."
   singleWordClauseTypeOverrideCommaOnly: true
 
+  thousandsSeparatorCommaToSpace: true
+
   dictSuffixes:
     - "ment"  # adverb
     - "es"    # feminine plural

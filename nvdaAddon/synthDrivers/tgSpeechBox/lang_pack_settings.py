@@ -372,6 +372,8 @@ _LANG_PACK_SPECS = (
     ("stripHyphen", "stripHyphen", "bool", False, None),
     # --- Year splitting ---
     ("yearSplitting", "yearSplittingEnabled", "bool", True, None),
+    # --- Thousands separator ---
+    ("thousandsSeparatorCommaToSpace", "thousandsSeparatorCommaToSpace", "bool", False, None),
 )
 
 # Inject generated accessors onto the mixin class.
