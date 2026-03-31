@@ -901,7 +901,8 @@ normalization:
     # Characters that follow ɡ in non -og words — blocks LOT→THOUGHT shift.
     # ɹ: progress, ɡɹ.  l: toggling, ɡl.  ə: toggle/goggle, ɡəl.
     # n: cognitive/prognosis, ɡn.
-    OG_LOT_AFTER: ["ɹ", "l", "ə", "n"]
+    # ᵒ: toggle/goggle — ə͡l (syllabic L) normalizes to ᵒl before rules run.
+    OG_LOT_AFTER: ["ɹ", "l", "ə", "ᵒ", "n"]
 
   replacements:
     # eSpeak (classic) en-us has a dictionary entry for "Microsoft" that produces
