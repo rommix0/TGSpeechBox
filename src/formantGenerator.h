@@ -280,8 +280,20 @@ public:
             if (!std::isfinite(pb8v) || pb8v <= 0.0) pb8v = defaultCb8;
             pf7 *= f4FreqScale;
             pf8 *= f4FreqScale;
-            output += (r7.resonate(input, pf7, pb7v) - input) * kParF7Amp;
-            output += (r8.resonate(input, pf8, pb8v) - input) * kParF8Amp;
+            // Nyquist fade for parallel F7/F8: at low SRs these sit near
+            // the folding frequency, and even aperiodic noise aliases badly
+            // when a resonator peaks right at Nyquist.
+            const double nyq = 0.5 * (double)sampleRate;
+            auto parFade = [&](double cf) -> double {
+                double ratio = cf / nyq;
+                if (ratio < 0.65) return 1.0;
+                if (ratio > 0.85) return 0.0;
+                return 1.0 - (ratio - 0.65) / 0.20;
+            };
+            double fade7 = parFade(pf7);
+            double fade8 = parFade(pf8);
+            if (fade7 > 0.0) output += (r7.resonate(input, pf7, pb7v) - input) * kParF7Amp * fade7;
+            if (fade8 > 0.0) output += (r8.resonate(input, pf8, pb8v) - input) * kParF8Amp * fade8;
         }
 
         return calculateValueAtFadePosition(output,input,frame->parallelBypass);

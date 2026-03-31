@@ -413,7 +413,11 @@ public:
         // Prevents harmonic energy near Nyquist from exciting resonators
         // into BLT-warped ringing (trapezoidal SVF has same warping as BLT).
         // At 44100+ Hz the warping is negligible, so we bypass entirely.
-        if (sampleRate < 44100) {
+        // Disable voiced anti-alias LP at 22050+ Hz.  The cascade
+        // Nyquist fade already protects resonators from BLT warping,
+        // and at sharpness 3.0 the harmonic energy near Nyquist is low.
+        // At the old 6500 Hz cutoff, F7/F8 inputs lost 3-5 dB.
+        if (sampleRate < 22050) {
             voicedAntiAliasActive = true;
             double aaFc;
             if (sampleRate <= 11025) {
@@ -454,7 +458,7 @@ public:
             // 1.0) should sound like old slider ~30 at 44100.
             if (sampleRate >= 44100)      outputBaseSharpness = 6.0;
             else if (sampleRate >= 32000) outputBaseSharpness = 4.5;
-            else if (sampleRate >= 22050) outputBaseSharpness = 2.0;
+            else if (sampleRate >= 22050) outputBaseSharpness = 3.0;
             else if (sampleRate >= 16000) outputBaseSharpness = 1.5;
             else                          outputBaseSharpness = 1.3;
 
@@ -469,7 +473,12 @@ public:
             // to compensate for half-band decimation filter leakage.
             // 22050→44100 OS would otherwise match native 44100 sharpness,
             // but the simple average doesn't fully suppress aliased harmonics.
-            if (sampleRate < 44100) {
+            // Disable 2x oversampling at 22050+ Hz.  The half-band
+            // decimation (0.5 average) creates -3 dB at Nyquist/2 (~5.5 kHz),
+            // starving cascade F7/F8 of harmonic input and producing a
+            // "behind a wall" quality.  At sharpness 3.0 the aliased energy
+            // from harmonics folding at 11025 Hz is negligible.
+            if (sampleRate < 22050) {
                 sourceOversampleActive = true;
                 int esr = 2 * sampleRate;
                 if (esr >= 44100)      osBaseSharpness = 4.5;
