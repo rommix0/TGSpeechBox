@@ -1200,6 +1200,11 @@ int main(int argc, char** argv) {
           bool nextDigit = *(p + 1) &&
               (unsigned char)(*(p + 1) - '0') <= 9;
           if (prevDigit && nextDigit) { p++; continue; }
+          // Ordinal dot: "3. Mai" (German/Swedish/Czech/Finnish)
+          if (c == '.' && prevDigit && *(p+1) == ' ' && *(p+2) &&
+              ((unsigned char)(*(p+2) - 'A') <= 25 || (unsigned char)(*(p+2) - 'a') <= 25)) {
+            p++; continue;
+          }
           clauseType = c;
           p++;
           break;

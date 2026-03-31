@@ -192,6 +192,14 @@ std::vector<sapi_clause> split_clauses(const std::wstring& text)
                         ++pos;
                         continue;
                     }
+                    // Ordinal dot: "3. Mai" (German/Swedish/Czech/Finnish)
+                    if (c == L'.' && prevDigit && (pos + 2 < total) &&
+                        s[pos + 1] == L' ' &&
+                        ((static_cast<unsigned>(s[pos + 2] - L'A') <= 25) ||
+                         (static_cast<unsigned>(s[pos + 2] - L'a') <= 25))) {
+                        ++pos;
+                        continue;
+                    }
                 }
                 clauseType = (c == L'\u2026') ? '.' : static_cast<char>(c);
                 ++pos;

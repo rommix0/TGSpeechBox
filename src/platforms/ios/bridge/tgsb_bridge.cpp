@@ -439,6 +439,14 @@ void tgsb_queue_text(TgsbEngine *engine,
                     p++;
                     continue;
                 }
+                /* Ordinal dot: "3. Mai" — digit + dot + space + letter
+                 * (German, Swedish, Czech, Finnish ordinals) */
+                if (c == '.' && prevDigit && *(p+1) == ' ' && *(p+2) &&
+                    ((unsigned char)(*(p+2) - 'A') <= 25 ||
+                     (unsigned char)(*(p+2) - 'a') <= 25)) {
+                    p++;
+                    continue;
+                }
                 clauseType = c;
                 p++;
                 break;

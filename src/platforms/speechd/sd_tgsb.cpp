@@ -479,7 +479,12 @@ static void synthesize(const std::string& text,
       if (c == ',' || c == '.') {
         bool prevDigit = (p > clauseStart) && (unsigned char)(*(p-1) - '0') <= 9;
         bool nextDigit = *(p+1) && (unsigned char)(*(p+1) - '0') <= 9;
-        if (prevDigit && nextDigit) { p++; continue; }
+        if (prevDigit && nextDigit) { p++; continue; }  // thousands: 26,655
+        // Ordinal dot: "3. Mai" — digit + dot + space + letter (German/Swedish/Czech/Finnish)
+        if (c == '.' && prevDigit && *(p+1) == ' ' && *(p+2) &&
+            ((unsigned char)(*(p+2) - 'A') <= 25 || (unsigned char)(*(p+2) - 'a') <= 25)) {
+          p++; continue;
+        }
         clauseType = c; p++; break;
       }
       if ((unsigned char)c == 0xE2 && (unsigned char)*(p+1) == 0x80 &&
