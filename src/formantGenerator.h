@@ -212,11 +212,11 @@ void setCascadeBwScale(double scale) {
 class ParallelFormantGenerator {
 private:
     int sampleRate;
-    Resonator r1, r2, r3, r4, r5, r6;
+    Resonator r1, r2, r3, r4, r5, r6, r7, r8;
     double f4FreqScale;
 
 public:
-    ParallelFormantGenerator(int sr): sampleRate(sr), r1(sr), r2(sr), r3(sr), r4(sr), r5(sr), r6(sr), f4FreqScale(1.0) {}
+    ParallelFormantGenerator(int sr): sampleRate(sr), r1(sr), r2(sr), r3(sr), r4(sr), r5(sr), r6(sr), r7(sr), r8(sr), f4FreqScale(1.0) {}
 
     void setF4FreqScale(double scale) {
         if (scale < 0.7) scale = 0.7;
@@ -225,12 +225,13 @@ public:
     }
 
     void reset() {
-        r1.reset(); r2.reset(); r3.reset(); r4.reset(); r5.reset(); r6.reset();
+        r1.reset(); r2.reset(); r3.reset(); r4.reset(); r5.reset(); r6.reset(); r7.reset(); r8.reset();
     }
 
     void decay(double factor) {
         r1.decay(factor); r2.decay(factor); r3.decay(factor);
         r4.decay(factor); r5.decay(factor); r6.decay(factor);
+        r7.decay(factor); r8.decay(factor);
     }
 
     double getNext(const speechPlayer_frame_t* frame, const speechPlayer_frameEx_t* frameEx, bool glottisOpen, double input) {
@@ -258,6 +259,31 @@ public:
         output+=(r4.resonate(input,frame->pf4 * f4FreqScale,frame->pb4)-input)*frame->pa4;
         output+=(r5.resonate(input,frame->pf5 * f4FreqScale,frame->pb5)-input)*frame->pa5;
         output+=(r6.resonate(input,frame->pf6 * f4FreqScale,frame->pb6)-input)*frame->pa6;
+
+        // Higher parallel formants F7/F8 (DSP v8).
+        // Extend fricative spectral envelope above F6 for "presence" and "air."
+        // Frequencies/bandwidths shared with cascade (frameEx cf7/cb7/cf8/cb8).
+        // Fixed amplitude rolloff — frication above 6.5 kHz isn't phonemically
+        // contrastive, so per-phoneme control is unnecessary.  When input is
+        // zero (vowels), these produce zero output regardless of amplitude.
+        // Rolloff from Rabiner 1968 ndbScale progression (QLatt extrapolation).
+        if (frameEx) {
+            constexpr double kParF7Amp = 0.15;
+            constexpr double kParF8Amp = 0.07;
+            constexpr double defaultCf7 = 6500.0, defaultCb7 = 720.0;
+            constexpr double defaultCf8 = 7500.0, defaultCb8 = 1250.0;
+            double pf7 = frameEx->cf7, pb7v = frameEx->cb7;
+            double pf8 = frameEx->cf8, pb8v = frameEx->cb8;
+            if (!std::isfinite(pf7) || pf7 <= 0.0) pf7 = defaultCf7;
+            if (!std::isfinite(pb7v) || pb7v <= 0.0) pb7v = defaultCb7;
+            if (!std::isfinite(pf8) || pf8 <= 0.0) pf8 = defaultCf8;
+            if (!std::isfinite(pb8v) || pb8v <= 0.0) pb8v = defaultCb8;
+            pf7 *= f4FreqScale;
+            pf8 *= f4FreqScale;
+            output += (r7.resonate(input, pf7, pb7v) - input) * kParF7Amp;
+            output += (r8.resonate(input, pf8, pb8v) - input) * kParF8Amp;
+        }
+
         return calculateValueAtFadePosition(output,input,frame->parallelBypass);
     }
 };
