@@ -804,11 +804,24 @@ public:
         }
         lastNoiseMod = noiseMod;
 
-        // Aspiration noise: use WHITE noise (flat spectrum) so tilt filter can shape it
-        // Base gain 0.1, breathiness lifts it up to 0.25
-        // noiseAmplitudeScale compensates for spectral density at different sample rates
+        // Aspiration noise: blend white and brownish depending on sample rate.
+        // At lower SRs the voiced signal has fewer harmonics (lower sharpness),
+        // making white aspiration noise disproportionately prominent through
+        // the cascade formants.  Brownish noise (-6 dB/oct rolloff from IIR
+        // feedback) naturally reduces high-frequency cascade excitation.
+        //   44100+ Hz: pure white (voiced signal is bright enough)
+        //   22050 Hz:  70/30 white/brown blend
+        //   16000 Hz:  50/50 blend
+        //   11025 Hz:  30/70 blend
+        double aspWhiteFrac;
+        if (sampleRate >= 44100)      aspWhiteFrac = 1.0;
+        else if (sampleRate >= 22050) aspWhiteFrac = 0.70;
+        else if (sampleRate >= 16000) aspWhiteFrac = 0.50;
+        else                          aspWhiteFrac = 0.30;
+        double aspNoise = aspWhiteFrac * aspirationGen.white()
+                        + (1.0 - aspWhiteFrac) * aspirationGen.getNext();
         double aspBase = 0.10 + (0.15 * breathiness);
-        double aspiration = aspirationGen.white() * aspBase * noiseAmplitudeScale * noiseMod;
+        double aspiration = aspNoise * aspBase * noiseAmplitudeScale * noiseMod;
         
         // Apply tilt filter to aspiration (color the noise)
         aspiration = applyAspirationTilt(aspiration);
