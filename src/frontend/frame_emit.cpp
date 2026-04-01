@@ -929,6 +929,12 @@ static void generateAcousticEvents(
             seg2[pa4i] *= (1.0 - decayRate * 0.7);
             seg2[pa5i] *= (1.0 - decayRate * 0.9);
             seg2[pa6i] *= (1.0 - decayRate * 1.0);  // high freq fades first
+          } else {
+            // Affricates: gentle tail decay so frication doesn't hit the
+            // crossfade at 100%.  Without this, the affricate→vowel boundary
+            // has an amplitude cliff (88%→0%) that creates a "stringy bounce."
+            // Reduce to ~65% so the crossfade has less work to do.
+            seg2[faIdx] *= 0.75;
           }
 
           nvspFrontend_Frame decayFrame;

@@ -735,7 +735,7 @@ settings:
       stopMs: 4             # already tiny — protect what's left of the burst
       nasalMs: 18           # place perception (/ɲ/ vs /n/ vs /ŋ/)
       liquidMs: 15           # /ɹ/ and /l/ need F3 transition time
-      affricateMs: 12        # shorter than fricative, longer than stop
+      affricateMs: 15        # modest bump from 12, preserves some frication
       semivowelMs: 30        # glide IS the trajectory — needs full sweep
       tapMs: 4               # quick by nature, don't over-protect
       trillMs: 12            # needs at least one modulation cycle

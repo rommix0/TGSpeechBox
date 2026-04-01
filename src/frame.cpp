@@ -235,16 +235,26 @@ class FrameManagerImpl: public FrameManager {
 						double oldF = ((speechPlayer_frameParam_t*)&(oldFrameRequest->frame))[cfIdx];
 						double newF = ((speechPlayer_frameParam_t*)&(newFrameRequest->frame))[cfIdx];
 						double deltaHz = fabs(newF - oldF);
-						if(deltaHz > 400.0) {
+						// Threshold lowered from 400→150 Hz and factor raised
+						// from 0.25→0.40 so moderate formant jumps (affricate→vowel,
+						// nasal→stop) get enough resonator damping to avoid
+						// "stringy" chirp artifacts from IIR transient energy.
+						if(deltaHz > 150.0) {
 							double env = sin(linearRatio * 3.14159265);
-							double extraBw = env * (deltaHz - 400.0) * 0.25;
+							double extraBw = env * (deltaHz - 150.0) * 0.40;
 							((speechPlayer_frameParam_t*)&curFrame)[cbIdx] += extraBw;
 						}
 					};
+					// F1 widening added for nasal→stop transitions where
+					// F1 jumps 300→150 Hz (velopharyngeal port closure).
+					widenForDelta((int)(offsetof(speechPlayer_frame_t,cf1)/szP),
+					              (int)(offsetof(speechPlayer_frame_t,cb1)/szP));
 					widenForDelta((int)(offsetof(speechPlayer_frame_t,cf2)/szP),
 					              (int)(offsetof(speechPlayer_frame_t,cb2)/szP));
 					widenForDelta((int)(offsetof(speechPlayer_frame_t,cf3)/szP),
 					              (int)(offsetof(speechPlayer_frame_t,cb3)/szP));
+					widenForDelta((int)(offsetof(speechPlayer_frame_t,pf1)/szP),
+					              (int)(offsetof(speechPlayer_frame_t,pb1)/szP));
 					widenForDelta((int)(offsetof(speechPlayer_frame_t,pf2)/szP),
 					              (int)(offsetof(speechPlayer_frame_t,pb2)/szP));
 					widenForDelta((int)(offsetof(speechPlayer_frame_t,pf3)/szP),
