@@ -846,6 +846,49 @@ static void generateAcousticEvents(
           seg1[vp] = startPitch;
           seg1[evp] = startPitch + pitchDelta * burstFrac;
 
+          // Locus-theory F2/F3 blending: adjust burst formants toward
+          // the following vowel's formants.  Velars shift most (~850 Hz
+          // F2 range), alveolars shift moderately, labials shift least.
+          // Based on Wintalker/DECTalk locus tables and OpenFormant's
+          // 0.6 blend factor.  Without this, every /k/ has the same F2
+          // regardless of context, creating a "chopped" transition.
+          {
+            const int cf2i = static_cast<int>(FieldId::cf2);
+            const int cf3i = static_cast<int>(FieldId::cf3);
+            const int pf2i = static_cast<int>(FieldId::pf2);
+            const int pf3i = static_cast<int>(FieldId::pf3);
+            // Look ahead for next vowel
+            size_t curIdx = &t - tokens.data();
+            double nextCf2 = 0, nextCf3 = 0;
+            for (size_t j = curIdx + 1; j < tokens.size(); ++j) {
+              const Token& ahead = tokens[j];
+              if (ahead.def && (ahead.def->flags & kIsVowel)) {
+                nextCf2 = ahead.def->field[cf2i];
+                nextCf3 = ahead.def->field[cf3i];
+                break;
+              }
+              if (ahead.silence) break;  // don't blend across silence
+            }
+            if (nextCf2 > 0 && seg1[cf2i] > 0) {
+              double blend = 0.0;
+              switch (place) {
+                case Place::Velar:    blend = 0.55; break;  // highest context-dependency
+                case Place::Palatal:  blend = 0.45; break;
+                case Place::Alveolar: blend = 0.30; break;
+                case Place::Labial:   blend = 0.20; break;  // least context-dependent
+                default: break;
+              }
+              if (blend > 0.0) {
+                seg1[cf2i] += blend * (nextCf2 - seg1[cf2i]);
+                seg1[pf2i] += blend * (nextCf2 - seg1[pf2i]);
+                if (nextCf3 > 0 && seg1[cf3i] > 0) {
+                  seg1[cf3i] += blend * 0.5 * (nextCf3 - seg1[cf3i]);
+                  seg1[pf3i] += blend * 0.5 * (nextCf3 - seg1[pf3i]);
+                }
+              }
+            }
+          }
+
           const int pa3i = static_cast<int>(FieldId::pa3);
           const int pa4i = static_cast<int>(FieldId::pa4);
           const int pa5i = static_cast<int>(FieldId::pa5);
@@ -872,12 +915,26 @@ static void generateAcousticEvents(
           const int faIdx = static_cast<int>(FieldId::fricationAmplitude);
           if (!isAffricate) {
             seg2[faIdx] *= (1.0 - decayRate);
+
+            // Spectral evolution: high-frequency parallel amplitudes decay
+            // faster than low, matching natural burst decay where the initial
+            // broadband explosion narrows and dims.  Without this, the burst
+            // and decay frames have identical spectral shape — just different
+            // overall amplitude — creating an audible "seam."
+            const int pa1i = static_cast<int>(FieldId::pa1);
+            const int pa2i = static_cast<int>(FieldId::pa2);
+            seg2[pa1i] *= (1.0 - decayRate * 0.3);  // low freq persists
+            seg2[pa2i] *= (1.0 - decayRate * 0.4);
+            seg2[pa3i] *= (1.0 - decayRate * 0.5);
+            seg2[pa4i] *= (1.0 - decayRate * 0.7);
+            seg2[pa5i] *= (1.0 - decayRate * 0.9);
+            seg2[pa6i] *= (1.0 - decayRate * 1.0);  // high freq fades first
           }
 
           nvspFrontend_Frame decayFrame;
           std::memcpy(&decayFrame, seg2, sizeof(decayFrame));
           double decayDur = stopMainDur - burstMs;
-          double decayFade = std::min(burstMs * 0.5, decayDur);
+          double decayFade = std::min(burstMs * 0.8, decayDur);
           emitFn(&decayFrame, &frameEx, decayDur, decayFade);
 
           trajectoryState->prevCf2 = burstFrame.cf2;
