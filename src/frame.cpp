@@ -111,6 +111,15 @@ static inline bool isNoiseSourceParam(int idx) {
 	return false;
 }
 
+// Voicing amplitude — gets delayed onset when transVoicingHoldRatio > 0.
+// Keeps voiceAmplitude at old value (e.g. zero after affricate) for the
+// first fraction of the crossfade, then ramps to new value.
+static inline bool isVoicingParam(int idx) {
+	const int szP = sizeof(speechPlayer_frameParam_t);
+	int i = (int)(offsetof(speechPlayer_frame_t, voiceAmplitude) / szP);
+	return (idx == i);
+}
+
 struct frameRequest_t {
 	unsigned int minNumSamples;
 	unsigned int numFadeSamples;
@@ -175,11 +184,40 @@ class FrameManagerImpl: public FrameManager {
 					!std::isfinite(newFrameRequest->endCf3);
 
 				if (noFormantTargets) {
-					// Simple linear crossfade — all params, same rate.
+					// Simple linear crossfade — no cosine smoothing, no BW
+					// widening (those cause shimmer on staircase steps).
+					// But DO apply per-parameter amplitude timing: source
+					// hold and voicing hold are pure amplitude operations
+					// that don't cause shimmer.
+					double sourceHoldSimple = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transSourceHoldRatio : 0.0;
+					if (sourceHoldSimple > 0.99) sourceHoldSimple = 0.99;
+					double voicingHoldSimple = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transVoicingHoldRatio : 0.0;
+					if (voicingHoldSimple > 0.99) voicingHoldSimple = 0.99;
+
 					for(int i=0;i<speechPlayer_frame_numParams;++i) {
 						double oldVal = ((speechPlayer_frameParam_t*)&(oldFrameRequest->frame))[i];
 						double newVal = ((speechPlayer_frameParam_t*)&(newFrameRequest->frame))[i];
-						((speechPlayer_frameParam_t*)&curFrame)[i]=calculateValueAtFadePosition(oldVal, newVal, linearRatio);
+						if(isNoiseSourceParam(i) && sourceHoldSimple > 0.0) {
+							double dr = (linearRatio <= sourceHoldSimple) ? 0.0
+								: (linearRatio - sourceHoldSimple) / (1.0 - sourceHoldSimple);
+							double oldContrib = oldVal * (1.0 - dr);
+							double newContrib = newVal * linearRatio;
+							double val = oldContrib + newContrib;
+							double maxVal = (oldVal > newVal) ? oldVal : newVal;
+							if(val > maxVal) val = maxVal;
+							((speechPlayer_frameParam_t*)&curFrame)[i] = val;
+						} else if(isVoicingParam(i) && voicingHoldSimple > 0.0) {
+							double dr = (linearRatio <= voicingHoldSimple) ? 0.0
+								: (linearRatio - voicingHoldSimple) / (1.0 - voicingHoldSimple);
+							double oldContrib = oldVal * (1.0 - linearRatio);
+							double newContrib = newVal * dr;
+							double val = oldContrib + newContrib;
+							double maxVal = (oldVal > newVal) ? oldVal : newVal;
+							if(val > maxVal) val = maxVal;
+							((speechPlayer_frameParam_t*)&curFrame)[i] = val;
+						} else {
+							((speechPlayer_frameParam_t*)&curFrame)[i]=calculateValueAtFadePosition(oldVal, newVal, linearRatio);
+						}
 					}
 				} else {
 
@@ -204,6 +242,8 @@ class FrameManagerImpl: public FrameManager {
 				const double ampMode = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transAmplitudeMode : 0.0;
 				double sourceHoldRatio = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transSourceHoldRatio : 0.0;
 				if (sourceHoldRatio > 0.99) sourceHoldRatio = 0.99;  // prevent division by zero
+				double voicingHoldRatio = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transVoicingHoldRatio : 0.0;
+				if (voicingHoldRatio > 0.99) voicingHoldRatio = 0.99;
 
 				for(int i=0;i<speechPlayer_frame_numParams;++i) {
 					double oldVal = ((speechPlayer_frameParam_t*)&(oldFrameRequest->frame))[i];
@@ -243,6 +283,27 @@ class FrameManagerImpl: public FrameManager {
 						} else {
 							double oldContrib = oldVal * (1.0 - delayedRatio);
 							double newContrib = newVal * paramLinear;
+							double val = oldContrib + newContrib;
+							double maxVal = (oldVal > newVal) ? oldVal : newVal;
+							if(val > maxVal) val = maxVal;
+							((speechPlayer_frameParam_t*)&curFrame)[i] = val;
+						}
+					} else if(isVoicingParam(i) && voicingHoldRatio > 0.0) {
+						// Delayed voicing onset: new voicing holds at old value,
+						// then ramps.  Mirror of noise hold — old fades normally,
+						// new ramps late.  Creates temporal separation between
+						// affricate release (frication) and vowel onset (voicing).
+						double delayedRatio = (paramLinear <= voicingHoldRatio) ? 0.0
+							: (paramLinear - voicingHoldRatio) / (1.0 - voicingHoldRatio);
+						if(ampMode > 0.5) {
+							// Equal-power: old fades normally, new ramps delayed.
+							double theta = paramLinear * 1.5707963267948966;
+							double thetaNew = delayedRatio * 1.5707963267948966;
+							double val = oldVal * cos(theta) + newVal * sin(thetaNew);
+							((speechPlayer_frameParam_t*)&curFrame)[i] = val;
+						} else {
+							double oldContrib = oldVal * (1.0 - paramLinear);
+							double newContrib = newVal * delayedRatio;
 							double val = oldContrib + newContrib;
 							double maxVal = (oldVal > newVal) ? oldVal : newVal;
 							if(val > maxVal) val = maxVal;

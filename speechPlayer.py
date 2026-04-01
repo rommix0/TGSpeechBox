@@ -76,7 +76,7 @@ class FrameEx(Structure):
     If you don't need these, just use queueFrame() as before.
     
     IMPORTANT: This struct must match nvspFrontend_FrameEx / speechPlayer_frameEx_t
-    exactly (27 doubles = 216 bytes). Field order matters for ctypes.memmove().
+    exactly (29 doubles = 232 bytes). Field order matters for ctypes.memmove().
     """
     _fields_ = [
         # Voice quality parameters (DSP v5)
@@ -122,6 +122,14 @@ class FrameEx(Structure):
         ("cb7", c_double),          # F7 bandwidth (Hz), default 720.0
         ("cf8", c_double),          # F8 frequency (Hz), default 7500.0
         ("cb8", c_double),          # F8 bandwidth (Hz), default 1250.0
+
+        # Source amplitude timing (DSP v8)
+        # Delays fadeout of old noise sources during crossfade.
+        ("transSourceHoldRatio", c_double),  # 0.0 = legacy, 0.3 = hold 30%
+
+        # Voicing onset hold (DSP v8)
+        # Delays ramp-in of new voicing during crossfade.
+        ("transVoicingHoldRatio", c_double),  # 0.0 = legacy, 0.25 = hold 25%
     ]
     
     @classmethod

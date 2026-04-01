@@ -387,6 +387,7 @@ static void generateAcousticEvents(
     frameEx.transF3Scale = t.transF3Scale;
     frameEx.transNasalScale = t.transNasalScale;
     frameEx.transSourceHoldRatio = t.transSourceHoldRatio;
+    frameEx.transVoicingHoldRatio = t.transVoicingHoldRatio;
 
     // Detect source transitions for equal-power amplitude crossfade.
     // When voicing source type changes (voiced→voiceless or vice versa),

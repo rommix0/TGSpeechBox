@@ -1012,6 +1012,11 @@ double lengthContrastPreGeminateVowelScale = 0.85;
   double boundarySmoothingFricativeToVowelHold = 0.0;
   double boundarySmoothingStopToVowelHold = 0.0;
 
+  // Voicing onset hold ratios: delay new voicing ramp-in during crossfade.
+  // Creates temporal separation between affricate/stop release and vowel onset.
+  double boundarySmoothingAffricateToVowelVoicingHold = 0.0;
+  double boundarySmoothingStopToVowelVoicingHold = 0.0;
+
   // Coda noise taper: maintain frication continuity through fricative→stop closures.
   // When enabled, the silent closure gap between a fricative and a following coda stop
   // is replaced with a taper frame that decays the fricative's noise, keeping the DSP's

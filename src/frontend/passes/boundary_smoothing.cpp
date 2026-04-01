@@ -452,6 +452,18 @@ bool runBoundarySmoothing(PassContext& ctx, std::vector<Token>& tokens, std::str
       if (holdRatio > 0.0) {
         cur.transSourceHoldRatio = holdRatio;
       }
+
+      // Voicing onset hold: delay new voicing ramp-in so affricate/stop
+      // release is heard clearly before vowel onset.
+      double voicingHold = 0.0;
+      if (prevAffricate) {
+        voicingHold = lang.boundarySmoothingAffricateToVowelVoicingHold;
+      } else if (prevStop) {
+        voicingHold = lang.boundarySmoothingStopToVowelVoicingHold;
+      }
+      if (voicingHold > 0.0) {
+        cur.transVoicingHoldRatio = voicingHold;
+      }
     }
   }
 

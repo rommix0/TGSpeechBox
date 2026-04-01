@@ -121,10 +121,15 @@ typedef struct nvspFrontend_FrameEx {
      0.0 = legacy, 0.3 = hold for first 30% of fade.
      Set by boundary_smoothing based on transition type. */
   double transSourceHoldRatio;
+
+  /* Voicing onset hold — delays ramp-in of new voiceAmplitude.
+     0.0 = legacy, 0.25 = hold old voicing for first 25% of fade.
+     Combined with transSourceHoldRatio for per-parameter timing. */
+  double transVoicingHoldRatio;
 } nvspFrontend_FrameEx;
 
 /* Number of fields in FrameEx struct (for size validation) */
-#define NVSP_FRONTEND_FRAMEEX_NUM_PARAMS 28
+#define NVSP_FRONTEND_FRAMEEX_NUM_PARAMS 29
 
 /*
   VoicingTone parameters for DSP-level voice quality (ABI v2+).

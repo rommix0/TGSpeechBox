@@ -166,6 +166,25 @@ typedef struct {
 	 * This creates overlap: voicing ramps in while frication still holds.
 	 */
 	double transSourceHoldRatio;
+
+	/* Voicing onset hold — delays ramp-in of new voiceAmplitude.
+	 *
+	 * Delays onset of new frame's voicing during crossfades, keeping
+	 * voiceAmplitude at the OLD value for the first fraction of the fade.
+	 *
+	 * 0.0 = no hold (legacy, voicing ramps immediately)
+	 * 0.25 = voicing stays at old value for first 25%, then ramps over 75%
+	 *
+	 * Combined with transSourceHoldRatio, this creates temporal structure:
+	 *   sourceHold=0.40, voicingHold=0.25 →
+	 *   0-25%:  frication=HIGH, voicing=ZERO  (pure affricate release)
+	 *   25-40%: frication=HIGH, voicing=ramping (overlap)
+	 *   40-100%: frication=fading, voicing=ramping (transition)
+	 *
+	 * Research shows per-parameter timing is key to natural affricates —
+	 * each source should have its own onset/offset schedule.
+	 */
+	double transVoicingHoldRatio;
 } speechPlayer_frameEx_t;
 
 // Default values for frameEx parameters. Used when:
@@ -201,7 +220,8 @@ static const speechPlayer_frameEx_t speechPlayer_frameEx_defaults = {
 	720.0,  // cb7: Rabiner 1968 default
 	7500.0, // cf8: Rabiner 1968 default
 	1250.0, // cb8: Rabiner 1968 default
-	0.0     // transSourceHoldRatio: no hold (legacy)
+	0.0,    // transSourceHoldRatio: no hold (legacy)
+	0.0     // transVoicingHoldRatio: no hold (legacy)
 };
 
 const int speechPlayer_frameEx_numParams=sizeof(speechPlayer_frameEx_t)/sizeof(double);

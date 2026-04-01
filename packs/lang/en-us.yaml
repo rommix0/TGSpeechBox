@@ -576,9 +576,16 @@ settings:
     # ── Source amplitude hold ratios ──
     # Delay old noise fadeout at consonant→vowel boundaries
     # so frication/aspiration overlaps with voicing onset.
-    affricateToVowelHold: 0.35   # strong overlap for /tʃ/→V, /dʒ/→V
+    affricateToVowelHold: 0.40   # strong overlap for /tʃ/→V, /dʒ/→V
     fricativeToVowelHold: 0.20   # moderate for /s/→V, /f/→V
     stopToVowelHold: 0.15        # subtle burst persistence
+
+    # ── Voicing onset hold ratios ──
+    # Delay new voicing ramp-in at consonant→vowel boundaries.
+    # Combined with source hold above, creates per-parameter timing:
+    # frication holds while voicing waits, then overlaps, then transitions.
+    affricateToVowelVoicingHold: 0.25  # voicing waits 25% of crossfade
+    stopToVowelVoicingHold: 0.10       # subtle delay for stop burst clarity
 
     # ── Per-place transition speeds ──
     #
