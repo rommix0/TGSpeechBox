@@ -17,7 +17,7 @@ from . import speechPlayer
 
 
 # FrameEx struct matching nvspFrontend_FrameEx in the DLL (ABI v2+)
-# IMPORTANT: Must match speechPlayer.FrameEx exactly (27 doubles = 216 bytes)
+# IMPORTANT: Must match speechPlayer.FrameEx exactly (29 doubles = 232 bytes)
 class FrameEx(ctypes.Structure):
     _fields_ = [
         # Voice quality parameters (DSP v5)
@@ -55,6 +55,10 @@ class FrameEx(ctypes.Structure):
         ("cb7", ctypes.c_double),
         ("cf8", ctypes.c_double),
         ("cb8", ctypes.c_double),
+        # Source amplitude timing (DSP v8)
+        ("transSourceHoldRatio", ctypes.c_double),  # 0.0 = legacy, 0.3 = hold 30%
+        # Voicing onset hold (DSP v8)
+        ("transVoicingHoldRatio", ctypes.c_double),  # 0.0 = legacy, 0.25 = hold 25%
     ]
 
 
