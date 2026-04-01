@@ -98,6 +98,19 @@ static inline bool isAmplitudeParam(int idx) {
 	return false;
 }
 
+// Noise source amplitudes — these get delayed fadeout when
+// transSourceHoldRatio > 0 to create temporal overlap with voicing.
+// Does NOT include voiceAmplitude (voicing uses normal timing).
+static inline bool isNoiseSourceParam(int idx) {
+	const int szP = sizeof(speechPlayer_frameParam_t);
+	int i;
+	i = (int)(offsetof(speechPlayer_frame_t, aspirationAmplitude) / szP);
+	if(idx == i) return true;
+	i = (int)(offsetof(speechPlayer_frame_t, fricationAmplitude) / szP);
+	if(idx == i) return true;
+	return false;
+}
+
 struct frameRequest_t {
 	unsigned int minNumSamples;
 	unsigned int numFadeSamples;
@@ -189,6 +202,8 @@ class FrameManagerImpl: public FrameManager {
 				const double scF3 = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transF3Scale : 0.0;
 				const double scN  = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transNasalScale : 0.0;
 				const double ampMode = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transAmplitudeMode : 0.0;
+				double sourceHoldRatio = newFrameRequest->hasFrameEx ? newFrameRequest->frameEx.transSourceHoldRatio : 0.0;
+				if (sourceHoldRatio > 0.99) sourceHoldRatio = 0.99;  // prevent division by zero
 
 				for(int i=0;i<speechPlayer_frame_numParams;++i) {
 					double oldVal = ((speechPlayer_frameParam_t*)&(oldFrameRequest->frame))[i];
@@ -213,6 +228,26 @@ class FrameManagerImpl: public FrameManager {
 					if(isFrequencyParam(i)) {
 						double paramCosine = cosineSmooth(paramLinear);
 						((speechPlayer_frameParam_t*)&curFrame)[i]=calculateFreqAtFadePosition(oldVal, newVal, paramCosine);
+					} else if(isNoiseSourceParam(i) && sourceHoldRatio > 0.0) {
+						// Delayed noise fadeout: old noise holds, then fades.
+						// Voicing uses normal ratio — creates temporal overlap
+						// where both frication and voicing are active.
+						double delayedRatio = (paramLinear <= sourceHoldRatio) ? 0.0
+							: (paramLinear - sourceHoldRatio) / (1.0 - sourceHoldRatio);
+						if(ampMode > 0.5) {
+							// Equal-power with delayed ratio for old, normal for new.
+							double theta = delayedRatio * 1.5707963267948966;
+							double thetaNew = paramLinear * 1.5707963267948966;
+							double val = oldVal * cos(theta) + newVal * sin(thetaNew);
+							((speechPlayer_frameParam_t*)&curFrame)[i] = val;
+						} else {
+							double oldContrib = oldVal * (1.0 - delayedRatio);
+							double newContrib = newVal * paramLinear;
+							double val = oldContrib + newContrib;
+							double maxVal = (oldVal > newVal) ? oldVal : newVal;
+							if(val > maxVal) val = maxVal;
+							((speechPlayer_frameParam_t*)&curFrame)[i] = val;
+						}
 					} else if(isAmplitudeParam(i) && ampMode > 0.5) {
 						// Equal-power crossfade: sin²(θ) + cos²(θ) = 1
 						// Total energy stays constant across source transitions.

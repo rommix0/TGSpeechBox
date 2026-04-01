@@ -573,6 +573,13 @@ settings:
     # to preserve more steady-state time for resonator settling.
     highRateFadeRatioFloor: 0.40
 
+    # ── Source amplitude hold ratios ──
+    # Delay old noise fadeout at consonant→vowel boundaries
+    # so frication/aspiration overlaps with voicing onset.
+    affricateToVowelHold: 0.35   # strong overlap for /tʃ/→V, /dʒ/→V
+    fricativeToVowelHold: 0.20   # moderate for /s/→V, /f/→V
+    stopToVowelHold: 0.15        # subtle burst persistence
+
     # ── Per-place transition speeds ──
     #
     # These control what fraction of the fade time each formant uses

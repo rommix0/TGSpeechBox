@@ -152,6 +152,20 @@ typedef struct {
 	double cb7;   /* F7 bandwidth (Hz).  Default 720.0  */
 	double cf8;   /* F8 frequency (Hz).  Default 7500.0 */
 	double cb8;   /* F8 bandwidth (Hz).  Default 1250.0 */
+
+	/* Source amplitude timing — noise hold ratio.
+	 *
+	 * Delays fadeout of old frame's noise sources (fricationAmplitude,
+	 * aspirationAmplitude) during crossfades, creating temporal overlap
+	 * with the incoming frame's voicing.
+	 *
+	 * 0.0 = no hold (legacy, noise fades at same rate as everything)
+	 * 0.3 = old noise holds for first 30% of fade, then fades over 70%
+	 *
+	 * voiceAmplitude is NOT affected — it uses the normal fade ratio.
+	 * This creates overlap: voicing ramps in while frication still holds.
+	 */
+	double transSourceHoldRatio;
 } speechPlayer_frameEx_t;
 
 // Default values for frameEx parameters. Used when:
@@ -186,7 +200,8 @@ static const speechPlayer_frameEx_t speechPlayer_frameEx_defaults = {
 	6500.0, // cf7: Rabiner 1968 default
 	720.0,  // cb7: Rabiner 1968 default
 	7500.0, // cf8: Rabiner 1968 default
-	1250.0  // cb8: Rabiner 1968 default
+	1250.0, // cb8: Rabiner 1968 default
+	0.0     // transSourceHoldRatio: no hold (legacy)
 };
 
 const int speechPlayer_frameEx_numParams=sizeof(speechPlayer_frameEx_t)/sizeof(double);

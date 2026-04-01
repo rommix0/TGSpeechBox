@@ -178,6 +178,7 @@ bool runBoundarySmoothing(PassContext& ctx, std::vector<Token>& tokens, std::str
     const bool curNasal = tokIsNasal(cur);
     const bool prevLiquid = tokIsLiquid(prev);
     const bool curLiquid = tokIsLiquid(cur);
+    const bool prevAffricate = tokIsAffricate(prev);
     const bool curTap = tokIsTap(cur);
     const bool prevTap = tokIsTap(prev);
 
@@ -435,6 +436,22 @@ bool runBoundarySmoothing(PassContext& ctx, std::vector<Token>& tokens, std::str
     // Nasal F1 should jump nearly instantly (overrides the above).
     if (lang.boundarySmoothingNasalF1Instant && (curNasal || prevNasal)) {
       cur.transF1Scale = 0.05;  // 5% of fade = nearly instant
+    }
+
+    // Source amplitude hold: delay old noise fadeout at consonant→vowel
+    // boundaries so frication/aspiration overlaps with voicing onset.
+    if (curVowelLike && !prevVowelLike && !tokIsSilenceOrMissing(prev)) {
+      double holdRatio = 0.0;
+      if (prevAffricate) {
+        holdRatio = lang.boundarySmoothingAffricateToVowelHold;
+      } else if (prevFric) {
+        holdRatio = lang.boundarySmoothingFricativeToVowelHold;
+      } else if (prevStop) {
+        holdRatio = lang.boundarySmoothingStopToVowelHold;
+      }
+      if (holdRatio > 0.0) {
+        cur.transSourceHoldRatio = holdRatio;
+      }
     }
   }
 

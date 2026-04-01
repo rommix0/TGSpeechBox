@@ -134,6 +134,7 @@ struct Token {
   double transF2Scale = 0.0;
   double transF3Scale = 0.0;
   double transNasalScale = 0.0;
+  double transSourceHoldRatio = 0.0;
 
   // Token-level breathiness override (set by allophone rules).
   // Added to phoneme-level and user-level breathiness in frame_emit.

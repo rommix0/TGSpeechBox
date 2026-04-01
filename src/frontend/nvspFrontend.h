@@ -115,10 +115,16 @@ typedef struct nvspFrontend_FrameEx {
   double cb7;   /* F7 bandwidth (Hz).  Default 720.0  */
   double cf8;   /* F8 frequency (Hz).  Default 7500.0 */
   double cb8;   /* F8 bandwidth (Hz).  Default 1250.0 */
+
+  /* Source amplitude timing — noise hold ratio.
+     Delays fadeout of old noise sources during crossfade.
+     0.0 = legacy, 0.3 = hold for first 30% of fade.
+     Set by boundary_smoothing based on transition type. */
+  double transSourceHoldRatio;
 } nvspFrontend_FrameEx;
 
 /* Number of fields in FrameEx struct (for size validation) */
-#define NVSP_FRONTEND_FRAMEEX_NUM_PARAMS 27
+#define NVSP_FRONTEND_FRAMEEX_NUM_PARAMS 28
 
 /*
   VoicingTone parameters for DSP-level voice quality (ABI v2+).
