@@ -41,6 +41,8 @@ class VoiceManagementMixin:
         self._perVoiceFrameExJitter = {}
         self._perVoiceFrameExShimmer = {}
         self._perVoiceFrameExSharpness = {}
+        self._perVoiceChorusDepth = {}
+        self._perVoiceChorusDetune = {}
 
     def _reapplyVoiceProfile(self):
         """Re-apply the current voice setting to ensure the frontend profile is in sync.
@@ -94,6 +96,8 @@ class VoiceManagementMixin:
                 self._perVoiceFrameExJitter[oldVoice] = getattr(self, "_curFrameExJitter", 0)
                 self._perVoiceFrameExShimmer[oldVoice] = getattr(self, "_curFrameExShimmer", 0)
                 self._perVoiceFrameExSharpness[oldVoice] = getattr(self, "_curFrameExSharpness", 50)
+                self._perVoiceChorusDepth[oldVoice] = getattr(self, "_curChorusDepth", 0)
+                self._perVoiceChorusDetune[oldVoice] = getattr(self, "_curChorusDetune", 33)
 
             self._curVoice = voice
 
@@ -115,6 +119,8 @@ class VoiceManagementMixin:
                 self._curFrameExJitter = self._perVoiceFrameExJitter.get(voice, 0)
                 self._curFrameExShimmer = self._perVoiceFrameExShimmer.get(voice, 0)
                 self._curFrameExSharpness = self._perVoiceFrameExSharpness.get(voice, 50)
+                self._curChorusDepth = self._perVoiceChorusDepth.get(voice, 0)
+                self._curChorusDetune = self._perVoiceChorusDetune.get(voice, 33)
                 # During init, skip DLL calls — step 10 does one final apply.
                 if getattr(self, "_initComplete", False):
                     self._pushFrameExDefaultsToFrontend()
