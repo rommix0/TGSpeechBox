@@ -588,30 +588,33 @@ settings:
 
     # Labial (/b/, /p/, /m/, /f/, /v/)
     # Lips are light and independent of tongue — F2/F3 drift gently.
-    labialF1Scale: 0.30      # jaw drops fast, lips don't impede
-    labialF2Scale: 0.55      # lips don't drag the tongue — F2 drifts
-    labialF3Scale: 0.55      # same — tongue barely involved
+    # Transition scales pushed higher (less "hold") now that locus-theory
+    # F2/F3 blending reduces the formant jump at stop boundaries.
+    # Smaller jump + smoother arrival = more natural transitions.
+    labialF1Scale: 0.35      # jaw drops fast, lips don't impede
+    labialF2Scale: 0.70      # lips don't drag the tongue — continuous drift
+    labialF3Scale: 0.70      # same — tongue barely involved
 
     # Alveolar (/t/, /d/, /n/, /s/, /z/, /ɹ/, /l/)
     # Tongue tip is fast for stops/fricatives, but /ɹ/ and /l/ live
     # here too and their F3 transitions are large.  F3 kept moderate
     # to protect /ɹ/ → vowel from spiking.
-    alveolarF1Scale: 0.40    # jaw — moderate
-    alveolarF2Scale: 0.50    # compromise: fast enough for /s/, safe for /ɹ/
-    alveolarF3Scale: 0.85    # slow — /ɹ/ F3 needs ~50ms; effective now ~37ms (44*0.85)
+    alveolarF1Scale: 0.45    # jaw — moderate
+    alveolarF2Scale: 0.65    # smoother than 0.50, still safe for /ɹ/
+    alveolarF3Scale: 0.85    # slow — /ɹ/ F3 needs ~50ms; unchanged
 
     # Palatal/postalveolar (/ʃ/, /ʒ/, /tʃ/, /dʒ/, /j/)
     # Tongue blade — F3 IS the place cue.  Rushing it erases /ʃ/ vs /s/.
-    palatalF1Scale: 0.35     # jaw — moderate
-    palatalF2Scale: 0.55     # blade is medium speed
-    palatalF3Scale: 0.75     # SLOW — low F3 region must linger
+    palatalF1Scale: 0.40     # jaw — moderate
+    palatalF2Scale: 0.70     # blade glides rather than snaps
+    palatalF3Scale: 0.85     # continuous arrival, less hold
 
     # Velar (/k/, /ɡ/, /ŋ/)
-    # Tongue body — heaviest articulator.  F2 transition IS the velar
-    # cue.  F2-F3 convergence (velar pinch) needs time to develop.
-    velarF1Scale: 0.35       # jaw — moderate
-    velarF2Scale: 0.65       # SLOW — tongue body is heavy, F2 IS identity
-    velarF3Scale: 0.60       # slow — pinch convergence needs time
+    # Tongue body — heaviest articulator.  Locus blending now handles
+    # context-dependent F2, so the remaining transition can be gentler.
+    velarF1Scale: 0.40       # jaw — moderate
+    velarF2Scale: 0.80       # locus blending does the heavy lifting
+    velarF3Scale: 0.75       # pinch convergence, smoother arrival
   trajectoryLimit:
     enabled: true
     applyAcrossWordBoundary: true

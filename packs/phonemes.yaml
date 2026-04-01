@@ -804,8 +804,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 66
-    cb2: 75
-    cb3: 97.5
+    cb2: 90
+    cb3: 140
     cb4: 600
     cb5: 1000
     cb6: 1800
@@ -908,8 +908,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 66
-    cb2: 75
-    cb3: 127.5
+    cb2: 90
+    cb3: 160
     cb4: 350
     cb5: 500
     cb6: 1500
@@ -1146,8 +1146,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 77
-    cb2: 45
-    cb3: 210
+    cb2: 80
+    cb3: 240
     cb4: 400
     cb5: 700
     cb6: 1500
@@ -1327,8 +1327,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 220
-    cb2: 90
-    cb3: 112.5
+    cb2: 100
+    cb3: 150
     cb4: 600
     cb5: 1200
     cb6: 2000
@@ -1381,8 +1381,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 66
-    cb2: 112.5
-    cb3: 180
+    cb2: 130
+    cb3: 200
     cb4: 450
     cb5: 800
     cb6: 1500
@@ -2753,8 +2753,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 66
-    cb2: 67.5
-    cb3: 90
+    cb2: 85
+    cb3: 130
     cb4: 600
     cb5: 1200
     cb6: 2000
@@ -2981,8 +2981,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 77
-    cb2: 45
-    cb3: 135
+    cb2: 80
+    cb3: 170
     cb4: 350
     cb5: 500
     cb6: 1500
@@ -3397,8 +3397,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 66
-    cb2: 60
-    cb3: 127.5
+    cb2: 80
+    cb3: 160
     cb4: 600
     cb5: 1200
     cb6: 2000
@@ -8587,8 +8587,8 @@ phonemes:
     aspirationAmplitude: 0
     caNP: 0
     cb1: 77
-    cb2: 45
-    cb3: 210
+    cb2: 80
+    cb3: 240
     cb4: 400
     cb5: 700
     cb6: 1500
