@@ -1637,6 +1637,23 @@ settings:
     # be smoother than cross-syllable transitions.
     withinSyllableScale: 1.5       # transScale multiplier for within-syllable pairs
     withinSyllableFadeScale: 1.3   # fade multiplier for within-syllable pairs
+
+    # Per-parameter envelope timing (source hold ratios).
+    # These delay the fadeout of the OLD noise source during consonant→vowel
+    # crossfades, keeping frication/aspiration audible longer into the transition.
+    # Range 0.0–1.0 (fraction of crossfade duration). Default 0.0 (no hold).
+    affricateToVowelHold: 0.40     # strong overlap for /tʃ/→V, /dʒ/→V
+    fricativeToVowelHold: 0.20     # moderate for /s/→V, /f/→V etc.
+    stopToVowelHold: 0.15          # subtle burst persistence for /p/→V, /t/→V etc.
+
+    # Per-parameter envelope timing (voicing hold ratios).
+    # These delay the ramp-in of voicing amplitude during consonant→vowel
+    # crossfades, creating temporal separation between the consonant release
+    # and vowel onset. Combined with source hold, this creates a 3-phase
+    # envelope: pure release → overlap → transition to vowel.
+    # Range 0.0–1.0 (fraction of crossfade duration). Default 0.0 (no hold).
+    affricateToVowelVoicingHold: 0.25  # voicing waits 25% of crossfade
+    stopToVowelVoicingHold: 0.10       # subtle delay for stop burst clarity
 ```
 
 **Within-syllable gentling:** When two adjacent tokens share the same `syllableIndex`, their transition is within a single articulatory gesture. `withinSyllableScale` multiplies the per-place transScale values (clamped to 1.0 — transitions get slower, not faster), and `withinSyllableFadeScale` multiplies the fade duration. The defaults (1.5 / 1.3) give within-syllable transitions noticeably gentler smoothing without turning cross-syllable boundaries to mush.
@@ -1650,6 +1667,8 @@ Flat-key naming convention: `boundarySmoothing` + field name in PascalCase. Exam
 - `boundarySmoothingVowelToStopFadeMs`, `boundarySmoothingStopToVowelFadeMs`, ... (all 13 fade times)
 - `boundarySmoothingLabialF1Scale`, `boundarySmoothingLabialF2Scale`, ... (all 12 place scales)
 - `boundarySmoothingWithinSyllableScale`, `boundarySmoothingWithinSyllableFadeScale`
+- `boundarySmoothingAffricateToVowelHold`, `boundarySmoothingFricativeToVowelHold`, `boundarySmoothingStopToVowelHold`
+- `boundarySmoothingAffricateToVowelVoicingHold`, `boundarySmoothingStopToVowelVoicingHold`
 
 #### Transition coverage
 
@@ -1689,6 +1708,25 @@ At 4x speed with a 25ms vowel: default allows 19ms fade / 6ms steady. With floor
 - Aspiration-dominant tokens (/h/, voiceless fricatives) are automatically skipped — they keep their natural crisp onset.
 - If consonant-to-consonant transitions sound harsh, the generic fallback (10ms) may need tuning for your language.
 - The pre-silence protection skips the nasal F1 override too — utterance-final nasalized vowels hold steady rather than snapping. This is correct behavior but worth monitoring if your language has prominent final nasal vowels (e.g. French).
+
+**Per-parameter envelope timing:**
+
+The source hold and voicing hold ratios create temporal structure within crossfades. Instead of all parameters blending at the same rate, each source type transitions on its own schedule:
+
+```
+Example: affricateToVowelHold=0.40, affricateToVowelVoicingHold=0.25
+
+  0–25%:   frication=HIGH, voicing=ZERO    → pure affricate release
+  25–40%:  frication=HIGH, voicing=ramping  → overlap zone (both active)
+  40–100%: frication=fading, voicing=ramping → transition to vowel
+```
+
+All ratios are proportional — they scale with speech rate automatically. At rate 0 with a 10ms crossfade, 25% = 2.5ms. At rate 50 with a 5ms crossfade, 25% = 1.25ms. Both produce audible temporal separation.
+
+- If affricates (/tʃ/, /dʒ/) sound "stringy" or disappear at high rates: increase `affricateToVowelHold` (more frication persistence) and `affricateToVowelVoicingHold` (more separation from following vowel). The en-us defaults (0.40 / 0.25) were tuned for clarity up to rate ~50.
+- If stops sound too abrupt or "clicky": a small `stopToVowelVoicingHold` (0.05–0.15) gives the burst a moment to ring before voicing begins.
+- Languages with short VOT (e.g. Spanish) may want lower or zero voicing hold; languages with long VOT or aspiration (e.g. English, Hindi) benefit from higher values.
+- Fricatives have no voicing hold by default — they are often voiced themselves (/v/, /z/, /ð/), so delaying voicing onset would be counterproductive.
 
 ### Trajectory limiting
 
@@ -2142,6 +2180,7 @@ Think of a vowel as resonances (formants). The important ones are F1–F3.
 
 **Formant center frequencies** define where the resonances are (in Hz-ish units):
 - `cf1`, `cf2`, `cf3`, `cf4`, `cf5`, `cf6` — "Cascade" formant frequencies. F1–F3 matter most for vowel identity.
+- `cf7`, `cf8` — Higher formant frequencies (defaults: 6500 Hz, 7500 Hz). These add presence to fricatives via parallel resonators. Per-phoneme tuning is rarely needed — natural variation is only ~60 Hz across vowels, and what matters more is scaling with vocal-tract length, which the existing F4-widening voice parameter already handles.
 - `pf1`, `pf2`, `pf3`, `pf4`, `pf5`, `pf6` — "Parallel" formant frequencies. Usually matched to the `cf*` values.
 
 Quick intuition:
@@ -2151,7 +2190,7 @@ Quick intuition:
 - Lower `cf3` → more "r-colored" (rhotic vowels)
 
 **Bandwidths** define how wide each resonance is:
-- `cb1..cb6` and `pb1..pb6`
+- `cb1..cb6`, `cb7`, `cb8`, and `pb1..pb6`
 
 Quick intuition:
 - Narrow bandwidth (small numbers) → very "ringy / boxy / hollow"
