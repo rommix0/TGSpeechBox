@@ -480,10 +480,10 @@ settings:
         position: word-final
         action: scale
         fieldScales:
-          fricationAmplitude: 0.80
-          pa4: 0.80
-          pa5: 0.70
-          pa6: 0.55
+          fricationAmplitude: 0.85
+          pa4: 0.85
+          pa5: 0.80
+          pa6: 0.65
 
     # ── Post-nasal /d/ burst softening ──────────────────────────────
     # /nd/ clusters ("calendar", "understand") sound affricated on small
@@ -747,7 +747,7 @@ settings:
     minimumDurations:
       vowelMs: 20     # formant identity needs ~20 to 30ms to establish F1/F2
       fricativeMs: 18       # spectral noise identity needs multiple cycles
-      stopMs: 4             # already tiny — protect what's left of the burst
+      stopMs: 6             # protect burst audibility after diphthongs/vowels
       nasalMs: 18           # place perception (/ɲ/ vs /n/ vs /ŋ/)
       liquidMs: 15           # /ɹ/ and /l/ need F3 transition time
       affricateMs: 15        # modest bump from 12, preserves some frication
@@ -758,7 +758,7 @@ settings:
 
     # Word-final segments carry morphological load in English:
     # plural /s/, past tense /d/, possessive /z/. Extra protection.
-    wordFinalBonusMs: 5
+    wordFinalBonusMs: 8
 
     # Let floors shrink at extreme speeds so rate boost can push past
     # the normal ceiling.  0.5 = floors halve at max speed.
