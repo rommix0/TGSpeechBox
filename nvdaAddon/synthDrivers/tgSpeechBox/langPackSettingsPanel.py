@@ -327,6 +327,11 @@ def _getPanelClass():
                 "boundarySmoothing.withinSyllableFadeScale",
                 "boundarySmoothing.withinSyllableScale",
                 "boundarySmoothing.highRateFadeRatioFloor",
+                "boundarySmoothing.affricateToVowelHold",
+                "boundarySmoothing.fricativeToVowelHold",
+                "boundarySmoothing.stopToVowelHold",
+                "boundarySmoothing.affricateToVowelVoicingHold",
+                "boundarySmoothing.stopToVowelVoicingHold",
 
                 # --- Cluster blend ---
                 "clusterBlend.defaultPairScale",

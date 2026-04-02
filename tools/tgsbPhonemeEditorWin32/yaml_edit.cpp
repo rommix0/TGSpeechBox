@@ -636,6 +636,11 @@ static const NestedKeyMapping kNestedMappings[] = {
   {"boundarySmoothingVowelToNasalFadeMs", "boundarySmoothing", nullptr},
   {"boundarySmoothingVowelToStopFadeMs", "boundarySmoothing", nullptr},
   {"boundarySmoothingVowelToVowelFadeMs", "boundarySmoothing", nullptr},
+  {"boundarySmoothingAffricateToVowelHold", "boundarySmoothing", nullptr},
+  {"boundarySmoothingFricativeToVowelHold", "boundarySmoothing", nullptr},
+  {"boundarySmoothingStopToVowelHold", "boundarySmoothing", nullptr},
+  {"boundarySmoothingAffricateToVowelVoicingHold", "boundarySmoothing", nullptr},
+  {"boundarySmoothingStopToVowelVoicingHold", "boundarySmoothing", nullptr},
 
   // clusterTiming settings
   {"clusterTimingEnabled", "clusterTiming", nullptr},

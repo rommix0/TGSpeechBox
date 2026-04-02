@@ -931,6 +931,31 @@ msgstr "Határsimítás: Szótagon belüli skála"
 
 #. Setting key display name
 #: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Affricate To Vowel Hold"
+msgstr "Határsimítás: Zár-réshangtól magánhangzóra tartás"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Fricative To Vowel Hold"
+msgstr "Határsimítás: Réshangtól magánhangzóra tartás"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Stop To Vowel Hold"
+msgstr "Határsimítás: Zárhangtól magánhangzóra tartás"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Affricate To Vowel Voicing Hold"
+msgstr "Határsimítás: Zár-réshangtól magánhangzóra zöngésítés tartás"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Stop To Vowel Voicing Hold"
+msgstr "Határsimítás: Zárhangtól magánhangzóra zöngésítés tartás"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
 msgid "Clause Final Fade (ms)"
 msgstr "Tagmondat végi elhalkulás (ms)"
 

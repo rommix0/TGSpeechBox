@@ -404,6 +404,11 @@ class LanguagePack:
     boundary_smoothing_nasal_f1_instant: bool = True
     boundary_smoothing_nasal_f2_f3_spans_phone: bool = True
     boundary_smoothing_high_rate_fade_ratio_floor: float = 0.40
+    boundary_smoothing_affricate_to_vowel_hold: float = 0.0
+    boundary_smoothing_fricative_to_vowel_hold: float = 0.0
+    boundary_smoothing_stop_to_vowel_hold: float = 0.0
+    boundary_smoothing_affricate_to_vowel_voicing_hold: float = 0.0
+    boundary_smoothing_stop_to_vowel_voicing_hold: float = 0.0
     coda_noise_taper_enabled: bool = True
     coda_noise_taper_pre_gain: float = 0.40
     coda_noise_taper_early_fric_scale: float = 0.45
@@ -935,6 +940,11 @@ def _merge_settings(lp: LanguagePack, s: dict):
     lp.boundary_smoothing_within_syllable_scale = gn("boundarySmoothingWithinSyllableScale", lp.boundary_smoothing_within_syllable_scale)
     lp.boundary_smoothing_within_syllable_fade_scale = gn("boundarySmoothingWithinSyllableFadeScale", lp.boundary_smoothing_within_syllable_fade_scale)
     lp.boundary_smoothing_high_rate_fade_ratio_floor = gn("boundarySmoothingHighRateFadeRatioFloor", lp.boundary_smoothing_high_rate_fade_ratio_floor)
+    lp.boundary_smoothing_affricate_to_vowel_hold = gn("boundarySmoothingAffricateToVowelHold", lp.boundary_smoothing_affricate_to_vowel_hold)
+    lp.boundary_smoothing_fricative_to_vowel_hold = gn("boundarySmoothingFricativeToVowelHold", lp.boundary_smoothing_fricative_to_vowel_hold)
+    lp.boundary_smoothing_stop_to_vowel_hold = gn("boundarySmoothingStopToVowelHold", lp.boundary_smoothing_stop_to_vowel_hold)
+    lp.boundary_smoothing_affricate_to_vowel_voicing_hold = gn("boundarySmoothingAffricateToVowelVoicingHold", lp.boundary_smoothing_affricate_to_vowel_voicing_hold)
+    lp.boundary_smoothing_stop_to_vowel_voicing_hold = gn("boundarySmoothingStopToVowelVoicingHold", lp.boundary_smoothing_stop_to_vowel_voicing_hold)
     lp.coda_noise_taper_enabled = gb("codaNoiseTaperEnabled", lp.coda_noise_taper_enabled)
     lp.coda_noise_taper_pre_gain = gn("codaNoiseTaperPreGain", lp.coda_noise_taper_pre_gain)
     lp.coda_noise_taper_early_fric_scale = gn("codaNoiseTaperEarlyFricScale", lp.coda_noise_taper_early_fric_scale)
@@ -1214,6 +1224,11 @@ def _merge_settings(lp: LanguagePack, s: dict):
         lp.boundary_smoothing_within_syllable_scale = _gn_from(_bs, "withinSyllableScale", lp.boundary_smoothing_within_syllable_scale)
         lp.boundary_smoothing_within_syllable_fade_scale = _gn_from(_bs, "withinSyllableFadeScale", lp.boundary_smoothing_within_syllable_fade_scale)
         lp.boundary_smoothing_high_rate_fade_ratio_floor = _gn_from(_bs, "highRateFadeRatioFloor", lp.boundary_smoothing_high_rate_fade_ratio_floor)
+        lp.boundary_smoothing_affricate_to_vowel_hold = _gn_from(_bs, "affricateToVowelHold", lp.boundary_smoothing_affricate_to_vowel_hold)
+        lp.boundary_smoothing_fricative_to_vowel_hold = _gn_from(_bs, "fricativeToVowelHold", lp.boundary_smoothing_fricative_to_vowel_hold)
+        lp.boundary_smoothing_stop_to_vowel_hold = _gn_from(_bs, "stopToVowelHold", lp.boundary_smoothing_stop_to_vowel_hold)
+        lp.boundary_smoothing_affricate_to_vowel_voicing_hold = _gn_from(_bs, "affricateToVowelVoicingHold", lp.boundary_smoothing_affricate_to_vowel_voicing_hold)
+        lp.boundary_smoothing_stop_to_vowel_voicing_hold = _gn_from(_bs, "stopToVowelVoicingHold", lp.boundary_smoothing_stop_to_vowel_voicing_hold)
 
     if "syllableStructure" in s and isinstance(s["syllableStructure"], dict):
         _ss = s["syllableStructure"]

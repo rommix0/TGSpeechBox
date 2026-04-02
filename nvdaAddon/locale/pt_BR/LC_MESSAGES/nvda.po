@@ -931,6 +931,31 @@ msgstr "Suavização de Limites: Escala Intrassilábica"
 
 #. Setting key display name
 #: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Affricate To Vowel Hold"
+msgstr "Suavização de Limites: Retenção de Africada para Vogal"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Fricative To Vowel Hold"
+msgstr "Suavização de Limites: Retenção de Fricativa para Vogal"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Stop To Vowel Hold"
+msgstr "Suavização de Limites: Retenção de Oclusiva para Vogal"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Affricate To Vowel Voicing Hold"
+msgstr "Suavização de Limites: Retenção de Sonorização de Africada para Vogal"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
+msgid "Boundary Smoothing: Stop To Vowel Voicing Hold"
+msgstr "Suavização de Limites: Retenção de Sonorização de Oclusiva para Vogal"
+
+#. Setting key display name
+#: synthDrivers/tgspeechbox/langPackSettingsPanel.py
 msgid "Clause Final Fade (ms)"
 msgstr "Desvanecer Final de Cláusula (ms)"
 
