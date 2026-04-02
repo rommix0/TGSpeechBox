@@ -242,9 +242,10 @@ settings:
       "ɔ ɪ": 1.15         # CHOICE — wide
       "e ɪ": 0.95         # FACE — narrow, fine short
       "o ʊ": 0.85         # GOAT — narrow; keep short for "social", "combobox"
+      "ɛ ɹ": 1.40         # SQUARE — wide F3 sweep (2500→1620), needs time
     durationFloorMs: 50
-    rateCompensation: 0.15
-    onsetHoldExponent: 1.3
+    rateCompensation: 0.30
+    onsetHoldExponent: 1.6
     microFrameIntervalMs: 8
     onsetSettleMs: 12
   lengthContrast:

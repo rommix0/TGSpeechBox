@@ -43,6 +43,15 @@ static inline bool tokIsVowelOrSemivowel(const Token& t) {
   return t.def && ((t.def->flags & (kIsVowel | kIsSemivowel)) != 0);
 }
 
+// Rhotic diphthongs: eSpeak ties vowel+/ɹ/ (e.g. /ɛ͡ɹ/ in "shared").
+// Without this, collapse skips the pair because /ɹ/ is a liquid, leaving
+// /ɛ/ and /ɹ/ as two short tokens with no micro-frame formant sweep —
+// the vowel quality vanishes at high rates.  Same pattern as the Spanish
+// semivowel offglide fix.
+static inline bool tokIsValidOffglide(const Token& t) {
+  return t.def && ((t.def->flags & (kIsVowel | kIsSemivowel | kIsLiquid)) != 0);
+}
+
 } // namespace
 
 bool runDiphthongCollapse(
@@ -80,7 +89,7 @@ bool runDiphthongCollapse(
     Token& a = tokens[i];
     Token& b = tokens[i + 1];
 
-    if (!a.tiedTo || !b.tiedFrom || !tokIsVowel(a) || !tokIsVowelOrSemivowel(b)) {
+    if (!a.tiedTo || !b.tiedFrom || !tokIsVowel(a) || !tokIsValidOffglide(b)) {
       ++i;
       continue;
     }
