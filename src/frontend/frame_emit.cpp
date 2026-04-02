@@ -159,8 +159,8 @@ static void generateAcousticEvents(
   const int fa = static_cast<int>(FieldId::fricationAmplitude);
 
   // Trill modulation constants
-  constexpr double kTrillCloseFactor = 0.22;
-  constexpr double kTrillCloseFrac = 0.28;
+  constexpr double kTrillCloseFactor = 0.0;   // full gating — square wave amplitude envelope
+  constexpr double kTrillCloseFrac = 0.50;    // 50% duty cycle
   constexpr double kTrillFricFloor = 0.12;
   constexpr double kMinPhaseMs = 0.25;
 
@@ -710,10 +710,7 @@ static void generateAcousticEvents(
         openMs = std::max(kMinPhaseMs, cycleMs - closeMs);
       }
 
-      double microFadeMs = pack.lang.trillModulationFadeMs;
-      if (microFadeMs <= 0.0) {
-        microFadeMs = std::min(2.0, cycleMs * 0.12);
-      }
+      double microFadeMs = 0.25;  // hard edges for percussive trill character
 
       const bool hasVoiceAmp = ((mask & (1ull << va)) != 0);
       const bool hasFricAmp = ((mask & (1ull << fa)) != 0);
