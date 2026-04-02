@@ -119,6 +119,13 @@ normalization:
     - from: "ts"
       to: "t͡s"
 
+  preReplacements:
+    # eSpeak number expansion concatenates morphemes, creating geminate /ss/
+    # at boundaries (e.g. "200" → "dossjentos" from dos+cientos with seseo).
+    # Spanish has no geminate /ss/ — deduplicate before dialect s→s_es/s_mx.
+    - from: "ss"
+      to: "s"
+
   replacements:
     # Pronounciation-level normalization rules:
     # Palatal nasal: some tables emit ñ as nʲ (or n͡ʲ). Map it to /ɲ/ so it doesn't collapse to plain /n/.
