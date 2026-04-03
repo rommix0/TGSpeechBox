@@ -67,6 +67,11 @@ settings:
   # Auto-tie vowel+semivowel pairs into diphthongs so collapse pass
   # gives them proper formant interpolation (fixes /ei/, /eu/ offglides).
   autoTieDiphthongs: true
+  # Keep /ɪ_es/ as the offglide — don't replace with base /j/.
+  # The ɪ→ɪ_es replacement gives Spanish-tuned formants; the default
+  # offglide-to-semivowel swap bypasses that, producing a /j/ with
+  # near-identical F2 to /e/, making the diphthong inaudible.
+  autoDiphthongOffglideToSemivowel: false
 
   allophoneRulesEnabled: true
   allophoneRules:
@@ -293,9 +298,13 @@ normalization:
     # More clear diphthong transition for /j/.
     - from: j
       to: j_es
-    # In Spanish, ɪ is a semivowel, part of the glides.
+    # In Spanish, ɪ and ʊ are diphthong glides (semivowels), not lax
+    # vowels.  The _es variants have peripheral formants near cardinal
+    # /i/ and /u/ (Quilis 1981, Martínez Celdrán).
     - from: "ɪ"
       to: "ɪ_es"
+    - from: "ʊ"
+      to: "ʊ_es"
     # Yeísmo (neutral):
     - from: "ʎ"
       to: "ʎ_es"

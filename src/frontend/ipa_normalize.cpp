@@ -51,6 +51,24 @@ namespace nvsp_frontend {
 
 using ipa_internal::isTieBar;
 
+// IPA vowel codepoint check — used to distinguish diphthong ties (e͡ɪ)
+// from affricate ties (t͡s) in the replacement guard.
+static bool isIpaVowelChar(char32_t c) {
+  switch (c) {
+    case U'a': case U'e': case U'i': case U'o': case U'u': case U'y':
+    case U'\u0251': case U'\u00E6': case U'\u025B': case U'\u026A':
+    case U'\u0254': case U'\u0259': case U'\u028A': case U'\u028C':
+    case U'\u0252': case U'\u025C': case U'\u0250': case U'\u0264':
+    case U'\u0275': case U'\u0258': case U'\u025E': case U'\u0276':
+    case U'\u0268': case U'\u0289': case U'\u026F': case U'\u025D':
+    case U'\u025A': case U'\u00F8': case U'\u1D7B': case U'\u1D7F':
+    case U'\u00E4':  // ä (used in en-us MOUTH)
+      return true;
+    default:
+      return false;
+  }
+}
+
 namespace {
 
 // ============================================================================
@@ -427,11 +445,29 @@ static void applyRules(std::u32string& text, const PackSet& pack, const std::vec
           }
         }
 
-        // Don't replace inside a tied sequence.  A tie bar immediately
-        // before the match means this phoneme is bound to its predecessor
-        // (e.g. "s" inside "t͡s") and must not be split out independently.
+        // Don't replace inside a tied AFFRICATE sequence.  A tie bar
+        // immediately before the match means this phoneme is bound to its
+        // predecessor (e.g. "s" inside "t͡s") and must not be split out.
+        // But diphthong ties (e͡ɪ, a͡ɪ, o͡ʊ) must allow replacement so
+        // the offglide gets its language-specific variant (ɪ→ɪ_es).
+        // Distinguish by checking whether the char before the tie bar
+        // is a vowel (diphthong) or consonant (affricate).
         if (ok && matchStart > 0 && isTieBar(text[matchStart - 1])) {
-          ok = false;
+          // Find the character before the tie bar.
+          bool isDiphthongTie = false;
+          if (matchStart >= 2) {
+            char32_t preTie = text[matchStart - 2];
+            // Skip stress/prosody marks to find the actual phoneme.
+            size_t scan = matchStart - 2;
+            while (scan > 0 && !isIpaVowelChar(preTie) &&
+                   (preTie == U'\u02C8' || preTie == U'\u02CC' ||  // ˈ ˌ
+                    preTie == U'\u02D0' || preTie == U'\u02D1')) {  // ː ˑ
+              --scan;
+              preTie = text[scan];
+            }
+            isDiphthongTie = isIpaVowelChar(preTie);
+          }
+          if (!isDiphthongTie) ok = false;
         }
 
         if (traceThis) {
@@ -585,6 +621,26 @@ std::u32string normalizeIpaText(const PackSet& pack, const std::string& ipaUtf8)
   replaceAll(t, U"\u026B\u0329", U"\u0259l");
   replaceAll(t, U"\u0259\u0361l", U"\u0259l");
   replaceAll(t, U"\u028A\u0361l", U"\u0259l");
+
+  // Strip diphthong tie bars (vowel͡vowel).  eSpeak marks diphthongs
+  // with tie bars (e͡ɪ, a͡ɪ, o͡ʊ) which block dialect replacements
+  // (ɪ→ɪ_es, ʊ→ʊ_es) because the tie bar guard protects against
+  // splitting affricates.  Removing them here is safe: autoTieDiphthongs
+  // will re-tie vowel pairs later.  Affricate tie bars (t͡s, t͡ʃ, d͡ʒ)
+  // are preserved — both sides are consonants.
+  {
+    std::u32string cleaned;
+    cleaned.reserve(t.size());
+    for (size_t i = 0; i < t.size(); ++i) {
+      if (isTieBar(t[i]) && i > 0 && i + 1 < t.size() &&
+          isIpaVowelChar(t[i - 1]) && isIpaVowelChar(t[i + 1])) {
+        continue;  // strip vowel͡vowel tie bar
+      }
+      cleaned.push_back(t[i]);
+    }
+    t = std::move(cleaned);
+  }
+
   // Allophone digits (eSpeak often uses '2').
   if (pack.lang.stripAllophoneDigits) {
     // Keep 1-5 for tone digits if tonal.
