@@ -701,6 +701,7 @@ std::string runTextParser(
   // words (e.g. "quote", ".") that eSpeak doesn't phonemize.  Skip
   // text words with no alpha content when advancing the IPA index.
   bool hadIpaSplice = false;
+  std::unordered_set<size_t> splicedChunks;  // IPA-overridden chunks — skip stress correction
   if (!ipaOverrides.empty()) {
     size_t ipaIdx = 0;
     for (size_t i = 0; i < textWords.size(); ++i) {
@@ -739,6 +740,7 @@ std::string runTextParser(
           }
         }
         ipaChunks[ipaIdx] = std::move(spliced);
+        splicedChunks.insert(ipaIdx);
         hadIpaSplice = true;
       }
       ++ipaIdx;
@@ -1014,6 +1016,10 @@ std::string runTextParser(
   bool anyChange = false;
 
   for (size_t i = 0; i < textWords.size(); ++i) {
+    // IPA-overridden chunks already have correct stress from the dict
+    // entry — don't let the stress dict re-pattern them (it can corrupt
+    // the \x1F-delimited phoneme sequence).
+    if (splicedChunks.count(i)) continue;
     std::string corrected = correctStress(textWords[i], ipaChunks[i], stressDict, compoundMap, legalOnsets);
     if (corrected != ipaChunks[i]) {
       ipaChunks[i] = std::move(corrected);
